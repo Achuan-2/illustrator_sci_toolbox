@@ -1326,3 +1326,27 @@ function addBorder(color, thickness, dash, autoGroup) {
 
     return "Success";
 }
+
+
+function updateLabelOffsets(offsetX, offsetY, sessionId) {
+    if (app.documents.length === 0) return "Error: No document open.";
+
+    var doc = app.activeDocument;
+    var validCount = 0;
+
+    for (var i = 0; i < doc.textFrames.length; i++) {
+        var tf = doc.textFrames[i];
+        var note = tf.note;
+        if (!note || note.indexOf("sid") === -1) continue;
+
+        try {
+            var data = eval('(' + note + ')');
+            if (data && data.sid == sessionId) {
+                tf.left = data.baseL + offsetX;
+                tf.top = data.baseT - offsetY;
+                validCount++;
+            }
+        } catch (e) { }
+    }
+    return "Success";
+}
