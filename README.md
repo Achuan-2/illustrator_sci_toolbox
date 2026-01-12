@@ -3,6 +3,9 @@
 [English](README_EN.md) | 简体中文
 </div>
 
+<img width="2406" height="762" alt="image" src="https://github.com/user-attachments/assets/c719fa09-747f-452f-852e-108c0f80862a" />
+
+
 [![Star History Chart](https://api.star-history.com/svg?repos=Achuan-2/illustrator_sci_toolbox&type=Date)](https://www.star-history.com/#Achuan-2/illustrator_sci_toolbox&Date)
 
 
