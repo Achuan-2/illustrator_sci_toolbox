@@ -9,7 +9,7 @@ body:
 
         我需要的功能我会慢慢改进（打赏可以催更）；有些我觉得可以改进但现阶段不必要的功能，需要打赏才考虑实现（会标注“打赏”标签和所需金额）；我不需要的功能或实现成本极高的功能会直接关闭 issue，不予考虑。
 
-        请不要不经思考随意提大量 issue，因为这会打扰到我并浪费我阅读 issue 的时间。
+        请不要不经思考随意提大量 issue，因为这会打扰到我并浪费我的时间。
   - type: checkboxes
     attributes:
       label: 是否已搜索现有 Issue？
@@ -17,22 +17,6 @@ body:
         请先在现有 Issue 中搜索，避免重复提交相同问题。
       options:
         - label: 我已搜索过现有 Issue
-          required: true
-  - type: checkboxes
-    attributes:
-      label: 是否能在默认主题（白天/夜间）复现？
-      description: |
-        请确认该问题是否在默认主题下可复现，便于排查与主题相关的问题。
-      options:
-        - label: 我在默认主题下能复现该问题
-          required: true
-  - type: checkboxes
-    attributes:
-      label: 是否排除扩展影响？
-      description: |
-        主题、代码片段、插件等扩展可能导致问题，请尽量排除扩展影响后再提交问题。
-      options:
-        - label: 我已排除扩展导致问题的可能性
           required: true
   - type: textarea
     attributes:
@@ -61,7 +45,6 @@ body:
       value: |
         - 版本：
         - 操作系统：
-        - 浏览器（若使用）：
       render: markdown
     validations:
       required: true
