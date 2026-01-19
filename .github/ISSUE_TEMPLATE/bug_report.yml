@@ -54,6 +54,8 @@ body:
       description: |
         为了加速实现，可选打赏支持。请说明是否愿意打赏支持及标注打赏金额，已打赏用户标注过去打赏过的金额。
         ![打赏链接](https://fastly.jsdelivr.net/gh/Achuan-2/PicBed/assets/20241128221208-2024-11-28.png)
+    validations:
+      required: true
   - type: textarea
     attributes:
       label: 其他信息（可选）
