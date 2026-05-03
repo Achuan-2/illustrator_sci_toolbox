@@ -37,6 +37,11 @@ var useUniformHeightCheckbox = document.querySelector("#use-uniform-height");
 var arrangeOrderSelect = document.querySelector("#arrange-order");
 var arrangeReverseOrderCheckbox = document.querySelector("#arrange-reverse-order");
 
+// Grid Arrange UI
+var gridRowGapInput = document.querySelector("#grid-row-gap");
+var gridColGapInput = document.querySelector("#grid-col-gap");
+var gridArrangeButton = document.querySelector("#grid-arrange-button");
+
 // Distribute spacing UI
 var distributeVerticalButton = document.querySelector("#distribute-vertical-button");
 var distributeHorizontalButton = document.querySelector("#distribute-horizontal-button");
@@ -90,6 +95,7 @@ var autoGroupBorderCheckbox = document.querySelector("#auto-group-border");
 
 // Event Listeners
 arrangeButton.addEventListener("click", handleArrange);
+gridArrangeButton.addEventListener("click", handleGridArrange);
 addLabelButton.addEventListener("click", handleAddLabel);
 updateLabelButton.addEventListener("click", handleUpdateLabel);
 filterTextButton.addEventListener("click", handleFilterText);
@@ -294,6 +300,23 @@ function handleArrange() {
     `, function (result) {
         if (result === 'EvalScript error.') {
             alert('Error executing the script');
+        }
+    });
+}
+
+function handleGridArrange() {
+    console.log("Grid Arrange button clicked");
+    var rowGap = parseFloat(gridRowGapInput.value);
+    if (isNaN(rowGap)) rowGap = 1;
+    if (rowGap < 0) rowGap = 0;
+    var colGap = parseFloat(gridColGapInput.value);
+    if (isNaN(colGap)) colGap = 1;
+    if (colGap < 0) colGap = 0;
+
+    csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
+    csInterface.evalScript(`gridArrange(${rowGap}, ${colGap})`, function (result) {
+        if (result === 'EvalScript error.') {
+            alert('Error executing the Grid Arrange script');
         }
     });
 }

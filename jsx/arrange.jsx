@@ -301,6 +301,110 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
     }
 }
 
+function detectGrid(selection) {
+    var items = [];
+    for (var i = 0; i < selection.length; i++) {
+        var info = getVisibleInfo(selection[i]);
+        items.push({
+            item: selection[i],
+            cx: (info.left + info.right) / 2,
+            cy: (info.top + info.bottom) / 2,
+            info: info
+        });
+    }
+
+    items.sort(function (a, b) { return b.cy - a.cy; });
+
+    var avgH = 0;
+    for (var i = 0; i < items.length; i++) {
+        avgH += items[i].info.height;
+    }
+    avgH = avgH / items.length;
+    var thresholdY = avgH * 0.5;
+    if (thresholdY < 1) thresholdY = 1;
+
+    var rows = [];
+    var currentRow = [items[0]];
+    var rowMeanCy = items[0].cy;
+
+    for (var i = 1; i < items.length; i++) {
+        if (Math.abs(items[i].cy - rowMeanCy) <= thresholdY) {
+            currentRow.push(items[i]);
+            rowMeanCy = 0;
+            for (var j = 0; j < currentRow.length; j++) rowMeanCy += currentRow[j].cy;
+            rowMeanCy = rowMeanCy / currentRow.length;
+        } else {
+            currentRow.sort(function (a, b) { return a.cx - b.cx; });
+            rows.push(currentRow);
+            currentRow = [items[i]];
+            rowMeanCy = items[i].cy;
+        }
+    }
+    currentRow.sort(function (a, b) { return a.cx - b.cx; });
+    rows.push(currentRow);
+
+    return rows;
+}
+
+function gridArrange(rowGap, colGap) {
+    if (app.documents.length === 0) return;
+
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+
+    if (!selection || selection.length === 0) {
+        alert("Please select items to arrange");
+        return;
+    }
+    if (selection.length < 2) {
+        alert("Grid Arrange requires at least 2 items");
+        return;
+    }
+
+    var rows = detectGrid(selection);
+    var numRows = rows.length;
+    var numCols = 0;
+    for (var r = 0; r < numRows; r++) {
+        if (rows[r].length > numCols) numCols = rows[r].length;
+    }
+
+    var rowGapPt = mmToPoints(rowGap);
+    var colGapPt = mmToPoints(colGap);
+
+    var startX = rows[0][0].info.left;
+    var startY = rows[0][0].info.top;
+
+    var colWidths = [];
+    for (var c = 0; c < numCols; c++) {
+        colWidths[c] = 0;
+        for (var r = 0; r < numRows; r++) {
+            if (c < rows[r].length && rows[r][c].info.width > colWidths[c]) {
+                colWidths[c] = rows[r][c].info.width;
+            }
+        }
+    }
+
+    var rowHeights = [];
+    for (var r = 0; r < numRows; r++) {
+        rowHeights[r] = 0;
+        for (var c = 0; c < rows[r].length; c++) {
+            if (rows[r][c].info.height > rowHeights[r]) {
+                rowHeights[r] = rows[r][c].info.height;
+            }
+        }
+    }
+
+    var currentY = startY;
+    for (var r = 0; r < numRows; r++) {
+        var currentX = startX;
+        for (var c = 0; c < rows[r].length; c++) {
+            moveItemTopLeftTo(rows[r][c].item, currentX, currentY);
+            currentX += colWidths[c] + colGapPt;
+        }
+        currentY -= rowHeights[r] + rowGapPt;
+    }
+}
+
 function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOffsetY, labelTemplate, fontColor, order, reverseOrder, startCount, sessionId) {
     if (app.documents.length === 0) return "Error: No document open.";
 
