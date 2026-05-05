@@ -1350,3 +1350,242 @@ function updateLabelOffsets(offsetX, offsetY, sessionId) {
     }
     return "Success";
 }
+
+function formatClipRect(color, strokeWidth) {
+    if (app.documents.length === 0) return "Error: No document open.";
+    var doc = app.activeDocument;
+    var sel = doc.selection;
+    if (!sel || sel.length === 0) return "Error: Please select rectangle shapes.";
+
+    var r = 0, g = 0, b = 0;
+    try {
+        if (typeof color === 'string' && color.charAt(0) === '#' && color.length >= 7) {
+            r = parseInt(color.substr(1, 2), 16) || 0;
+            g = parseInt(color.substr(3, 2), 16) || 0;
+            b = parseInt(color.substr(5, 2), 16) || 0;
+        }
+    } catch (e) {}
+    var rgbColor = new RGBColor();
+    rgbColor.red = r;
+    rgbColor.green = g;
+    rgbColor.blue = b;
+
+    var w = (typeof strokeWidth === 'number') ? strokeWidth : 1;
+
+    var count = 0;
+    for (var i = 0; i < sel.length; i++) {
+        if (sel[i].typename === "PathItem" || sel[i].typename === "CompoundPathItem") {
+            sel[i].filled = false;
+            sel[i].stroked = true;
+            sel[i].strokeColor = rgbColor;
+            sel[i].strokeWidth = w;
+            try { sel[i].strokeDashes = []; } catch (e) {}
+            count++;
+        }
+    }
+    if (count === 0) return "Error: No PathItem shapes found. Draw rectangles with the Rectangle tool (M) first.";
+    return "Success";
+}
+
+function arrayClip(gapMm) {
+    if (app.documents.length === 0) return "Error: No document open.";
+    var doc = app.activeDocument;
+    var sel = doc.selection;
+    if (!sel || sel.length < 2) return "Error: Select at least 1 clip rectangle and 1 image.";
+
+    var images = [];
+    var clipRects = [];
+    for (var i = 0; i < sel.length; i++) {
+        if (sel[i].typename === "PathItem") clipRects.push(sel[i]);
+        else images.push(sel[i]);
+    }
+    if (images.length < 1) return "Error: No images found (non-PathItem objects required).";
+    if (clipRects.length < 1) return "Error: No clip rectangles found (PathItem objects required).";
+
+    var imgInfos = [];
+    for (var i = 0; i < images.length; i++) {
+        imgInfos.push(getVisibleInfo(images[i]));
+    }
+
+    var mode;
+    if (images.length === 1) {
+        mode = "column";
+    } else {
+        var minLeft = Infinity, maxLeft = -Infinity;
+        var minTop = Infinity, maxTop = -Infinity;
+        for (var i = 0; i < imgInfos.length; i++) {
+            if (imgInfos[i].left < minLeft) minLeft = imgInfos[i].left;
+            if (imgInfos[i].left > maxLeft) maxLeft = imgInfos[i].left;
+            if (imgInfos[i].top < minTop) minTop = imgInfos[i].top;
+            if (imgInfos[i].top > maxTop) maxTop = imgInfos[i].top;
+        }
+        mode = (maxTop - minTop > maxLeft - minLeft) ? "column" : "row";
+    }
+
+    var indices = [];
+    for (var i = 0; i < images.length; i++) indices.push(i);
+    if (mode === "column") {
+        indices.sort(function (a, b) { return imgInfos[b].top - imgInfos[a].top; });
+    } else {
+        indices.sort(function (a, b) { return imgInfos[a].left - imgInfos[b].left; });
+    }
+    var sortedImages = [], sortedInfos = [];
+    for (var i = 0; i < indices.length; i++) {
+        sortedImages.push(images[indices[i]]);
+        sortedInfos.push(imgInfos[indices[i]]);
+    }
+
+    var refW = sortedInfos[0].width, refH = sortedInfos[0].height;
+    for (var i = 1; i < sortedInfos.length; i++) {
+        if (Math.abs(sortedInfos[i].width - refW) > 1 || Math.abs(sortedInfos[i].height - refH) > 1) {
+            return "Error: All images must be the same size.";
+        }
+    }
+
+    var firstInfo = sortedInfos[0];
+    var overlappingRects = [];
+    for (var i = 0; i < clipRects.length; i++) {
+        var ri = getVisibleInfo(clipRects[i]);
+        if (ri.left < firstInfo.right && ri.right > firstInfo.left &&
+            ri.top > firstInfo.bottom && ri.bottom < firstInfo.top) {
+            overlappingRects.push(clipRects[i]);
+        }
+    }
+    if (overlappingRects.length === 0) return "Error: No clip rects overlap the first image.";
+
+    if (mode === "column") {
+        overlappingRects.sort(function (a, b) { return getVisibleInfo(a).left - getVisibleInfo(b).left; });
+    } else {
+        overlappingRects.sort(function (a, b) { return getVisibleInfo(b).top - getVisibleInfo(a).top; });
+    }
+
+    var rectOffsets = [];
+    for (var i = 0; i < overlappingRects.length; i++) {
+        var ri = getVisibleInfo(overlappingRects[i]);
+        rectOffsets.push({
+            dx: ri.left - firstInfo.left,
+            dy: ri.top - firstInfo.top,
+            w: ri.width,
+            h: ri.height
+        });
+    }
+
+    var gapPt = mmToPoints(gapMm);
+    var numImgs = sortedImages.length;
+    var numRects = overlappingRects.length;
+
+    var resultStartX, resultStartY;
+    if (mode === "column") {
+        var rightMost = -Infinity;
+        for (var i = 0; i < sortedInfos.length; i++) {
+            if (sortedInfos[i].right > rightMost) rightMost = sortedInfos[i].right;
+        }
+        resultStartX = rightMost + gapPt;
+        resultStartY = sortedInfos[0].top;
+    } else {
+        resultStartX = sortedInfos[0].left;
+        var bottomMost = Infinity;
+        for (var i = 0; i < sortedInfos.length; i++) {
+            if (sortedInfos[i].bottom < bottomMost) bottomMost = sortedInfos[i].bottom;
+        }
+        resultStartY = bottomMost - gapPt;
+    }
+
+    var clipGroups = [];
+    for (var r = 0; r < numRects; r++) {
+        clipGroups[r] = [];
+        for (var im = 0; im < numImgs; im++) {
+            var dupImg = sortedImages[im].duplicate();
+            var off = rectOffsets[r];
+            var clipLeft = sortedInfos[im].left + off.dx;
+            var clipTop = sortedInfos[im].top + off.dy;
+            var clipPath = doc.pathItems.rectangle(clipTop, clipLeft, off.w, off.h);
+            clipPath.filled = false;
+            clipPath.stroked = false;
+
+            var grp = doc.groupItems.add();
+            dupImg.move(grp, ElementPlacement.PLACEATEND);
+            clipPath.move(grp, ElementPlacement.PLACEATBEGINNING);
+            clipPath.clipping = true;
+            grp.clipped = true;
+
+            if (mode === "column") {
+                scaleItemToVisibleHeight(grp, refH);
+            } else {
+                scaleItemToVisibleWidth(grp, refW);
+            }
+            clipGroups[r][im] = grp;
+        }
+    }
+
+    var colWidths = [];
+    for (var r = 0; r < numRects; r++) {
+        var maxW = 0;
+        for (var im = 0; im < numImgs; im++) {
+            var gi = getVisibleInfo(clipGroups[r][im]);
+            if (gi.width > maxW) maxW = gi.width;
+        }
+        colWidths.push(maxW);
+    }
+    var rowHeights = [];
+    for (var im = 0; im < numImgs; im++) {
+        var maxH = 0;
+        for (var r = 0; r < numRects; r++) {
+            var gi = getVisibleInfo(clipGroups[r][im]);
+            if (gi.height > maxH) maxH = gi.height;
+        }
+        rowHeights.push(maxH);
+    }
+
+    if (mode === "column") {
+        var cx = resultStartX;
+        for (var r = 0; r < numRects; r++) {
+            var cy = resultStartY;
+            for (var im = 0; im < numImgs; im++) {
+                moveItemTopLeftTo(clipGroups[r][im], cx, cy);
+                cy -= rowHeights[im] + gapPt;
+            }
+            cx += colWidths[r] + gapPt;
+        }
+    } else {
+        var cy = resultStartY;
+        for (var im = 0; im < numImgs; im++) {
+            var cx = resultStartX;
+            for (var r = 0; r < numRects; r++) {
+                moveItemTopLeftTo(clipGroups[r][im], cx, cy);
+                cx += colWidths[r] + gapPt;
+            }
+            cy -= rowHeights[im] + gapPt;
+        }
+    }
+
+    // Copy rects to non-first images, preserving each rect's style
+    var imageRects = [];
+    imageRects[0] = overlappingRects.slice();
+    for (var im = 1; im < numImgs; im++) {
+        imageRects[im] = [];
+        for (var r = 0; r < numRects; r++) {
+            var off = rectOffsets[r];
+            var rectLeft = sortedInfos[im].left + off.dx;
+            var rectTop = sortedInfos[im].top + off.dy;
+            var newRect = doc.pathItems.rectangle(rectTop, rectLeft, off.w, off.h);
+            newRect.filled = false;
+            newRect.stroked = true;
+            // Preserve original rect's stroke color and width
+            try { newRect.strokeColor = overlappingRects[r].strokeColor; } catch (e) {}
+            try { newRect.strokeWidth = overlappingRects[r].strokeWidth; } catch (e) {}
+            imageRects[im].push(newRect);
+        }
+    }
+
+    // Group each image with its rects
+    for (var im = 0; im < numImgs; im++) {
+        var grp = doc.groupItems.add();
+        sortedImages[im].move(grp, ElementPlacement.PLACEATEND);
+        for (var r = 0; r < imageRects[im].length; r++) {
+            imageRects[im][r].move(grp, ElementPlacement.PLACEATBEGINNING);
+        }
+    }
+
+    return "Success";
+}

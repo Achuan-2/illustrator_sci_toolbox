@@ -258,6 +258,7 @@
             <div class="tab" data-target="panel-swap" data-hash="swap">Swap</div>
             <div class="tab" data-target="panel-labels" data-hash="labels">Image Labels</div>
             <div class="tab" data-target="panel-border" data-hash="border">Add Border</div>
+            <div class="tab" data-target="panel-array-clip" data-hash="arrayclip">Array Clip</div>
             <div class="tab" data-target="panel-about" data-hash="about">About</div>
         </div>
         <div class="content">
@@ -509,6 +510,55 @@
                 </div>
             </div>
             <!-- Add Border Panel -->
+            <!-- Array Clip Panel -->
+            <div class="panel" id="panel-array-clip">
+                <h4>Format Clip Rect</h4>
+                <p style="color: var(--muted); font-size: 12px; margin: 4px 0 8px;">
+                    Draw rectangles with the Rectangle tool (M), select them, then apply a preset.
+                </p>
+                <div class="grid">
+                    <div class="input-group">
+                        <label>Preset:</label>
+                        <select id="clip-rect-preset" style="flex:1"></select>
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-primary" id="format-clip-rect-button">Apply</button>
+                    <button class="btn btn-danger" id="delete-preset-button">Delete</button>
+                </div>
+                <div class="spacer"></div>
+                <h4>Add Preset</h4>
+                <div class="grid">
+                    <div class="input-group">
+                        <label>Color:</label>
+                        <input type="color" id="preset-color" value="#ff0000">
+                    </div>
+                    <div class="input-group">
+                        <label>Width (pt):</label>
+                        <input type="number" id="preset-width" value="1" min="0.1" step="0.1">
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn" id="add-preset-button">Add Preset</button>
+                </div>
+
+                <div class="spacer"></div>
+
+                <h4>Array Clip</h4>
+                <p style="color: var(--muted); font-size: 12px; margin: 4px 0 8px;">
+                    Select images + clip rectangles on the first image, then click below.
+                </p>
+                <div class="grid">
+                    <div class="input-group">
+                        <label>Gap (mm):</label>
+                        <input type="number" id="array-clip-gap" value="1" min="0" step="0.1">
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-primary" id="array-clip-button">Array Clip</button>
+                </div>
+            </div>
+
             <div class="panel" id="panel-border">
                 <div class="grid">
                     <div class="input-group">
@@ -688,6 +738,7 @@
                 else if (hash === 'labels') target = 'panel-labels';
                 else if (hash === 'size') target = 'panel-size';
                 else if (hash === 'border') target = 'panel-border';
+                else if (hash === 'arrayclip') target = 'panel-array-clip';
                 else if (hash === 'swap') target = 'panel-swap';
                 else if (hash === 'about') target = 'panel-about';
 

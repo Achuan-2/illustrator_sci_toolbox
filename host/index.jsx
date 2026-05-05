@@ -88,6 +88,49 @@ var addBorderButton = document.querySelector("#add-border-button");
 var borderDashInput = document.querySelector("#border-dash");
 var autoGroupBorderCheckbox = document.querySelector("#auto-group-border");
 
+// Array Clip UI Elements
+var formatClipRectButton = document.querySelector("#format-clip-rect-button");
+var arrayClipButton = document.querySelector("#array-clip-button");
+var arrayClipGapInput = document.querySelector("#array-clip-gap");
+var clipRectPresetSelect = document.querySelector("#clip-rect-preset");
+var presetColorInput = document.querySelector("#preset-color");
+var presetWidthInput = document.querySelector("#preset-width");
+var addPresetButton = document.querySelector("#add-preset-button");
+var deletePresetButton = document.querySelector("#delete-preset-button");
+
+var PRESET_KEY = 'clipRectPresets';
+var defaultPresets = [
+    { name: 'Red 1pt', color: '#ff0000', width: 1 },
+    { name: 'Blue 1pt', color: '#0066ff', width: 1 },
+    { name: 'Green 1pt', color: '#00cc00', width: 1 },
+    { name: 'Black 0.5pt', color: '#000000', width: 0.5 }
+];
+
+function loadPresets() {
+    try {
+        var stored = localStorage.getItem(PRESET_KEY);
+        if (stored) return JSON.parse(stored);
+    } catch (e) { }
+    return defaultPresets.slice();
+}
+
+function savePresets(presets) {
+    localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+}
+
+function refreshPresetSelect() {
+    var presets = loadPresets();
+    clipRectPresetSelect.innerHTML = '';
+    for (var i = 0; i < presets.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = presets[i].name;
+        clipRectPresetSelect.appendChild(opt);
+    }
+}
+
+refreshPresetSelect();
+
 // Event Listeners
 arrangeButton.addEventListener("click", handleArrange);
 addLabelButton.addEventListener("click", handleAddLabel);
@@ -104,6 +147,11 @@ copySizeButton.addEventListener("click", handleCopySize);
 pasteSizeButton.addEventListener("click", handlePasteSize);
 
 addBorderButton.addEventListener("click", handleAddBorder);
+
+formatClipRectButton.addEventListener("click", handleFormatClipRect);
+arrayClipButton.addEventListener("click", handleArrayClip);
+addPresetButton.addEventListener("click", handleAddPreset);
+deletePresetButton.addEventListener("click", handleDeletePreset);
 
 distributeVerticalButton.addEventListener("click", () => handleDistributeSpacing("vertical"));
 distributeHorizontalButton.addEventListener("click", () => handleDistributeSpacing("horizontal"));
@@ -681,4 +729,64 @@ function handleAddBorder() {
             alert(result);
         }
     });
+}
+
+function handleFormatClipRect() {
+    console.log("Format Clip Rect button clicked");
+    var presets = loadPresets();
+    var idx = parseInt(clipRectPresetSelect.value);
+    if (isNaN(idx) || idx < 0 || idx >= presets.length) {
+        alert("Please select a preset.");
+        return;
+    }
+    var preset = presets[idx];
+    var color = preset.color;
+    var width = preset.width;
+
+    csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
+    csInterface.evalScript(`formatClipRect("${color}", ${width})`, function (result) {
+        if (result && result.indexOf("Error:") === 0) {
+            alert(result);
+        }
+    });
+}
+
+function handleArrayClip() {
+    console.log("Array Clip button clicked");
+    var gap = parseFloat(arrayClipGapInput.value);
+    if (isNaN(gap) || gap < 0) gap = 1;
+
+    csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
+    csInterface.evalScript(`arrayClip(${gap})`, function (result) {
+        if (result && result.indexOf("Error:") === 0) {
+            alert(result);
+        }
+    });
+}
+
+function handleAddPreset() {
+    var color = presetColorInput.value;
+    var width = parseFloat(presetWidthInput.value);
+    if (isNaN(width) || width <= 0) {
+        alert("Invalid width value.");
+        return;
+    }
+    var presets = loadPresets();
+    presets.push({ name: color + " " + width + "pt", color: color, width: width });
+    savePresets(presets);
+    refreshPresetSelect();
+    clipRectPresetSelect.value = presets.length - 1;
+}
+
+function handleDeletePreset() {
+    var presets = loadPresets();
+    if (presets.length <= 1) {
+        alert("Cannot delete the last preset.");
+        return;
+    }
+    var idx = parseInt(clipRectPresetSelect.value);
+    if (isNaN(idx) || idx < 0 || idx >= presets.length) return;
+    presets.splice(idx, 1);
+    savePresets(presets);
+    refreshPresetSelect();
 }
