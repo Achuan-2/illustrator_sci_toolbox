@@ -6,7 +6,15 @@
 <img width="2406" height="762" alt="image" src="https://github.com/user-attachments/assets/c719fa09-747f-452f-852e-108c0f80862a" />
 
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Achuan-2/illustrator_sci_toolbox&type=Date)](https://www.star-history.com/#Achuan-2/illustrator_sci_toolbox&Date)
+## Star History
+
+<a href="https://www.star-history.com/?repos=Achuan-2%2Fillustrator_sci_toolbox&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Achuan-2/illustrator_sci_toolbox&type=date&theme=dark&legend=top-left&sealed_token=-oezg8f6EWOb9qHf-7P2h51krd95lWkq6wvAGw7OaEpHFYQB34wEayk1dyvTjUCbNm1f1wWi13ogYaYxk4TzXA0G0Q4ZfBqB57V2fYj0IIOidElP5gSI62tblaTqYc_VKCV5wNOXUgq2Yb10K7uBV-AqjDfLVcLjyJ0jEHG5R8f07zMTONho-UhPIJtH" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Achuan-2/illustrator_sci_toolbox&type=date&legend=top-left&sealed_token=-oezg8f6EWOb9qHf-7P2h51krd95lWkq6wvAGw7OaEpHFYQB34wEayk1dyvTjUCbNm1f1wWi13ogYaYxk4TzXA0G0Q4ZfBqB57V2fYj0IIOidElP5gSI62tblaTqYc_VKCV5wNOXUgq2Yb10K7uBV-AqjDfLVcLjyJ0jEHG5R8f07zMTONho-UhPIJtH" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Achuan-2/illustrator_sci_toolbox&type=date&legend=top-left&sealed_token=-oezg8f6EWOb9qHf-7P2h51krd95lWkq6wvAGw7OaEpHFYQB34wEayk1dyvTjUCbNm1f1wWi13ogYaYxk4TzXA0G0Q4ZfBqB57V2fYj0IIOidElP5gSI62tblaTqYc_VKCV5wNOXUgq2Yb10K7uBV-AqjDfLVcLjyJ0jEHG5R8f07zMTONho-UhPIJtH" />
+ </picture>
+</a>
 
 
 ## 1 开发背景
