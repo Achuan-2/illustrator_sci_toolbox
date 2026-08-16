@@ -173,10 +173,10 @@
 
 ### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）
    
-如果打开插件面板显示空白，请按以下方法开启PlayerDebugMode：
+如果打开插件面板显示空白，请按以下方法开启PlayerDebugMode进行修复：
     
 - Windows 解决方法：
-  - **手动设置**：`win+r` 输入 `regedit` 打开注册表，进入 `HKEY_CURRENT_USER\Software\Adobe\`，在对应的 `CSXS.版本号`（如 CSXS.9、CSXS.10、CSXS.11 等）项下新建字符串值 `PlayerDebugMode` 并设置数值数据为 `1`。
+  - **手动设置**：`Win+R` 输入 `regedit` 打开注册表，进入 `HKEY_CURRENT_USER\Software\Adobe\`，在对应的 `CSXS.版本号`（如 CSXS.9、CSXS.10、CSXS.11 等）项下新建字符串值 `PlayerDebugMode` 并设置数值数据为 `1`。
 
     <img width="1902" height="1103" alt="image" src="https://github.com/user-attachments/assets/9d2e4b7d-201b-48e6-95ea-4dc02bdf0986" />
 
