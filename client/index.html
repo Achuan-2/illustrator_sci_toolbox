@@ -34,23 +34,24 @@
         /* 让根容器在 CEP 面板内可自适应宽度与高度 */
         .app {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             height: 100%;
             min-width: 100px;
             /* 防止过窄挤压到不可用 */
         }
 
-        /* 顶部标签栏：横向排布，可在狭窄面板时换行 */
+        /* 左侧垂直标签栏：宽度随内容自适应，窗口变窄时收缩、文字缩略显示 */
         .tabs {
             display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            border-bottom: 1px solid var(--border);
-            padding: 8px;
-            position: sticky;
-            top: 0;
+            flex-direction: column;
+            gap: 4px;
+            border-right: 1px solid var(--border);
+            padding: 8px 6px;
             background: var(--bg);
-            z-index: 2;
+            flex: 0 1 auto;
+            /* 不固定宽度：以内容宽度为准，空间不足时允许收缩（overflow 使最小宽度为 0） */
+            min-width: 0;
+            overflow-y: auto;
         }
 
         .tab {
@@ -60,8 +61,10 @@
             cursor: pointer;
             user-select: none;
             transition: all .15s ease;
-            flex: 0 1 auto;
-            /* 允许压缩 */
+            flex: 0 0 auto;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tab:hover {
@@ -76,12 +79,15 @@
 
         /* 内容区：填满剩余空间并允许滚动 */
         .content {
+            flex: 1 1 auto;
+            min-width: 0;
             padding: 12px;
             overflow: auto;
             height: 100%;
             display: flex;
             flex-direction: column;
             gap: 12px;
+            box-sizing: border-box;
         }
 
         /* 面板容器：使用 block 切换可见，但内部采用自适应布局 */
@@ -239,12 +245,11 @@
             height: 8px;
         }
 
-        /* Order 选项功能介绍：显示在下拉框下方的小字 */
-        .order-hint {
-            flex-basis: 100%;
-            font-size: 11px;
-            color: var(--muted);
-            white-space: normal;
+        /* 当前面板名称：显示在内容区顶部 */
+        .panel-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text);
         }
 
         /* Label offset editing mode styles */
@@ -259,16 +264,17 @@
 <body>
     <div class="app">
         <div class="tabs" id="tabs">
-            <div class="tab active" data-target="panel-relative" data-hash="relative">Relative Position</div>
-            <div class="tab" data-target="panel-distribute" data-hash="distribute">Spacing Set</div>
-            <div class="tab" data-target="panel-swap" data-hash="swap">Swap</div>
-            <div class="tab" data-target="panel-size" data-hash="size">Size Paste</div>
-            <div class="tab" data-target="panel-arrange" data-hash="arrange">Images Arrange</div>
-            <div class="tab" data-target="panel-labels" data-hash="labels">Image Labels</div>
-            <div class="tab" data-target="panel-border" data-hash="border">Add Border</div>
-            <div class="tab" data-target="panel-about" data-hash="about">About</div>
+            <div class="tab active" data-target="panel-relative" data-hash="relative" title="Relative Position">Relative Position</div>
+            <div class="tab" data-target="panel-distribute" data-hash="distribute" title="Spacing Set">Spacing Set</div>
+            <div class="tab" data-target="panel-swap" data-hash="swap" title="Swap">Swap</div>
+            <div class="tab" data-target="panel-size" data-hash="size" title="Size Paste">Size Paste</div>
+            <div class="tab" data-target="panel-arrange" data-hash="arrange" title="Grid Layout">Grid Layout</div>
+            <div class="tab" data-target="panel-labels" data-hash="labels" title="Image Labels">Image Labels</div>
+            <div class="tab" data-target="panel-border" data-hash="border" title="Add Border">Add Border</div>
+            <div class="tab" data-target="panel-about" data-hash="about" title="About">About</div>
         </div>
         <div class="content">
+            <div class="panel-title" id="panel-title">Relative Position</div>
             <!-- Relative Position Panel -->
             <div class="panel active" id="panel-relative">
                 <div class="grid">
@@ -299,7 +305,6 @@
                             <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
                             <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
-                        <label class="order-hint" id="relative-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse Order:</label>
@@ -327,6 +332,21 @@
             <div class="panel" id="panel-arrange">
                 <div class="grid">
                     <div class="input-group">
+                        <label>Auto Layout:</label>
+                        <input type="checkbox" id="auto-layout"
+                            title="Auto-detect rows & columns from current positions and snap items to a tidy grid (Columns input is ignored)">
+                    </div>
+                    <div class="input-group" id="align-edges-group" style="display:none">
+                        <label>Align Edges:</label>
+                        <input type="checkbox" id="align-edges"
+                            title="Align the left edge of each row's first item and the right edge of each row's last item; gaps inside a row are distributed automatically (Column Gap is ignored)">
+                    </div>
+                    <div class="input-group" id="layout-width-group" style="display:none">
+                        <label>Layout Width (mm):</label>
+                        <input type="number" id="layout-width" value="0" min="0"
+                            title="Total width between the aligned left & right edges after arranging; 0 = keep current overall width">
+                    </div>
+                    <div class="input-group" id="columns-group">
                         <label>Columns:</label>
                         <input type="number" id="columns" value="1" min="1">
                     </div>
@@ -334,7 +354,7 @@
                         <label>Row Gap (mm):</label>
                         <input type="number" id="row-gap" value="1" min="0">
                     </div>
-                    <div class="input-group">
+                    <div class="input-group" id="col-gap-group">
                         <label>Column Gap (mm):</label>
                         <input type="number" id="col-gap" value="1" min="0">
                     </div>
@@ -358,7 +378,6 @@
                             <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
                             <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
-                        <label class="order-hint" id="arrange-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse order</label>
@@ -485,7 +504,6 @@
                             <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
                             <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
-                        <label class="order-hint" id="labels-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse order</label>
@@ -689,29 +707,23 @@
         PluginSettings.init();
     </script>
 
-    <!-- Order 选项功能介绍 -->
+    <!-- Arrange 面板选项联动显隐 -->
     <script>
         (function () {
-            var ORDER_DESCRIPTIONS = {
-                grid: "Grid: auto-detect rows — top-to-bottom between rows, left-to-right within a row (reading order). Best for grid-like layouts.",
-                stacking: "Stacking: follow the layer stacking order of the selected objects.",
-                horizontal: "Horizontal: sort strictly from left to right.",
-                vertical: "Vertical: sort strictly from top to bottom."
-            };
-            var selectIds = ["relative-order", "arrange-order", "labels-order"];
-
-            function updateHint(sel) {
-                var hint = document.getElementById(sel.id + "-hint");
-                if (hint) hint.textContent = ORDER_DESCRIPTIONS[sel.value] || "";
+            function updateArrangeVisibility() {
+                var auto = document.getElementById('auto-layout').checked;
+                var align = document.getElementById('align-edges').checked;
+                // 勾选 Auto Layout：隐藏 Columns，显示 Align Edges
+                document.getElementById('columns-group').style.display = auto ? 'none' : '';
+                document.getElementById('align-edges-group').style.display = auto ? '' : 'none';
+                // 勾选 Align Edges：隐藏 Column Gap（自动分布间距），显示布局总宽度
+                document.getElementById('col-gap-group').style.display = (auto && align) ? 'none' : '';
+                document.getElementById('layout-width-group').style.display = (auto && align) ? '' : 'none';
             }
-
-            selectIds.forEach(function (id) {
-                var sel = document.getElementById(id);
-                if (!sel) return;
-                sel.addEventListener("change", function () { updateHint(sel); });
-                // 设置加载完成后（PluginSettings 的 load 监听注册在前）刷新一次
-                window.addEventListener("load", function () { updateHint(sel); });
+            ['auto-layout', 'align-edges'].forEach(function (id) {
+                document.getElementById(id).addEventListener('change', updateArrangeVisibility);
             });
+            window.addEventListener('load', updateArrangeVisibility);
         })();
     </script>
 
@@ -720,6 +732,7 @@
         (function () {
             const tabs = document.querySelectorAll('.tab');
             const panels = document.querySelectorAll('.panel');
+            const titleEl = document.getElementById('panel-title');
 
             function activate(hash) {
                 let target = 'panel-relative';
@@ -733,6 +746,10 @@
 
                 tabs.forEach(t => t.classList.toggle('active', t.dataset.target === target));
                 panels.forEach(p => p.classList.toggle('active', p.id === target));
+
+                // 内容区顶部显示当前 Tab 名称
+                const activeTab = document.querySelector(`.tab[data-target="${target}"]`);
+                if (titleEl && activeTab) titleEl.textContent = activeTab.textContent;
             }
 
             function readHash() {

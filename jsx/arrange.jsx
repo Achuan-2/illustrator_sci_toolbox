@@ -284,7 +284,157 @@ function getOrderedSelection(selection, order, reverse) {
     return arr;
 }
 
-function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal, order, reverseOrder) {
+/**
+ * Auto Layout：根据选中对象当前的排布自动识别行与列，
+ * 然后将它们对齐到整齐的网格（行顶对齐、列左对齐，使用统一间距）
+ * rowGapPt / colGapPt 单位为 pt；useWidth/useHeight 控制是否先统一缩放
+ * alignEdges: 每行首对象左对齐、末对象右对齐，行内间距自动均分（忽略 colGapPt）
+ * layoutWidthPt: alignEdges 时布局的总宽度（pt），<=0 表示保持当前整体宽度
+ */
+function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, alignEdges, layoutWidthPt) {
+    var items = [];
+    for (var i = 0; i < selection.length; i++) {
+        var it = selection[i];
+        // 可选：先统一缩放（基于可视宽/高）
+        if (useHeight && hValPt > 0) scaleItemToVisibleHeight(it, hValPt);
+        if (useWidth && wValPt > 0) scaleItemToVisibleWidth(it, wValPt);
+        var info = getVisibleInfo(it);
+        items.push({
+            item: it,
+            left: info.left,
+            top: info.top,
+            right: info.right,
+            bottom: info.bottom,
+            width: info.width,
+            height: info.height,
+            cx: (info.left + info.right) / 2,
+            cy: (info.top + info.bottom) / 2
+        });
+    }
+
+    // 行聚类：垂直中心落在已有行的垂直范围内则归入该行
+    items.sort(function (a, b) { return b.top - a.top; });
+    var rows = []; // { top, bottom, members: [] }
+    for (var j = 0; j < items.length; j++) {
+        var itj = items[j];
+        var rowPlaced = false;
+        for (var r = 0; r < rows.length; r++) {
+            var row = rows[r];
+            if (itj.cy <= row.top && itj.cy >= row.bottom) {
+                row.members.push(itj);
+                if (itj.top > row.top) row.top = itj.top;
+                if (itj.bottom < row.bottom) row.bottom = itj.bottom;
+                rowPlaced = true;
+                break;
+            }
+        }
+        if (!rowPlaced) rows.push({ top: itj.top, bottom: itj.bottom, members: [itj] });
+    }
+    rows.sort(function (a, b) { return b.top - a.top; });
+
+    // 记录每个对象所属的行
+    var r2, m;
+    for (r2 = 0; r2 < rows.length; r2++) {
+        for (m = 0; m < rows[r2].members.length; m++) rows[r2].members[m].row = r2;
+    }
+
+    // 行高 = 行内最大高度
+    var rowHeights = [];
+    for (r2 = 0; r2 < rows.length; r2++) {
+        var h = 0;
+        for (m = 0; m < rows[r2].members.length; m++) {
+            if (rows[r2].members[m].height > h) h = rows[r2].members[m].height;
+        }
+        rowHeights.push(h);
+    }
+
+    // 起始点：整体可视左上；endX：整体最右边缘
+    var startX = items[0].left, startY = items[0].top, endX = items[0].right;
+    for (var s = 1; s < items.length; s++) {
+        if (items[s].left < startX) startX = items[s].left;
+        if (items[s].top > startY) startY = items[s].top;
+        if (items[s].right > endX) endX = items[s].right;
+    }
+
+    // 计算每行的 top（行间距统一）
+    var rowTops = [], y = startY;
+    for (r2 = 0; r2 < rows.length; r2++) {
+        rowTops.push(y);
+        y -= (rowHeights[r2] + rowGapPt);
+    }
+
+    if (alignEdges) {
+        // 左右边对齐：每行首对象左对齐 startX、末对象右对齐 endX，行内间距自动均分
+        // 指定了布局总宽度时，右边缘为 startX + layoutWidthPt
+        if (layoutWidthPt > 0) endX = startX + layoutWidthPt;
+        for (r2 = 0; r2 < rows.length; r2++) {
+            var members = rows[r2].members.slice().sort(function (a, b) { return a.left - b.left; });
+            if (members.length === 1) {
+                moveItemTopLeftTo(members[0].item, startX, rowTops[r2]);
+                continue;
+            }
+            var totalItemW = 0;
+            for (m = 0; m < members.length; m++) totalItemW += members[m].width;
+            var gap = ((endX - startX) - totalItemW) / (members.length - 1);
+            var x = startX;
+            for (m = 0; m < members.length; m++) {
+                moveItemTopLeftTo(members[m].item, x, rowTops[r2]);
+                x += members[m].width + gap;
+            }
+        }
+        return;
+    }
+
+    // 列聚类：水平中心落在已有列的水平范围内则归入该列
+    var byLeft = items.slice().sort(function (a, b) { return a.left - b.left; });
+    var cols = []; // { left, right, members: [] }
+    for (var k = 0; k < byLeft.length; k++) {
+        var itk = byLeft[k];
+        var colPlaced = false;
+        for (var c = 0; c < cols.length; c++) {
+            var col = cols[c];
+            if (itk.cx >= col.left && itk.cx <= col.right) {
+                col.members.push(itk);
+                if (itk.left < col.left) col.left = itk.left;
+                if (itk.right > col.right) col.right = itk.right;
+                colPlaced = true;
+                break;
+            }
+        }
+        if (!colPlaced) cols.push({ left: itk.left, right: itk.right, members: [itk] });
+    }
+    cols.sort(function (a, b) { return a.left - b.left; });
+
+    // 记录每个对象所属的列
+    var c2, n;
+    for (c2 = 0; c2 < cols.length; c2++) {
+        for (n = 0; n < cols[c2].members.length; n++) cols[c2].members[n].col = c2;
+    }
+
+    // 列宽 = 列内最大宽度
+    var colWidths = [];
+    for (c2 = 0; c2 < cols.length; c2++) {
+        var w = 0;
+        for (n = 0; n < cols[c2].members.length; n++) {
+            if (cols[c2].members[n].width > w) w = cols[c2].members[n].width;
+        }
+        colWidths.push(w);
+    }
+
+    // 计算每列的 left（列间距统一）
+    var colLefts = [], x = startX;
+    for (c2 = 0; c2 < cols.length; c2++) {
+        colLefts.push(x);
+        x += (colWidths[c2] + colGapPt);
+    }
+
+    // 移动每个对象到网格位置
+    for (var t = 0; t < items.length; t++) {
+        moveItemTopLeftTo(items[t].item, colLefts[items[t].col], rowTops[items[t].row]);
+    }
+}
+
+function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal, order, reverseOrder, autoLayout, alignEdges, layoutWidth) {
     if (app.documents.length === 0) return;
 
     var doc = app.activeDocument;
@@ -300,6 +450,12 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
     var colGapPt = mmToPoints(colGap);
     var wValPt = useWidth ? mmToPoints(wVal) : 0;
     var hValPt = useHeight ? mmToPoints(hVal) : 0;
+
+    // Auto Layout：根据当前排布自动识别行列并对齐（忽略 columns 与 order）
+    if (autoLayout) {
+        autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, !!alignEdges, mmToPoints(layoutWidth || 0));
+        return;
+    }
 
     // 使用排序后的序列进行排列
     var ordered = getOrderedSelection(selection, order || "stacking", !!reverseOrder);

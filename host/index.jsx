@@ -36,6 +36,9 @@ var useUniformHeightCheckbox = document.querySelector("#use-uniform-height");
 // New: Arrange order controls
 var arrangeOrderSelect = document.querySelector("#arrange-order");
 var arrangeReverseOrderCheckbox = document.querySelector("#arrange-reverse-order");
+var autoLayoutCheckbox = document.querySelector("#auto-layout");
+var alignEdgesCheckbox = document.querySelector("#align-edges");
+var layoutWidthInput = document.querySelector("#layout-width");
 
 // Distribute spacing UI
 var distributeVerticalButton = document.querySelector("#distribute-vertical-button");
@@ -289,7 +292,10 @@ function handleArrange() {
             ${useUniformHeightCheckbox.checked},
             ${uniformHeightInput.value},
             "${order}",
-            ${revOrder}
+            ${revOrder},
+            ${!!(autoLayoutCheckbox && autoLayoutCheckbox.checked)},
+            ${!!(alignEdgesCheckbox && alignEdgesCheckbox.checked)},
+            ${parseFloat(layoutWidthInput && layoutWidthInput.value) || 0}
         )
     `, function (result) {
         if (result === 'EvalScript error.') {
