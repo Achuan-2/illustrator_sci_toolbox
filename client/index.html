@@ -239,6 +239,14 @@
             height: 8px;
         }
 
+        /* Order 选项功能介绍：显示在下拉框下方的小字 */
+        .order-hint {
+            flex-basis: 100%;
+            font-size: 11px;
+            color: var(--muted);
+            white-space: normal;
+        }
+
         /* Label offset editing mode styles */
         .input-group input.editing-mode {
             border-color: var(--danger);
@@ -252,10 +260,10 @@
     <div class="app">
         <div class="tabs" id="tabs">
             <div class="tab active" data-target="panel-relative" data-hash="relative">Relative Position</div>
-            <div class="tab" data-target="panel-size" data-hash="size">Size Paste</div>
-            <div class="tab" data-target="panel-arrange" data-hash="arrange">Images Arrange</div>
             <div class="tab" data-target="panel-distribute" data-hash="distribute">Spacing Set</div>
             <div class="tab" data-target="panel-swap" data-hash="swap">Swap</div>
+            <div class="tab" data-target="panel-size" data-hash="size">Size Paste</div>
+            <div class="tab" data-target="panel-arrange" data-hash="arrange">Images Arrange</div>
             <div class="tab" data-target="panel-labels" data-hash="labels">Image Labels</div>
             <div class="tab" data-target="panel-border" data-hash="border">Add Border</div>
             <div class="tab" data-target="panel-about" data-hash="about">About</div>
@@ -286,10 +294,12 @@
                     <div class="input-group">
                         <label>Order:</label>
                         <select id="relative-order">
-                            <option value="stacking">stacking order</option>
-                            <option value="horizontal">horizontal order</option>
-                            <option value="vertical" selected>vertical order</option>
+                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
+                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
+                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
+                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
+                        <label class="order-hint" id="relative-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse Order:</label>
@@ -343,10 +353,12 @@
                     <div class="input-group">
                         <label>Order:</label>
                         <select id="arrange-order">
-                            <option value="stacking">stacking order</option>
-                            <option value="horizontal">horizontal order</option>
-                            <option value="vertical" selected>vertical order</option>
+                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
+                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
+                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
+                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
+                        <label class="order-hint" id="arrange-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse order</label>
@@ -468,10 +480,12 @@
                     <div class="input-group">
                         <label>Order:</label>
                         <select id="labels-order">
-                            <option value="stacking">stacking order</option>
-                            <option value="horizontal">horizontal order</option>
-                            <option value="vertical" selected>vertical order</option>
+                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
+                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
+                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
+                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
                         </select>
+                        <label class="order-hint" id="labels-order-hint"></label>
                     </div>
                     <div class="input-group">
                         <label>Reverse order</label>
@@ -563,7 +577,7 @@
                 labelOffsetY: -6,
                 labelTemplate: "a",
                 fontColor: "#000000",
-                labelsOrder: "vertical",
+                labelsOrder: "grid",
                 labelsReverseOrder: false,
                 autoUpdateIndex: true
             },
@@ -673,6 +687,32 @@
 
         // 初始化设置管理
         PluginSettings.init();
+    </script>
+
+    <!-- Order 选项功能介绍 -->
+    <script>
+        (function () {
+            var ORDER_DESCRIPTIONS = {
+                grid: "Grid: auto-detect rows — top-to-bottom between rows, left-to-right within a row (reading order). Best for grid-like layouts.",
+                stacking: "Stacking: follow the layer stacking order of the selected objects.",
+                horizontal: "Horizontal: sort strictly from left to right.",
+                vertical: "Vertical: sort strictly from top to bottom."
+            };
+            var selectIds = ["relative-order", "arrange-order", "labels-order"];
+
+            function updateHint(sel) {
+                var hint = document.getElementById(sel.id + "-hint");
+                if (hint) hint.textContent = ORDER_DESCRIPTIONS[sel.value] || "";
+            }
+
+            selectIds.forEach(function (id) {
+                var sel = document.getElementById(id);
+                if (!sel) return;
+                sel.addEventListener("change", function () { updateHint(sel); });
+                // 设置加载完成后（PluginSettings 的 load 监听注册在前）刷新一次
+                window.addEventListener("load", function () { updateHint(sel); });
+            });
+        })();
     </script>
 
     <!-- Tabs logic: keep ids intact for existing scripts -->

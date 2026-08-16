@@ -184,8 +184,58 @@ function moveItemTopLeftTo(item, xLeft, yTop) {
 }
 
 /**
+ * Grid 排序：自动按“行”聚类，行从上到下、行内从左到右
+ * （阅读顺序，适合自动识别网格状摆放的所选对象）
+ */
+function getGridOrderedItems(arr) {
+    var items = [];
+    for (var i = 0; i < arr.length; i++) {
+        var info = getVisibleInfo(arr[i]);
+        items.push({
+            item: arr[i],
+            left: info.left,
+            top: info.top,
+            bottom: info.bottom,
+            cy: (info.top + info.bottom) / 2
+        });
+    }
+    // 先按 top 从高到低（上方在前）
+    items.sort(function (a, b) { return b.top - a.top; });
+
+    // 聚类成行：垂直中心落在已有行的垂直范围内则归入该行
+    var rows = []; // 每行: { top, bottom, members: [] }
+    for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        var placed = false;
+        for (var r = 0; r < rows.length; r++) {
+            var row = rows[r];
+            if (it.cy <= row.top && it.cy >= row.bottom) {
+                row.members.push(it);
+                if (it.top > row.top) row.top = it.top;
+                if (it.bottom < row.bottom) row.bottom = it.bottom;
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            rows.push({ top: it.top, bottom: it.bottom, members: [it] });
+        }
+    }
+
+    // 行从上到下排序，行内从左到右排序
+    rows.sort(function (a, b) { return b.top - a.top; });
+    var result = [];
+    for (var k = 0; k < rows.length; k++) {
+        var members = rows[k].members;
+        members.sort(function (a, b) { return a.left - b.left; });
+        for (var m = 0; m < members.length; m++) result.push(members[m].item);
+    }
+    return result;
+}
+
+/**
  * 根据 order 与 reverse 对 selection 进行排序
- * order: "stacking" | "horizontal" | "vertical"
+ * order: "stacking" | "horizontal" | "vertical" | "grid"
  * reverse: boolean
  */
 function getOrderedSelection(selection, order, reverse) {
@@ -193,7 +243,9 @@ function getOrderedSelection(selection, order, reverse) {
     for (var i = 0; i < selection.length; i++) arr.push(selection[i]);
 
     var ord = order || "stacking";
-    if (ord === "horizontal" || ord === "vertical") {
+    if (ord === "grid") {
+        arr = getGridOrderedItems(arr);
+    } else if (ord === "horizontal" || ord === "vertical") {
         arr.sort(function (a, b) {
             var ia = getVisibleInfo(a);
             var ib = getVisibleInfo(b);
