@@ -5,6 +5,8 @@ var arrangeButton = document.querySelector("#arrange-button");
 var addLabelButton = document.querySelector("#add-label-button");
 var updateLabelButton = document.querySelector("#update-label-button");
 var filterTextButton = document.querySelector("#filter-text-button");
+var selectTextOnlyButton = document.querySelector("#select-text-only-button");
+var excludeTextButton = document.querySelector("#exclude-text-button");
 var copyPosButton = document.querySelector("#copy-pos-button");
 var pastePosButton = document.querySelector("#paste-pos-button");
 // Swap buttons (top-left / top-right / bottom-left / bottom-right)
@@ -96,6 +98,8 @@ arrangeButton.addEventListener("click", handleArrange);
 addLabelButton.addEventListener("click", handleAddLabel);
 updateLabelButton.addEventListener("click", handleUpdateLabel);
 filterTextButton.addEventListener("click", handleFilterText);
+if (selectTextOnlyButton) selectTextOnlyButton.addEventListener("click", function () { handleFilterSelection("textOnly"); });
+if (excludeTextButton) excludeTextButton.addEventListener("click", function () { handleFilterSelection("excludeText"); });
 copyPosButton.addEventListener("click", handleCopyPosition);
 pastePosButton.addEventListener("click", handlePastePosition);
 if (swapTLButton) swapTLButton.addEventListener("click", function () { handleSwapCorner('TL'); });
@@ -694,6 +698,21 @@ function handleAddBorder() {
     csInterface.evalScript(`addBorder("${color}", ${thickness}, ${dash}, ${autoGroup})`, function (result) {
         if (result && result.indexOf("Error:") === 0) {
             alert(result);
+        }
+    });
+}
+
+function handleFilterSelection(mode) {
+    console.log("Filter Selection clicked: " + mode);
+    csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
+    csInterface.evalScript(`filterSelection("${mode}")`, function (result) {
+        if (result === 'EvalScript error.') {
+            alert('Error executing the script');
+        } else if (result && result.indexOf("Error:") === 0) {
+            alert(result);
+        } else if (result && result.indexOf("Success|") === 0) {
+            var msg = result.split('|')[1];
+            console.log("Selection filter:", msg);
         }
     });
 }

@@ -811,6 +811,70 @@ function filterTextFrames() {
     return "Success|" + textFrames.length;
 }
 
+function filterSelection(type) {
+    if (app.documents.length === 0) return "Error: No document open.";
+
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+
+    if (!selection || selection.length === 0) {
+        return "Error: Please select objects first.";
+    }
+
+    var textItems = [];
+    var nonTextItems = [];
+
+    for (var i = 0; i < selection.length; i++) {
+        var item = selection[i];
+        if (item.typename === "TextFrame") {
+            textItems.push(item);
+        } else if (item.typename === "GroupItem") {
+            var subTexts = [];
+            var subNonTexts = [];
+            for (var g = 0; g < item.pageItems.length; g++) {
+                var sub = item.pageItems[g];
+                if (sub.typename === "TextFrame") {
+                    subTexts.push(sub);
+                } else {
+                    subNonTexts.push(sub);
+                }
+            }
+            if (subTexts.length > 0) {
+                for (var st = 0; st < subTexts.length; st++) {
+                    textItems.push(subTexts[st]);
+                }
+            }
+            if (subNonTexts.length > 0 || subTexts.length === 0) {
+                nonTextItems.push(item);
+            }
+        } else {
+            nonTextItems.push(item);
+        }
+    }
+
+    if (type === "textOnly") {
+        if (textItems.length === 0) {
+            return "Error: No text frames found in current selection.";
+        }
+        doc.selection = null;
+        for (var t = 0; t < textItems.length; t++) {
+            textItems[t].selected = true;
+        }
+        return "Success|" + textItems.length;
+    } else if (type === "excludeText") {
+        if (nonTextItems.length === 0) {
+            return "Error: No non-text objects found in current selection.";
+        }
+        doc.selection = null;
+        for (var n = 0; n < nonTextItems.length; n++) {
+            nonTextItems[n].selected = true;
+        }
+        return "Success|" + nonTextItems.length;
+    }
+
+    return "Error: Unknown filter mode";
+}
+
 function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
     if (app.documents.length === 0) return "Error: No document open.";
 

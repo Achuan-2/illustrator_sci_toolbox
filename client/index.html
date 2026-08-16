@@ -271,6 +271,7 @@
             <div class="tab" data-target="panel-arrange" data-hash="arrange" title="Grid Layout">Grid Layout</div>
             <div class="tab" data-target="panel-labels" data-hash="labels" title="Labels">Labels</div>
             <div class="tab" data-target="panel-border" data-hash="border" title="Add Border">Add Border</div>
+            <div class="tab" data-target="panel-selection" data-hash="selection" title="Selection">Selection</div>
             <div class="tab" data-target="panel-about" data-hash="about" title="About">About</div>
         </div>
         <div class="content">
@@ -565,6 +566,14 @@
                     <button class="btn btn-primary" id="add-border-button">Add Border</button>
                 </div>
             </div>
+            <!-- Selection Panel -->
+            <div class="panel" id="panel-selection">
+                <h3>Selection Filter</h3>
+                <div class="toolbar">
+                    <button class="btn btn-primary" id="select-text-only-button" title="Select text frames from selected objects">Select Text Only</button>
+                    <button class="btn" id="exclude-text-button" title="Exclude text frames from current selection">Exclude Text</button>
+                </div>
+            </div>
             <!-- About Panel -->
             <div class="panel" id="panel-about">
                 <h3>About This Plugin</h3>
@@ -743,6 +752,7 @@
                 else if (hash === 'size') target = 'panel-size';
                 else if (hash === 'border') target = 'panel-border';
                 else if (hash === 'swap') target = 'panel-swap';
+                else if (hash === 'selection') target = 'panel-selection';
                 else if (hash === 'about') target = 'panel-about';
 
                 tabs.forEach(t => t.classList.toggle('active', t.dataset.target === target));
