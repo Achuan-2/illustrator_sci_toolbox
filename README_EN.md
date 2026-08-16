@@ -52,8 +52,10 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
   - Column: Set how many columns to arrange into.
   - Row Gap: Row spacing.
   - Column Gap: Column spacing.
-  - Resize Width: If checked, will uniformly set the Width of all objects.
-  - Resize Height: If checked, will uniformly set the Height of all objects.
+  - Object Size:
+    - Keep Original Size: Keep original dimensions of each object.
+    - Auto Adjust: Proportional scaling so objects in the same row share the same height (or column width if 1 column).
+    - Custom Size: Specify custom width and/or height.
   - Order: Determine the order of objects. The plugin supports determining order based on vertical position, horizontal position, and layer order.
 
   <img alt="PixPin_2025-08-06_17-59-37" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_17-59-37-20250806175940-zw3soci.png" style="width: 298px;" />
@@ -107,59 +109,38 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
     
     【Method 2: ZIP File Installation】
 
-    After downloading the zip file, unzip it to a folder, and copy to the Adobe plugin folder.
+    Download the zip file, extract it to a folder, and copy to the Adobe CEP extensions folder:
 
-    - Windows:
-
-      - 32-bit version: `C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\`
-      - 64-bit version: `C:\Program Files\Common Files\Adobe\CEP\extensions` (Newer Illustrator versions are generally 64-bit, 32-bit are older versions)
-
-      <img alt="PixPin_2025-08-06_12-07-37" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_12-07-37-20250806120739-cquahfa.png" style="width: 50%;" />
-    - MacOS
-
-      - System directory: `/Library/Application Support/Adobe/CEP/extensions`
+    - Windows (Recommended per-user directory, no admin rights required):
+      - Press `Win+R`, enter `%APPDATA%\Adobe\CEP\extensions` and press Enter (Full path: `C:\Users\<Username>\AppData\Roaming\Adobe\CEP\extensions`, create `CEP\extensions` if it does not exist).
+      - Or system-wide directory: `C:\Program Files\Common Files\Adobe\CEP\extensions`
+    - MacOS:
       - User directory: `~/Library/Application Support/Adobe/CEP/extensions`
-    - How to confirm the path is correct: If the path is correct, the folder already exists and contains some folders.
+      - System directory: `/Library/Application Support/Adobe/CEP/extensions`
+    - How to confirm the path is correct: If the path is correct, other extension folders may already be present (or you can create one).
 
     Remember to restart Illustrator after installation!!!
    
     【Set PlayerDebugMode】
    
-   If the plugin shows a blank page after opening, you need to additionally set PlayerDebugMode to use this plugin.
-
-   Steps to enable developer extensions (PlayerDebugMode=1)
+   - **Method 1 (ZXP Installer)**: The latest version has been repackaged with clean signing and timestamping, so setting `PlayerDebugMode` is usually **not required**.
+   - **Method 2 (ZIP Manual Extraction)**: Due to Adobe's security policy for direct folder copying, if the panel appears blank, enable debug mode using either method below:
     
-    - Windows Solution
-    
-      - Press `win+r`, enter `regedit`, open Registry Editor.
-      - Find `Computer\HKEY_CURRENT_USER\Software\Adobe\` (you can paste directly in the address bar to jump), under the `CSXS.version number` folder: Right-click to create a new [String Value], name it PlayerDebugMode, then double-click and enter value 1. If there are multiple CSXS versions, you need to create PlayerDebugMode string for each version!!!
+    - Windows Solution (Choose one):
+      - **Recommended (One-Click)**: Double-click the `开启PlayerDebugMode.reg` file in the plugin root directory and click "Yes" to merge into registry.
+      - **Manual Setup**: Press `Win+R`, enter `regedit`, navigate to `HKEY_CURRENT_USER\Software\Adobe\`, and in each corresponding `CSXS.x` folder (e.g. CSXS.9, CSXS.10, CSXS.11, etc.), create a new String Value named `PlayerDebugMode` and set its data to `1`.
     
         <img width="1902" height="1103" alt="image" src="https://github.com/user-attachments/assets/9d2e4b7d-201b-48e6-95ea-4dc02bdf0986" />
 
-    - Mac System Solution
+    - Mac System Solution:
     
-      - Open Terminal, enter
-    
-        ```bash
-        defaults write com.adobe.CSXS.version number PlayerDebugMode 1
-        ```
-    
-        For example
+      - Open Terminal and run:
     
         ```bash
-        defaults write com.adobe.CSXS.4 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.5 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.6 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.7 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.8 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.9 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.10 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.11 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.12 PlayerDebugMode 1
+        for v in 6 7 8 9 10 11 12 13 14 15 16; do defaults write com.adobe.CSXS.$v PlayerDebugMode 1; done && killall -u `whoami` cfprefsd
         ```
     
-        > If you don't know your version number, you can set them all from 4 to 12.
-        >
+        > Remember to restart Illustrator after applying the settings.
 
 
 

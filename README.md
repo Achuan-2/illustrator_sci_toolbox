@@ -57,13 +57,15 @@
 - 一键排列图片（Grid Layout）：可以批量调整图片宽高、一键排列整齐
 
   - Auto Layout：勾选后自动根据选中对象当前的排布识别行与列，一键排列整齐（适合先大致摆好位置，再用本功能快速对齐），此时无需设置 Columns
-    - Align Edges：Auto Layout 下可选，勾选后每行对象的左边缘、右边缘分别对齐，行内间距自动均分，此时无需设置 Column Gap
+    - Align Edges：勾选后每行对象的左右边缘对齐。在“自动调整”模式下支持自定义 Column Gap，插件会自动等比缩放各行高度填满总宽度；在其它模式下，行内间距自动均分
     - Layout Width：Align Edges 下可设置布局后的总宽度（mm），左边缘锚定当前位置、右边缘对齐到该宽度；填 0 表示保持当前整体宽度
   - Columns：设置要排成几列
   - Row Gap：行间距
   - Column Gap：列间距
-  - Resize Width：如果打上勾，会统一设置所有对象的Width
-  - Resize Height：如果打上勾，会统一设置所有对象的Height
+  - Object Size（对象大小）：
+    - 保持原来大小（Keep Original Size）：排列时保留每个对象的原始尺寸
+    - 自动调整（Auto Adjust）：自动等比缩放，使同一行对象高度对齐（单列时按首个对象宽度对齐）
+    - 自定义大小（Custom Size）：可单独或同时指定 Resize Width 和 Resize Height
   - Order：判断对象的先后顺序，插件支持根据网格位置（grid order，默认，自动识别行并按“从上到下、同行从左到右”的阅读顺序排列）、垂直位置、水平位置以及图层顺序来确定对象顺序。（illustrator没法获取选择顺序，只能根据位置和图层顺序来确定对象顺序）
 
   ![PixPin_2025-08-06_17-59-37](https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_17-59-37-20250806175940-zw3soci.png)
@@ -130,94 +132,74 @@
   > 补充：发现illustrator添加图片有蒙版功能，可以快速添加蒙版之后也能设置描边，并且会随着图片移动而移动，也挺方便的。本质上也是illustrator添加了一个和图片等大的矩形，然后创建剪切蒙版，相当于是给这个剪切组添加描边
 
 
-## 3 如何使用本插件
-
-1. 下载插件zip或zxp文件（选一个就好）：[https://github.com/Achuan-2/illustrator_sci_plugin/releases](https://github.com/Achuan-2/illustrator_sci_plugin/releases)
-
-    <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
+## 3 如何安装本插件
 
 
-2. 安装方法
+### 3.1 下载插件
+
+下载插件zip或zxp文件（选一个就好）：[https://github.com/Achuan-2/illustrator_sci_plugin/releases](https://github.com/Achuan-2/illustrator_sci_plugin/releases)
+
+  <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
+
+
+
+### 3.2. 安装方法
 
      
-    【方法一: zxp文件安装】
+#### 方法一: zxp文件安装
 
-    下载zxp文件后，安装[ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/?srsltid=AfmBOoo-EVsObqPpzaZW0PvdAs_QcLleVQPtl2Yy00HAkA4rzndfdAcI)，打开软件拖进zxp文件进行安装
+下载zxp文件后，安装[ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/?srsltid=AfmBOoo-EVsObqPpzaZW0PvdAs_QcLleVQPtl2Yy00HAkA4rzndfdAcI)，打开软件拖进zxp文件进行安装
 
-    <img alt="PixPin_2025-09-10_20-49-35" src="https://github.com/user-attachments/assets/d2b7c2a6-65f6-438a-9b52-5ce08b614717" style="width: 50%;" />
+<img alt="PixPin_2025-09-10_20-49-35" src="https://github.com/user-attachments/assets/d2b7c2a6-65f6-438a-9b52-5ce08b614717" style="width: 50%;" />
 
-    <img alt="PixPin_2025-09-13_09-22-10" src="https://github.com/user-attachments/assets/3abec6d2-b8ef-4e5e-ad24-3e0bc68a9f0c" style="width: 50%;" />
+<img alt="PixPin_2025-09-13_09-22-10" src="https://github.com/user-attachments/assets/3abec6d2-b8ef-4e5e-ad24-3e0bc68a9f0c" style="width: 50%;" />
 
-    <img alt="PixPin_2025-09-13_09-22-15" src="https://github.com/user-attachments/assets/bf0359aa-f05c-4a88-97f0-9196a83b93ea" style="width: 50%;" />
+<img alt="PixPin_2025-09-13_09-22-15" src="https://github.com/user-attachments/assets/bf0359aa-f05c-4a88-97f0-9196a83b93ea" style="width: 50%;" />
 
-    安装后记得重启illustrator！！！
+安装后记得重启illustrator！！！
     
-    【方法二：zip文件安装】
+#### 方法二：zip文件安装
 
-    下载zip文件后，解压为文件夹，复制到Adobe 插件文件夹
+下载zip文件后，解压为文件夹，复制到 Adobe 插件目录：
 
-    - windows：
+- Windows（推荐用户目录，无需管理员权限）：
+  - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车（完整路径：`C:\Users\<你的用户名>\AppData\Roaming\Adobe\CEP\extensions`，若没有相关文件夹可手动新建）。
+- MacOS：
+  - 目录：`~/Library/Application Support/Adobe/CEP/extensions`
+- 如何判断路径正确：如果路径正确，通常里面已经存在其他插件文件夹（若没有也可新建）。
 
-      - 32位版本：`C:\Program Files (x86)\Common Files\Adobe\CEP\extensions\`
-      - 64位版本：`C:\Program Files\Common Files\Adobe\CEP\extensions`（illustrator版本比较新一般都是64位版本，32位版本应该都是比较老的版本）
-
-      <img alt="PixPin_2025-08-06_12-07-37" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_12-07-37-20250806120739-cquahfa.png" style="width: 50%;" />
-    - MacOS
-
-      - 系统目录：`/Library/Application Support/Adobe/CEP/extensions`
-      - 用户目录：`~/Library/Application Support/Adobe/CEP/extensions`
-    - 如何判断路径正确，如果打开的路径正确，文件夹是本来就存在的，并且里面有一些文件夹
-
-    安装后记得重启illustrator！！！
+安装后记得重启 illustrator！！！
    
-    【设置PlayerDebugMode】
+
+### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）
    
-   如果打开插件后若显示页面空白，需要额外设置PlayerDebugMode，才能使用本插件
+如果打开插件面板显示空白，请按以下方法开启PlayerDebugMode：
+    
+- Windows 解决方法：
+  - **手动设置**：`win+r` 输入 `regedit` 打开注册表，进入 `HKEY_CURRENT_USER\Software\Adobe\`，在对应的 `CSXS.版本号`（如 CSXS.9、CSXS.10、CSXS.11 等）项下新建字符串值 `PlayerDebugMode` 并设置数值数据为 `1`。
 
-   启用允许开发者扩展（PlayerDebugMode=1）步骤
-    
-    - Windows解决方法
-    
-      - `win+r`输入`regedit`，打开注册表
-      - 找到`计算机\HKEY_CURRENT_USER\Software\Adobe\`（可以直接在地址栏粘贴跳转）下的`CSXS.版本号`文件夹：右键新建【字符串值】，名称为 PlayerDebugMode，然后双击输入值为1。如果CSXS有多个版本，需要每个版本都创建PlayerDebugMode字符串！！！
-    
-        <img width="1902" height="1103" alt="image" src="https://github.com/user-attachments/assets/9d2e4b7d-201b-48e6-95ea-4dc02bdf0986" />
+    <img width="1902" height="1103" alt="image" src="https://github.com/user-attachments/assets/9d2e4b7d-201b-48e6-95ea-4dc02bdf0986" />
 
-    - Mac系统解决方法
-    
-      - 打开终端，输入
-    
-        ```bash
-        defaults write com.adobe.CSXS.版本号 PlayerDebugMode 1
-        ```
-    
-        如
-    
-        ```bash
-        defaults write com.adobe.CSXS.4 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.5 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.6 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.7 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.8 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.9 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.10 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.11 PlayerDebugMode 1
-        defaults write com.adobe.CSXS.12 PlayerDebugMode 1
-        ```
-    
-        > 如果不知道你的版本号，其实可以把4到12都设置一个遍
-        >
+- Mac 系统解决方法：
+
+  - 打开终端，输入命令（支持主流版本一键设置）：
+
+    ```bash
+    for v in 6 7 8 9 10 11 12 13 14 15 16; do defaults write com.adobe.CSXS.$v PlayerDebugMode 1; done && killall -u `whoami` cfprefsd
+    ```
+
+    > 设置完成后记得完全退出并重启 Illustrator。
 
 
 
-4. 打开插件
+## 4 如何打开插件
 
-    - 窗口-扩展功能，选择本插件
+- 窗口-扩展功能，选择本插件
 
-      <img alt="PixPin_2025-08-06_13-25-43" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_13-25-43-20250806132550-sz59wup.png" />
-    - 窗口可以拖拽到侧栏方便使用
+  ![](https://fastly.jsdelivr.net/gh/Achuan-2/PicBed/assets/20260816181448-2026-08-16.png)
+- 窗口可以拖拽到侧栏方便使用
 
-      <img alt="PixPin_2025-08-06_13-26-22" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_13-26-22-20250806132631-ib04jm0.png" style="width: 384px;" />​
+  ![](https://fastly.jsdelivr.net/gh/Achuan-2/PicBed/assets/20260816181518-2026-08-16.png)
 
 ## ❤️用爱发电
 

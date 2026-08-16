@@ -1,0 +1,7 @@
+*.p12
+*.zxp
+*.zip
+build/
+dist_temp/
+.DS_Store
+Thumbs.db
