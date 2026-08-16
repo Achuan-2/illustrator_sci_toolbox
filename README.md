@@ -188,7 +188,7 @@
     for v in 6 7 8 9 10 11 12 13 14 15 16; do defaults write com.adobe.CSXS.$v PlayerDebugMode 1; done && killall -u `whoami` cfprefsd
     ```
 
-    > 设置完成后记得完全退出并重启 Illustrator。
+> 设置完成后记得完全退出并重启 Illustrator。
 
 
 
