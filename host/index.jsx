@@ -300,6 +300,15 @@ function handleArrange() {
     `, function (result) {
         if (result === 'EvalScript error.') {
             alert('Error executing the script');
+        } else if (result) {
+            try {
+                var res = typeof result === 'string' ? JSON.parse(result) : result;
+                if (res && res.layoutWidth !== undefined && layoutWidthInput) {
+                    layoutWidthInput.value = res.layoutWidth;
+                }
+            } catch (e) {
+                // Ignore parse error for non-JSON returns
+            }
         }
     });
 }

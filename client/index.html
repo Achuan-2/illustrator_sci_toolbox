@@ -269,7 +269,7 @@
             <div class="tab" data-target="panel-swap" data-hash="swap" title="Swap">Swap</div>
             <div class="tab" data-target="panel-size" data-hash="size" title="Size Paste">Size Paste</div>
             <div class="tab" data-target="panel-arrange" data-hash="arrange" title="Grid Layout">Grid Layout</div>
-            <div class="tab" data-target="panel-labels" data-hash="labels" title="Image Labels">Image Labels</div>
+            <div class="tab" data-target="panel-labels" data-hash="labels" title="Labels">Labels</div>
             <div class="tab" data-target="panel-border" data-hash="border" title="Add Border">Add Border</div>
             <div class="tab" data-target="panel-about" data-hash="about" title="About">About</div>
         </div>
@@ -336,7 +336,7 @@
                         <input type="checkbox" id="auto-layout"
                             title="Auto-detect rows & columns from current positions and snap items to a tidy grid (Columns input is ignored)">
                     </div>
-                    <div class="input-group" id="align-edges-group" style="display:none">
+                    <div class="input-group" id="align-edges-group">
                         <label>Align Edges:</label>
                         <input type="checkbox" id="align-edges"
                             title="Align the left edge of each row's first item and the right edge of each row's last item; gaps inside a row are distributed automatically (Column Gap is ignored)">
@@ -344,7 +344,7 @@
                     <div class="input-group" id="layout-width-group" style="display:none">
                         <label>Layout Width (mm):</label>
                         <input type="number" id="layout-width" value="0" min="0"
-                            title="Total width between the aligned left & right edges after arranging; 0 = keep current overall width">
+                            title="Total width between the aligned left & right edges after arranging; minimum width is the maximum sum of object widths in a single row">
                     </div>
                     <div class="input-group" id="columns-group">
                         <label>Columns:</label>
@@ -385,7 +385,7 @@
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-primary" id="arrange-button">Arrange Images</button>
+                    <button class="btn btn-primary" id="arrange-button">Update Layout</button>
                 </div>
             </div>
 
@@ -439,7 +439,7 @@
                 </div>
             </div>
 
-            <!-- Image Labels Panel -->
+            <!-- Labels Panel -->
             <div class="panel" id="panel-labels">
                 <div class="grid">
                     <div class="input-group">
@@ -482,7 +482,7 @@
                     </div>
 
 
-                    <!-- New: Start Count for Image Labels -->
+                    <!-- New: Start Count for Labels -->
                     <div class="input-group">
                         <label>Label Index</label>
                         <input type="number" id="label-start-count" value="1" min="1" style="flex: 0 1 60px;">
@@ -495,7 +495,7 @@
                         <label id="label-preview" style="color: var(--primary); font-weight: bold;">a</label>
                     </div>
 
-                    <!-- New: Order options for Image Labels -->
+                    <!-- New: Order options for Labels -->
                     <div class="input-group">
                         <label>Order:</label>
                         <select id="labels-order">
@@ -713,12 +713,13 @@
             function updateArrangeVisibility() {
                 var auto = document.getElementById('auto-layout').checked;
                 var align = document.getElementById('align-edges').checked;
-                // 勾选 Auto Layout：隐藏 Columns，显示 Align Edges
+                // 勾选 Auto Layout：隐藏 Columns 控件
                 document.getElementById('columns-group').style.display = auto ? 'none' : '';
-                document.getElementById('align-edges-group').style.display = auto ? '' : 'none';
-                // 勾选 Align Edges：隐藏 Column Gap（自动分布间距），显示布局总宽度
-                document.getElementById('col-gap-group').style.display = (auto && align) ? 'none' : '';
-                document.getElementById('layout-width-group').style.display = (auto && align) ? '' : 'none';
+                // Align Edges 不勾选 auto layout 也可使用
+                document.getElementById('align-edges-group').style.display = '';
+                // 勾选 Align Edges：隐藏 Column Gap（自动分布间距），显示布局总宽度 Layout Width
+                document.getElementById('col-gap-group').style.display = align ? 'none' : '';
+                document.getElementById('layout-width-group').style.display = align ? '' : 'none';
             }
             ['auto-layout', 'align-edges'].forEach(function (id) {
                 document.getElementById(id).addEventListener('change', updateArrangeVisibility);

@@ -365,8 +365,26 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
 
     if (alignEdges) {
         // 左右边对齐：每行首对象左对齐 startX、末对象右对齐 endX，行内间距自动均分
-        // 指定了布局总宽度时，右边缘为 startX + layoutWidthPt
-        if (layoutWidthPt > 0) endX = startX + layoutWidthPt;
+        // 1. 计算所有行中最大的一行对象宽度之和 (maxRowObjectWidthPt)
+        var maxRowObjectWidthPt = 0;
+        for (r2 = 0; r2 < rows.length; r2++) {
+            var rowWidthSum = 0;
+            for (m = 0; m < rows[r2].members.length; m++) {
+                rowWidthSum += rows[r2].members[m].width;
+            }
+            if (rowWidthSum > maxRowObjectWidthPt) {
+                maxRowObjectWidthPt = rowWidthSum;
+            }
+        }
+
+        // 2. Layout Width 最小值不小于一行对象宽度之和；若用户设置小于该值，重置为该值
+        var targetLayoutWidthPt = layoutWidthPt;
+        if (targetLayoutWidthPt < maxRowObjectWidthPt) {
+            targetLayoutWidthPt = maxRowObjectWidthPt;
+        }
+
+        endX = startX + targetLayoutWidthPt;
+
         for (r2 = 0; r2 < rows.length; r2++) {
             var members = rows[r2].members.slice().sort(function (a, b) { return a.left - b.left; });
             if (members.length === 1) {
@@ -382,7 +400,8 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
                 x += members[m].width + gap;
             }
         }
-        return;
+        var resWidthMm = Math.round(pointsToMm(targetLayoutWidthPt) * 100) / 100;
+        return '{"layoutWidth":' + resWidthMm + '}';
     }
 
     // 列聚类：水平中心落在已有列的水平范围内则归入该列
@@ -450,20 +469,15 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
     var colGapPt = mmToPoints(colGap);
     var wValPt = useWidth ? mmToPoints(wVal) : 0;
     var hValPt = useHeight ? mmToPoints(hVal) : 0;
+    var layoutWidthPt = mmToPoints(layoutWidth || 0);
 
     // Auto Layout：根据当前排布自动识别行列并对齐（忽略 columns 与 order）
     if (autoLayout) {
-        autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, !!alignEdges, mmToPoints(layoutWidth || 0));
-        return;
+        return autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, !!alignEdges, layoutWidthPt);
     }
 
     // 使用排序后的序列进行排列
     var ordered = getOrderedSelection(selection, order || "stacking", !!reverseOrder);
-
-    // 起点：排序后第一个对象的可视左上
-    var firstInfo = getVisibleInfo(ordered[0]);
-    var startX = firstInfo.left;
-    var startY = firstInfo.top;
 
     // 先按需要统一缩放（基于可视宽/高）
     for (var i = 0; i < ordered.length; i++) {
@@ -476,9 +490,82 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
         }
     }
 
+    // 非 autoLayout 模式下使用 Align Edges
+    if (alignEdges) {
+        var colsNum = parseInt(columns) || 1;
+        if (colsNum < 1) colsNum = 1;
+
+        // 按 columns 将 ordered 分为多行
+        var nonAutoRows = [];
+        var currentRow = [];
+        for (var k = 0; k < ordered.length; k++) {
+            currentRow.push(ordered[k]);
+            if (currentRow.length === colsNum || k === ordered.length - 1) {
+                nonAutoRows.push(currentRow);
+                currentRow = [];
+            }
+        }
+
+        // 计算每行对象宽度之和，找到最大的一行对象宽度之和 (maxRowObjectWidthPt)
+        var maxRowObjectWidthPt = 0;
+        var rowHeights = [];
+        for (var r = 0; r < nonAutoRows.length; r++) {
+            var rMembers = nonAutoRows[r];
+            var sumW = 0;
+            var maxH = 0;
+            for (var m = 0; m < rMembers.length; m++) {
+                var info = getVisibleInfo(rMembers[m]);
+                sumW += info.width;
+                if (info.height > maxH) maxH = info.height;
+            }
+            if (sumW > maxRowObjectWidthPt) maxRowObjectWidthPt = sumW;
+            rowHeights.push(maxH);
+        }
+
+        // Layout Width 最小值不小于一行对象宽度之和；若用户设置小于该值，重置为该值
+        var targetLayoutWidthPt = layoutWidthPt;
+        if (targetLayoutWidthPt < maxRowObjectWidthPt) {
+            targetLayoutWidthPt = maxRowObjectWidthPt;
+        }
+
+        // 起点：第一个对象的可视左上
+        var firstInfo = getVisibleInfo(ordered[0]);
+        var startX = firstInfo.left;
+        var currentY = firstInfo.top;
+
+        for (var r = 0; r < nonAutoRows.length; r++) {
+            var rMembers = nonAutoRows[r];
+            var rowH = rowHeights[r];
+
+            if (rMembers.length === 1) {
+                moveItemTopLeftTo(rMembers[0], startX, currentY);
+            } else {
+                var totalItemW = 0;
+                for (var m = 0; m < rMembers.length; m++) {
+                    totalItemW += getVisibleInfo(rMembers[m]).width;
+                }
+                var gap = (targetLayoutWidthPt - totalItemW) / (rMembers.length - 1);
+                var x = startX;
+                for (var m = 0; m < rMembers.length; m++) {
+                    var itemM = rMembers[m];
+                    moveItemTopLeftTo(itemM, x, currentY);
+                    x += getVisibleInfo(itemM).width + gap;
+                }
+            }
+            currentY -= (rowH + rowGapPt);
+        }
+
+        var resWidthMm = Math.round(pointsToMm(targetLayoutWidthPt) * 100) / 100;
+        return '{"layoutWidth":' + resWidthMm + '}';
+    }
+
+    // 起点：排序后第一个对象的可视左上
+    var firstInfo = getVisibleInfo(ordered[0]);
+    var startX = firstInfo.left;
+    var currentY = firstInfo.top;
+
     // Arrange items using current position tracking (基于可视尺寸与位置)
     var currentX = startX;
-    var currentY = startY;
     var maxRowHeight = 0;
     var count = 0;
 
@@ -507,6 +594,7 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
             maxRowHeight = 0;
         }
     }
+    return '{"success":true}';
 }
 
 function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOffsetY, labelTemplate, fontColor, order, reverseOrder, startCount, sessionId) {
