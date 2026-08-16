@@ -360,14 +360,22 @@
                         <input type="number" id="col-gap" value="1" min="0">
                     </div>
                     <div class="input-group">
+                        <label>Object Size:</label>
+                        <select id="arrange-size-mode">
+                            <option value="original" selected title="Keep original size of objects (保持原来大小)">Keep Original Size</option>
+                            <option value="auto" title="Automatically adjust sizes proportionally (自动调整)">Auto Adjust</option>
+                            <option value="custom" title="Specify custom width and/or height (自定义大小)">Custom Size</option>
+                        </select>
+                    </div>
+                    <div class="input-group" id="arrange-custom-width-group" style="display:none">
                         <label>Resize Width (mm):</label>
                         <input type="number" id="uniform-width" value="100" min="0">
-                        <input type="checkbox" id="use-uniform-width" title="Use Uniform Width">
+                        <input type="checkbox" id="use-uniform-width" checked title="Use Uniform Width">
                     </div>
-                    <div class="input-group">
+                    <div class="input-group" id="arrange-custom-height-group" style="display:none">
                         <label>Resize Height (mm):</label>
                         <input type="number" id="uniform-height" value="100" min="0">
-                        <input type="checkbox" id="use-uniform-height" title="Use Uniform Height">
+                        <input type="checkbox" id="use-uniform-height" checked title="Use Uniform Height">
                     </div>
 
                     <!-- New: Order options for Arrange Images -->
@@ -722,18 +730,35 @@
             function updateArrangeVisibility() {
                 var auto = document.getElementById('auto-layout').checked;
                 var align = document.getElementById('align-edges').checked;
+                var sizeModeEl = document.getElementById('arrange-size-mode');
+                var sizeMode = sizeModeEl ? sizeModeEl.value : 'original';
+
                 // 勾选 Auto Layout：隐藏 Columns 控件
                 document.getElementById('columns-group').style.display = auto ? 'none' : '';
-                // Align Edges 不勾选 auto layout 也可使用
-                document.getElementById('align-edges-group').style.display = '';
-                // 勾选 Align Edges：隐藏 Column Gap（自动分布间距），显示布局总宽度 Layout Width
-                document.getElementById('col-gap-group').style.display = align ? 'none' : '';
-                document.getElementById('layout-width-group').style.display = align ? '' : 'none';
+                // 勾选 Align Edges：
+                // 如果对象大小为 Auto（自动调整），则允许自定义列间距（通过等比缩放填满对齐宽度）；
+                // 否则（非 Auto 模式），列间距由对象原始尺寸自动均分计算，因此隐藏
+                if (align) {
+                    document.getElementById('col-gap-group').style.display = sizeMode === 'auto' ? '' : 'none';
+                    document.getElementById('layout-width-group').style.display = '';
+                } else {
+                    document.getElementById('col-gap-group').style.display = '';
+                    document.getElementById('layout-width-group').style.display = 'none';
+                }
+
+                // Object Size 选项联动：仅在 custom 时显示自定义宽度/高度输入框
+                var customWidthGroup = document.getElementById('arrange-custom-width-group');
+                var customHeightGroup = document.getElementById('arrange-custom-height-group');
+                if (customWidthGroup) customWidthGroup.style.display = sizeMode === 'custom' ? '' : 'none';
+                if (customHeightGroup) customHeightGroup.style.display = sizeMode === 'custom' ? '' : 'none';
             }
-            ['auto-layout', 'align-edges'].forEach(function (id) {
-                document.getElementById(id).addEventListener('change', updateArrangeVisibility);
+            ['auto-layout', 'align-edges', 'arrange-size-mode'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('change', updateArrangeVisibility);
             });
             window.addEventListener('load', updateArrangeVisibility);
+            // 立即调用一次以初始化初始视图
+            updateArrangeVisibility();
         })();
     </script>
 

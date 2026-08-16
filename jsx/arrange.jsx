@@ -290,14 +290,31 @@ function getOrderedSelection(selection, order, reverse) {
  * rowGapPt / colGapPt 单位为 pt；useWidth/useHeight 控制是否先统一缩放
  * alignEdges: 每行首对象左对齐、末对象右对齐，行内间距自动均分（忽略 colGapPt）
  * layoutWidthPt: alignEdges 时布局的总宽度（pt），<=0 表示保持当前整体宽度
+ * sizeMode: "original" | "auto" | "custom"
  */
-function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, alignEdges, layoutWidthPt) {
+function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, alignEdges, layoutWidthPt, sizeMode) {
+    if (!sizeMode) {
+        sizeMode = (useWidth || useHeight) ? "custom" : "original";
+    }
+
     var items = [];
     for (var i = 0; i < selection.length; i++) {
         var it = selection[i];
-        // 可选：先统一缩放（基于可视宽/高）
-        if (useHeight && hValPt > 0) scaleItemToVisibleHeight(it, hValPt);
-        if (useWidth && wValPt > 0) scaleItemToVisibleWidth(it, wValPt);
+        // 自定义缩放
+        if (sizeMode === "custom") {
+            if (useWidth && useHeight && wValPt > 0 && hValPt > 0) {
+                var initInfo = getVisibleInfo(it);
+                if (initInfo.width > 0 && initInfo.height > 0) {
+                    var sX = (wValPt / initInfo.width) * 100;
+                    var sY = (hValPt / initInfo.height) * 100;
+                    it.resize(sX, sY, true, true, true, true, 100, Transformation.CENTER);
+                }
+            } else if (useHeight && hValPt > 0) {
+                scaleItemToVisibleHeight(it, hValPt);
+            } else if (useWidth && wValPt > 0) {
+                scaleItemToVisibleWidth(it, wValPt);
+            }
+        }
         var info = getVisibleInfo(it);
         items.push({
             item: it,
@@ -332,6 +349,60 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
     }
     rows.sort(function (a, b) { return b.top - a.top; });
 
+    // 自动调整大小模式：按行等比缩放使同一行对象高度一致（单列则按首对象宽度统一）
+    if (sizeMode === "auto") {
+        var isSingleCol = true;
+        for (var sc = 0; sc < rows.length; sc++) {
+            if (rows[sc].members.length > 1) {
+                isSingleCol = false;
+                break;
+            }
+        }
+
+        if (isSingleCol && rows.length > 1) {
+            // 单列纵向堆叠：按首个对象的宽度等比缩放
+            var refW = rows[0].members[0].width;
+            if (refW > 0) {
+                for (var r1 = 0; r1 < rows.length; r1++) {
+                    var singleMember = rows[r1].members[0];
+                    scaleItemToVisibleWidth(singleMember.item, refW);
+                    var updatedInfo = getVisibleInfo(singleMember.item);
+                    singleMember.width = updatedInfo.width;
+                    singleMember.height = updatedInfo.height;
+                    singleMember.left = updatedInfo.left;
+                    singleMember.right = updatedInfo.right;
+                    singleMember.top = updatedInfo.top;
+                    singleMember.bottom = updatedInfo.bottom;
+                    singleMember.cx = (updatedInfo.left + updatedInfo.right) / 2;
+                    singleMember.cy = (updatedInfo.top + updatedInfo.bottom) / 2;
+                }
+            }
+        } else {
+            // 多列/网格布局：每行内的对象统一按该行首个对象的高度等比缩放
+            for (var rAuto = 0; rAuto < rows.length; rAuto++) {
+                var rowMembers = rows[rAuto].members;
+                if (rowMembers.length > 0) {
+                    var refH = rowMembers[0].height;
+                    if (refH > 0) {
+                        for (var mAuto = 0; mAuto < rowMembers.length; mAuto++) {
+                            var curMem = rowMembers[mAuto];
+                            scaleItemToVisibleHeight(curMem.item, refH);
+                            var newInfo = getVisibleInfo(curMem.item);
+                            curMem.width = newInfo.width;
+                            curMem.height = newInfo.height;
+                            curMem.left = newInfo.left;
+                            curMem.right = newInfo.right;
+                            curMem.top = newInfo.top;
+                            curMem.bottom = newInfo.bottom;
+                            curMem.cx = (newInfo.left + newInfo.right) / 2;
+                            curMem.cy = (newInfo.top + newInfo.bottom) / 2;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 记录每个对象所属的行
     var r2, m;
     for (r2 = 0; r2 < rows.length; r2++) {
@@ -364,7 +435,83 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
     }
 
     if (alignEdges) {
-        // 左右边对齐：每行首对象左对齐 startX、末对象右对齐 endX，行内间距自动均分
+        if (sizeMode === "auto") {
+            // 自动调整大小模式 + Align Edges：
+            // 支持自定义 Column Gap (colGapPt)，通过等比缩放每行对象的高度，使每行对象总宽度 + 固定列间距精确填满 targetLayoutWidthPt
+
+            // 1. 计算基准 targetLayoutWidthPt（若用户未指定 layoutWidthPt，则根据各行自然宽度 + colGapPt 取最大值）
+            var targetLayoutWidthPt = layoutWidthPt;
+            if (targetLayoutWidthPt <= 0) {
+                var maxNaturalW = 0;
+                for (var rNat = 0; rNat < rows.length; rNat++) {
+                    var mNat = rows[rNat].members;
+                    var rSumW = 0;
+                    for (var iNat = 0; iNat < mNat.length; iNat++) {
+                        rSumW += mNat[iNat].width;
+                    }
+                    var rTotal = rSumW + (mNat.length - 1) * colGapPt;
+                    if (rTotal > maxNaturalW) maxNaturalW = rTotal;
+                }
+                var bbWidth = endX - startX;
+                targetLayoutWidthPt = maxNaturalW > bbWidth ? maxNaturalW : bbWidth;
+                if (targetLayoutWidthPt <= 0) targetLayoutWidthPt = maxNaturalW;
+            }
+
+            // 2. 对每行进行等比缩放计算
+            var rowHeightsAuto = [];
+            for (var rA = 0; rA < rows.length; rA++) {
+                var rowMems = rows[rA].members;
+                var nItems = rowMems.length;
+                var aspectSum = 0;
+                for (var mA = 0; mA < nItems; mA++) {
+                    var infA = getVisibleInfo(rowMems[mA].item);
+                    if (infA.height > 0) {
+                        aspectSum += infA.width / infA.height;
+                    }
+                }
+                var availW = targetLayoutWidthPt - (nItems - 1) * colGapPt;
+                var rowH = 0;
+                if (aspectSum > 0 && availW > 0) {
+                    rowH = availW / aspectSum;
+                    for (var mS = 0; mS < nItems; mS++) {
+                        scaleItemToVisibleHeight(rowMems[mS].item, rowH);
+                        var updated = getVisibleInfo(rowMems[mS].item);
+                        rowMems[mS].width = updated.width;
+                        rowMems[mS].height = updated.height;
+                    }
+                } else if (nItems > 0) {
+                    rowH = getVisibleInfo(rowMems[0].item).height;
+                }
+                rowHeightsAuto.push(rowH);
+            }
+
+            // 3. 重新计算 rowTops
+            var rowTopsAuto = [], yAuto = startY;
+            for (r2 = 0; r2 < rows.length; r2++) {
+                rowTopsAuto.push(yAuto);
+                yAuto -= (rowHeightsAuto[r2] + rowGapPt);
+            }
+
+            // 4. 摆放对象（使用精确的 colGapPt 间距）
+            for (r2 = 0; r2 < rows.length; r2++) {
+                var members = rows[r2].members.slice().sort(function (a, b) { return a.left - b.left; });
+                if (members.length === 1) {
+                    moveItemTopLeftTo(members[0].item, startX, rowTopsAuto[r2]);
+                } else {
+                    var x = startX;
+                    for (var m = 0; m < members.length; m++) {
+                        var memItem = members[m].item;
+                        moveItemTopLeftTo(memItem, x, rowTopsAuto[r2]);
+                        x += getVisibleInfo(memItem).width + colGapPt;
+                    }
+                }
+            }
+
+            var resWidthMm = Math.round(pointsToMm(targetLayoutWidthPt) * 100) / 100;
+            return '{"layoutWidth":' + resWidthMm + '}';
+        }
+
+        // 非 auto 模式（original 或 custom）：对象尺寸固定，间距自动均分
         // 1. 计算所有行中最大的一行对象宽度之和 (maxRowObjectWidthPt)
         var maxRowObjectWidthPt = 0;
         for (r2 = 0; r2 < rows.length; r2++) {
@@ -451,9 +598,10 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
     for (var t = 0; t < items.length; t++) {
         moveItemTopLeftTo(items[t].item, colLefts[items[t].col], rowTops[items[t].row]);
     }
+    return '{"success":true}';
 }
 
-function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal, order, reverseOrder, autoLayout, alignEdges, layoutWidth) {
+function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal, order, reverseOrder, autoLayout, alignEdges, layoutWidth, sizeMode) {
     if (app.documents.length === 0) return;
 
     var doc = app.activeDocument;
@@ -464,37 +612,69 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
         return;
     }
 
+    if (!sizeMode) {
+        sizeMode = (useWidth || useHeight) ? "custom" : "original";
+    }
+
     // Convert mm values to points
     var rowGapPt = mmToPoints(rowGap);
     var colGapPt = mmToPoints(colGap);
-    var wValPt = useWidth ? mmToPoints(wVal) : 0;
-    var hValPt = useHeight ? mmToPoints(hVal) : 0;
+    var wValPt = (sizeMode === "custom" && useWidth) ? mmToPoints(wVal) : 0;
+    var hValPt = (sizeMode === "custom" && useHeight) ? mmToPoints(hVal) : 0;
     var layoutWidthPt = mmToPoints(layoutWidth || 0);
 
     // Auto Layout：根据当前排布自动识别行列并对齐（忽略 columns 与 order）
     if (autoLayout) {
-        return autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, !!alignEdges, layoutWidthPt);
+        return autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useHeight, hValPt, !!alignEdges, layoutWidthPt, sizeMode);
     }
 
     // 使用排序后的序列进行排列
     var ordered = getOrderedSelection(selection, order || "stacking", !!reverseOrder);
+    var colsNum = parseInt(columns) || 1;
+    if (colsNum < 1) colsNum = 1;
 
-    // 先按需要统一缩放（基于可视宽/高）
-    for (var i = 0; i < ordered.length; i++) {
-        var it = ordered[i];
-        if (useHeight && hVal > 0) {
-            scaleItemToVisibleHeight(it, hValPt);
+    // 先按需要缩放（基于可视宽/高）
+    if (sizeMode === "custom") {
+        for (var i = 0; i < ordered.length; i++) {
+            var it = ordered[i];
+            if (useWidth && useHeight && wValPt > 0 && hValPt > 0) {
+                var inf = getVisibleInfo(it);
+                if (inf.width > 0 && inf.height > 0) {
+                    var sX = (wValPt / inf.width) * 100;
+                    var sY = (hValPt / inf.height) * 100;
+                    it.resize(sX, sY, true, true, true, true, 100, Transformation.CENTER);
+                }
+            } else if (useHeight && hValPt > 0) {
+                scaleItemToVisibleHeight(it, hValPt);
+            } else if (useWidth && wValPt > 0) {
+                scaleItemToVisibleWidth(it, wValPt);
+            }
         }
-        if (useWidth && wVal > 0) {
-            scaleItemToVisibleWidth(it, wValPt);
+    } else if (!alignEdges && sizeMode === "auto") {
+        if (colsNum === 1) {
+            // 单列纵向排列：按第一个对象的宽度等比缩放所有对象
+            var firstW = getVisibleInfo(ordered[0]).width;
+            if (firstW > 0) {
+                for (var idx = 0; idx < ordered.length; idx++) {
+                    scaleItemToVisibleWidth(ordered[idx], firstW);
+                }
+            }
+        } else {
+            // 多列网格排列：按行分组，每行内的对象等比缩放到该行首个对象的高度
+            for (var rowStart = 0; rowStart < ordered.length; rowStart += colsNum) {
+                var rowEnd = Math.min(rowStart + colsNum, ordered.length);
+                var rowFirstH = getVisibleInfo(ordered[rowStart]).height;
+                if (rowFirstH > 0) {
+                    for (var colIdx = rowStart; colIdx < rowEnd; colIdx++) {
+                        scaleItemToVisibleHeight(ordered[colIdx], rowFirstH);
+                    }
+                }
+            }
         }
     }
 
     // 非 autoLayout 模式下使用 Align Edges
     if (alignEdges) {
-        var colsNum = parseInt(columns) || 1;
-        if (colsNum < 1) colsNum = 1;
-
         // 按 columns 将 ordered 分为多行
         var nonAutoRows = [];
         var currentRow = [];
@@ -506,6 +686,74 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
             }
         }
 
+        if (sizeMode === "auto") {
+            // 自动调整大小模式 + Align Edges：
+            // 支持自定义 Column Gap (colGapPt)，通过等比缩放每行对象的高度，使每行对象总宽度 + 固定列间距精确填满 targetLayoutWidthPt
+            var targetLayoutWidthPt = layoutWidthPt;
+            if (targetLayoutWidthPt <= 0) {
+                var maxNaturalW = 0;
+                for (var rW = 0; rW < nonAutoRows.length; rW++) {
+                    var rMems = nonAutoRows[rW];
+                    var rSumW = 0;
+                    for (var mW = 0; mW < rMems.length; mW++) {
+                        rSumW += getVisibleInfo(rMems[mW]).width;
+                    }
+                    var rTotal = rSumW + (rMems.length - 1) * colGapPt;
+                    if (rTotal > maxNaturalW) maxNaturalW = rTotal;
+                }
+                targetLayoutWidthPt = maxNaturalW;
+            }
+
+            var rowHeightsAuto = [];
+            for (var r = 0; r < nonAutoRows.length; r++) {
+                var rMembers = nonAutoRows[r];
+                var nItems = rMembers.length;
+                var aspectSum = 0;
+                for (var mA = 0; mA < nItems; mA++) {
+                    var infoA = getVisibleInfo(rMembers[mA]);
+                    if (infoA.height > 0) {
+                        aspectSum += infoA.width / infoA.height;
+                    }
+                }
+                var availW = targetLayoutWidthPt - (nItems - 1) * colGapPt;
+                var rowH = 0;
+                if (aspectSum > 0 && availW > 0) {
+                    rowH = availW / aspectSum;
+                    for (var mS = 0; mS < nItems; mS++) {
+                        scaleItemToVisibleHeight(rMembers[mS], rowH);
+                    }
+                } else if (nItems > 0) {
+                    rowH = getVisibleInfo(rMembers[0]).height;
+                }
+                rowHeightsAuto.push(rowH);
+            }
+
+            var firstInfo = getVisibleInfo(ordered[0]);
+            var startX = firstInfo.left;
+            var currentY = firstInfo.top;
+
+            for (var r = 0; r < nonAutoRows.length; r++) {
+                var rMembers = nonAutoRows[r];
+                var rowH = rowHeightsAuto[r];
+
+                if (rMembers.length === 1) {
+                    moveItemTopLeftTo(rMembers[0], startX, currentY);
+                } else {
+                    var x = startX;
+                    for (var m = 0; m < rMembers.length; m++) {
+                        var itemM = rMembers[m];
+                        moveItemTopLeftTo(itemM, x, currentY);
+                        x += getVisibleInfo(itemM).width + colGapPt;
+                    }
+                }
+                currentY -= (rowH + rowGapPt);
+            }
+
+            var resWidthMm = Math.round(pointsToMm(targetLayoutWidthPt) * 100) / 100;
+            return '{"layoutWidth":' + resWidthMm + '}';
+        }
+
+        // 非 auto 模式（original 或 custom）：对象尺寸固定，间距自动均分
         // 计算每行对象宽度之和，找到最大的一行对象宽度之和 (maxRowObjectWidthPt)
         var maxRowObjectWidthPt = 0;
         var rowHeights = [];
@@ -583,7 +831,7 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
         }
 
         count++;
-        if (count < columns) {
+        if (count < colsNum) {
             // 横向推进：可视宽度 + 列间距
             currentX += infoAfter.width + colGapPt;
         } else {

@@ -34,6 +34,7 @@ var uniformWidthInput = document.querySelector("#uniform-width");
 var uniformHeightInput = document.querySelector("#uniform-height");
 var useUniformWidthCheckbox = document.querySelector("#use-uniform-width");
 var useUniformHeightCheckbox = document.querySelector("#use-uniform-height");
+var arrangeSizeModeSelect = document.querySelector("#arrange-size-mode");
 
 // New: Arrange order controls
 var arrangeOrderSelect = document.querySelector("#arrange-order");
@@ -267,19 +268,29 @@ function handleArrange() {
     if (isNaN(rowGap)) rowGap = 10;
     var colGap = parseFloat(colGapInput.value);
     if (isNaN(colGap)) colGap = 10;
-    if (
-        useUniformWidthCheckbox.checked &&
-        parseFloat(uniformWidthInput.value) < 0
-    ) {
-        alert("Please specify a valid uniform width");
-        return;
-    }
-    if (
-        useUniformHeightCheckbox.checked &&
-        parseFloat(uniformHeightInput.value) < 0
-    ) {
-        alert("Please specify a valid uniform height");
-        return;
+
+    var sizeMode = (arrangeSizeModeSelect && arrangeSizeModeSelect.value) || "original";
+    var useWidth = false;
+    var useHeight = false;
+    var widthVal = 0;
+    var heightVal = 0;
+
+    if (sizeMode === "custom") {
+        useWidth = !!(useUniformWidthCheckbox && useUniformWidthCheckbox.checked);
+        useHeight = !!(useUniformHeightCheckbox && useUniformHeightCheckbox.checked);
+        widthVal = parseFloat(uniformWidthInput.value);
+        if (isNaN(widthVal)) widthVal = 0;
+        heightVal = parseFloat(uniformHeightInput.value);
+        if (isNaN(heightVal)) heightVal = 0;
+
+        if (useWidth && widthVal < 0) {
+            alert("Please specify a valid uniform width");
+            return;
+        }
+        if (useHeight && heightVal < 0) {
+            alert("Please specify a valid uniform height");
+            return;
+        }
     }
 
     var order = (arrangeOrderSelect && arrangeOrderSelect.value) || "stacking";
@@ -291,15 +302,16 @@ function handleArrange() {
             ${columns},
             ${rowGap},
             ${colGap},
-            ${useUniformWidthCheckbox.checked},
-            ${uniformWidthInput.value},
-            ${useUniformHeightCheckbox.checked},
-            ${uniformHeightInput.value},
+            ${useWidth},
+            ${widthVal},
+            ${useHeight},
+            ${heightVal},
             "${order}",
             ${revOrder},
             ${!!(autoLayoutCheckbox && autoLayoutCheckbox.checked)},
             ${!!(alignEdgesCheckbox && alignEdgesCheckbox.checked)},
-            ${parseFloat(layoutWidthInput && layoutWidthInput.value) || 0}
+            ${parseFloat(layoutWidthInput && layoutWidthInput.value) || 0},
+            "${sizeMode}"
         )
     `, function (result) {
         if (result === 'EvalScript error.') {
