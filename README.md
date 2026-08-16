@@ -162,11 +162,11 @@
 
 下载zip文件后，解压为文件夹，复制到 Adobe 插件目录：
 
-- Windows（推荐用户目录，无需管理员权限）：
-  - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车（完整路径：`C:\Users\<你的用户名>\AppData\Roaming\Adobe\CEP\extensions`，若没有相关文件夹可手动新建）。
+- Windows：
+  - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车。
 - MacOS：
   - 目录：`~/Library/Application Support/Adobe/CEP/extensions`
-- 如何判断路径正确：如果路径正确，通常里面已经存在其他插件文件夹（若没有也可新建）。
+
 
 安装后记得重启 illustrator！！！
    
