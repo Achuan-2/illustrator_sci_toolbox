@@ -160,15 +160,16 @@
     
 #### 方法二：zip文件安装
 
-下载zip文件后，解压为文件夹，复制到 Adobe 插件目录：
+下载zip文件后，解压为文件夹，复制到 Adobe 插件目录。安装后重启 illustrator 即完成安装
+
+不同系统的Adobe 插件目录：
 
 - Windows：
+
   - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车。
 - MacOS：
+
   - 目录：`~/Library/Application Support/Adobe/CEP/extensions`
-
-
-安装后记得重启 illustrator！！！
    
 
 ### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）
