@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$NoRelease,
+    [switch]$NoCommit,
     [switch]$NoPause
 )
 
@@ -43,6 +44,52 @@ function Get-ReleaseNotes {
         throw "CHANGELOG.md has empty release notes for v$Version."
     }
     return $notes.Trim()
+}
+
+function Save-WorkspaceCommit {
+    param([string]$ProjectDir, [string]$Tag)
+
+    # Never stage files from a parent repository if this project is only a subdirectory.
+    $gitRoot = Invoke-CheckedCommand -Command 'git' -Arguments @('rev-parse', '--show-toplevel') -Operation 'Locating Git repository'
+    $resolvedRoot = [IO.Path]::GetFullPath($gitRoot).TrimEnd('\', '/')
+    $resolvedProject = [IO.Path]::GetFullPath($ProjectDir).TrimEnd('\', '/')
+    if (-not $resolvedRoot.Equals($resolvedProject, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Automatic commit requires the project directory to be the Git repository root.'
+    }
+
+    $changes = @(Invoke-CheckedCommand -Command 'git' -Arguments @(
+        'status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'
+    ) -Operation 'Checking workspace changes')
+    if ($changes.Count -eq 0) {
+        Write-Host '[GIT] Workspace is clean; automatic commit skipped.'
+        return
+    }
+
+    $conflicts = @(Invoke-CheckedCommand -Command 'git' -Arguments @(
+        'diff', '--name-only', '--diff-filter=U'
+    ) -Operation 'Checking merge conflicts')
+    if ($conflicts.Count -gt 0) { throw 'Resolve merge conflicts before building; no automatic commit was made.' }
+
+    # Include additions, modifications, deletions, and already staged files; honor .gitignore.
+    Invoke-CheckedCommand -Command 'git' -Arguments @('add', '--all', '--', '.') -Operation 'Staging workspace changes'
+    $stagedFiles = @(Invoke-CheckedCommand -Command 'git' -Arguments @(
+        'diff', '--cached', '--name-only'
+    ) -Operation 'Checking staged changes')
+    if ($stagedFiles.Count -eq 0) {
+        throw 'Workspace changes could not be staged. Check for uncommitted changes inside submodules.'
+    }
+
+    # Gitmoji U+1F516 means release/version tags; keep the script ASCII for Windows PowerShell 5.1.
+    $releaseEmoji = [char]::ConvertFromUtf32(0x1F516)
+    $message = $releaseEmoji + ' ' + $Tag + ' / ' + (Get-Date -Format 'yyyyMMdd')
+    Write-Host "[GIT] Committing workspace changes: $message"
+    Invoke-CheckedCommand -Command 'git' -Arguments @('commit', '-m', $message) -Operation 'Automatic workspace commit'
+    $remainingChanges = @(Invoke-CheckedCommand -Command 'git' -Arguments @(
+        'status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'
+    ) -Operation 'Checking workspace after commit')
+    if ($remainingChanges.Count -gt 0) {
+        throw 'Workspace still has uncommitted changes after commit. Check submodules or changes made by Git hooks.'
+    }
 }
 
 $projectDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -108,6 +155,12 @@ try {
         Invoke-CheckedCommand -Command 'gh' -Arguments @('auth', 'status', '--hostname', $githubHost) -Operation 'GitHub authentication check'
     }
 
+    if (-not $NoCommit) {
+        Save-WorkspaceCommit -ProjectDir $projectDir -Tag $tag
+    } else {
+        Write-Host '[GIT] Automatic commit skipped (-NoCommit).'
+    }
+
     Write-Host '[1/6] Preparing build directories...'
     New-Item -ItemType Directory -Path $buildDir, $distDir -Force | Out-Null
     # Remove only this version's outputs; retain older packages.
@@ -169,7 +222,7 @@ try {
                 'release', 'edit', $tag, '--title', $tag, '--notes-file', $notesFile, '--draft=false', '--repo', $repo
             ) -Operation 'Release update'
         } else {
-            # gh creates a missing tag on the remote default branch; no local commit/push is performed.
+            # gh creates a missing tag on the remote default branch; no automatic push is performed.
             Invoke-CheckedCommand -Command 'gh' -Arguments @(
                 'release', 'create', $tag, $outputZxp, $outputZip, '--title', $tag, '--notes-file', $notesFile, '--repo', $repo
             ) -Operation 'Release creation'
