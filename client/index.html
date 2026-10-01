@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>SCI Toolbox</title>
+    <title data-i18n="app.title"></title>
     <style>
         :root {
             --bg: #1f1f1f;
@@ -40,7 +40,7 @@
             /* 防止过窄挤压到不可用 */
         }
 
-        /* 左侧垂直标签栏：宽度随内容自适应，窗口变窄时收缩、文字缩略显示 */
+        /* 侧栏按标签内容确定宽度，不随当前面板的内容收缩 */
         .tabs {
             display: flex;
             flex-direction: column;
@@ -48,8 +48,7 @@
             border-right: 1px solid var(--border);
             padding: 8px 6px;
             background: var(--bg);
-            flex: 0 1 auto;
-            /* 不固定宽度：以内容宽度为准，空间不足时允许收缩（overflow 使最小宽度为 0） */
+            flex: 0 0 auto;
             min-width: 0;
             overflow-y: auto;
         }
@@ -79,7 +78,7 @@
 
         /* 内容区：填满剩余空间并允许滚动 */
         .content {
-            flex: 1 1 auto;
+            flex: 1 1 0;
             min-width: 0;
             padding: 12px;
             overflow: auto;
@@ -93,6 +92,7 @@
         /* 面板容器：使用 block 切换可见，但内部采用自适应布局 */
         .panel {
             display: none;
+            min-width: 0;
             background: var(--bg-panel);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -101,6 +101,11 @@
 
         .panel.active {
             display: block;
+        }
+
+        /* 关于页的长链接在内容区内换行，避免撑宽面板 */
+        #panel-about {
+            overflow-wrap: break-word;
         }
 
         .panel h3 {
@@ -264,67 +269,68 @@
 <body>
     <div class="app">
         <div class="tabs" id="tabs">
-            <div class="tab active" data-target="panel-relative" data-hash="relative" title="Relative Position">Relative Position</div>
-            <div class="tab" data-target="panel-distribute" data-hash="distribute" title="Spacing Set">Spacing Set</div>
-            <div class="tab" data-target="panel-swap" data-hash="swap" title="Swap">Swap</div>
-            <div class="tab" data-target="panel-size" data-hash="size" title="Size Paste">Size Paste</div>
-            <div class="tab" data-target="panel-arrange" data-hash="arrange" title="Grid Layout">Grid Layout</div>
-            <div class="tab" data-target="panel-labels" data-hash="labels" title="Labels">Labels</div>
-            <div class="tab" data-target="panel-border" data-hash="border" title="Add Border">Add Border</div>
-            <div class="tab" data-target="panel-selection" data-hash="selection" title="Selection">Selection</div>
-            <div class="tab" data-target="panel-about" data-hash="about" title="About">About</div>
+            <div class="tab active" data-target="panel-relative" data-hash="relative" data-i18n-title="tabs.relative" data-i18n="tabs.relative"></div>
+            <div class="tab" data-target="panel-distribute" data-hash="distribute" data-i18n-title="tabs.distribute" data-i18n="tabs.distribute"></div>
+            <div class="tab" data-target="panel-swap" data-hash="swap" data-i18n-title="tabs.swap" data-i18n="tabs.swap"></div>
+            <div class="tab" data-target="panel-size" data-hash="size" data-i18n-title="tabs.size" data-i18n="tabs.size"></div>
+            <div class="tab" data-target="panel-arrange" data-hash="arrange" data-i18n-title="tabs.arrange" data-i18n="tabs.arrange"></div>
+            <div class="tab" data-target="panel-labels" data-hash="labels" data-i18n-title="tabs.labels" data-i18n="tabs.labels"></div>
+            <div class="tab" data-target="panel-border" data-hash="border" data-i18n-title="tabs.border" data-i18n="tabs.border"></div>
+            <div class="tab" data-target="panel-selection" data-hash="selection" data-i18n-title="tabs.selection" data-i18n="tabs.selection"></div>
+            <div class="tab" data-target="panel-settings" data-hash="settings" data-i18n="tabs.settings" data-i18n-title="tabs.settings"></div>
+            <div class="tab" data-target="panel-about" data-hash="about" data-i18n-title="tabs.about" data-i18n="tabs.about"></div>
         </div>
         <div class="content">
-            <div class="panel-title" id="panel-title">Relative Position</div>
+            <div class="panel-title" id="panel-title"></div>
             <!-- Relative Position Panel -->
             <div class="panel active" id="panel-relative">
                 <div class="grid">
                     <div class="input-group">
-                        <label>ΔX (mm) [right:+,left:-]:</label>
+                        <label data-i18n="relative.deltaX"></label>
                         <input type="text" id="delta-x" value="0">
                     </div>
                     <div class="input-group">
-                        <label>ΔY (mm) [down:+,up:-]:</label>
+                        <label data-i18n="relative.deltaY"></label>
                         <input type="text" id="delta-y" value="0">
                     </div>
                     <div class="input-group">
-                        <label>Relative Corner:</label>
+                        <label data-i18n="relative.corner"></label>
                         <select id="relative-corner" style="width:120px">
-                            <option value="TL">Top-Left</option>
-                            <option value="TR">Top-Right</option>
-                            <option value="BL">Bottom-Left</option>
-                            <option value="BR">Bottom-Right</option>
+                            <option value="TL" data-i18n="corners.topLeft"></option>
+                            <option value="TR" data-i18n="corners.topRight"></option>
+                            <option value="BL" data-i18n="corners.bottomLeft"></option>
+                            <option value="BR" data-i18n="corners.bottomRight"></option>
                         </select>
                     </div>
 
                     <!-- New: Order options for Relative Position -->
                     <div class="input-group">
-                        <label>Order:</label>
+                        <label data-i18n="common.order"></label>
                         <select id="relative-order">
-                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
-                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
-                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
-                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
+                            <option value="grid" selected data-i18n-title="order.gridHint" data-i18n="order.grid"></option>
+                            <option value="stacking" data-i18n-title="order.stackingHint" data-i18n="order.stacking"></option>
+                            <option value="horizontal" data-i18n-title="order.horizontalHint" data-i18n="order.horizontal"></option>
+                            <option value="vertical" data-i18n-title="order.verticalHint" data-i18n="order.vertical"></option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>Reverse Order:</label>
-                        <input type="checkbox" id="reverse-move-checkbox" title="Reverse order and move direction">
+                        <label data-i18n="relative.reverse"></label>
+                        <input type="checkbox" id="reverse-move-checkbox" data-i18n-title="relative.reverseHint">
                     </div>
                     <div class="input-group">
-                        <label>Force Paste on Mismatch</label>
+                        <label data-i18n="relative.forcePaste"></label>
                         <input type="checkbox" id="allow-mismatch-paste"
-                            title="When counts mismatch, still paste using cyclic deltas">
+                            data-i18n-title="relative.forcePasteHint">
                     </div>
                     <div class="input-group">
-                        <label>Artboard Reference</label>
+                        <label data-i18n="relative.artboard"></label>
                         <input type="checkbox" id="use-artboard-ref"
-                            title="Use current artboard as copy reference; paste using each shape's own artboard-relative position">
+                            data-i18n-title="relative.artboardHint">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn" id="copy-pos-button">Copy</button>
-                    <button class="btn" id="paste-pos-button">Paste</button>
+                    <button class="btn" id="copy-pos-button" data-i18n="common.copy"></button>
+                    <button class="btn" id="paste-pos-button" data-i18n="common.paste"></button>
                 </div>
             </div>
 
@@ -333,102 +339,102 @@
             <div class="panel" id="panel-arrange">
                 <div class="grid">
                     <div class="input-group">
-                        <label>Auto Layout:</label>
+                        <label data-i18n="arrange.auto"></label>
                         <input type="checkbox" id="auto-layout"
-                            title="Auto-detect rows & columns from current positions and snap items to a tidy grid (Columns input is ignored)">
+                            data-i18n-title="arrange.autoHint">
                     </div>
                     <div class="input-group" id="align-edges-group">
-                        <label>Align Edges:</label>
+                        <label data-i18n="arrange.alignEdges"></label>
                         <input type="checkbox" id="align-edges"
-                            title="Align the left edge of each row's first item and the right edge of each row's last item; gaps inside a row are distributed automatically (Column Gap is ignored)">
+                            data-i18n-title="arrange.alignEdgesHint">
                     </div>
                     <div class="input-group" id="layout-width-group" style="display:none">
-                        <label>Layout Width (mm):</label>
+                        <label data-i18n="arrange.layoutWidth"></label>
                         <input type="number" id="layout-width" value="0" min="0"
-                            title="Total width between the aligned left & right edges after arranging; minimum width is the maximum sum of object widths in a single row">
+                            data-i18n-title="arrange.layoutWidthHint">
                     </div>
                     <div class="input-group" id="columns-group">
-                        <label>Columns:</label>
+                        <label data-i18n="arrange.columns"></label>
                         <input type="number" id="columns" value="1" min="1">
                     </div>
                     <div class="input-group">
-                        <label>Row Gap (mm):</label>
+                        <label data-i18n="arrange.rowGap"></label>
                         <input type="number" id="row-gap" value="1" min="0">
                     </div>
                     <div class="input-group" id="col-gap-group">
-                        <label>Column Gap (mm):</label>
+                        <label data-i18n="arrange.columnGap"></label>
                         <input type="number" id="col-gap" value="1" min="0">
                     </div>
                     <div class="input-group">
-                        <label>Object Size:</label>
+                        <label data-i18n="arrange.objectSize"></label>
                         <select id="arrange-size-mode">
-                            <option value="original" selected title="Keep original size of objects (保持原来大小)">Keep Original Size</option>
-                            <option value="auto" title="Automatically adjust sizes proportionally (自动调整)">Auto Adjust</option>
-                            <option value="custom" title="Specify custom width and/or height (自定义大小)">Custom Size</option>
+                            <option value="original" selected data-i18n-title="arrange.originalHint" data-i18n="arrange.original"></option>
+                            <option value="auto" data-i18n-title="arrange.autoSizeHint" data-i18n="arrange.autoSize"></option>
+                            <option value="custom" data-i18n-title="arrange.customSizeHint" data-i18n="arrange.customSize"></option>
                         </select>
                     </div>
                     <div class="input-group" id="arrange-custom-width-group" style="display:none">
-                        <label>Resize Width (mm):</label>
+                        <label data-i18n="arrange.resizeWidth"></label>
                         <input type="number" id="uniform-width" value="100" min="0">
-                        <input type="checkbox" id="use-uniform-width" checked title="Use Uniform Width">
+                        <input type="checkbox" id="use-uniform-width" checked data-i18n-title="arrange.useWidth">
                     </div>
                     <div class="input-group" id="arrange-custom-height-group" style="display:none">
-                        <label>Resize Height (mm):</label>
+                        <label data-i18n="arrange.resizeHeight"></label>
                         <input type="number" id="uniform-height" value="100" min="0">
-                        <input type="checkbox" id="use-uniform-height" checked title="Use Uniform Height">
+                        <input type="checkbox" id="use-uniform-height" checked data-i18n-title="arrange.useHeight">
                     </div>
 
                     <!-- New: Order options for Arrange Images -->
                     <div class="input-group">
-                        <label>Order:</label>
+                        <label data-i18n="common.order"></label>
                         <select id="arrange-order">
-                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
-                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
-                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
-                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
+                            <option value="grid" selected data-i18n-title="order.gridHint" data-i18n="order.grid"></option>
+                            <option value="stacking" data-i18n-title="order.stackingHint" data-i18n="order.stacking"></option>
+                            <option value="horizontal" data-i18n-title="order.horizontalHint" data-i18n="order.horizontal"></option>
+                            <option value="vertical" data-i18n-title="order.verticalHint" data-i18n="order.vertical"></option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>Reverse order</label>
-                        <input type="checkbox" id="arrange-reverse-order" title="Reverse ordered list">
+                        <label data-i18n="common.reverseOrder"></label>
+                        <input type="checkbox" id="arrange-reverse-order" data-i18n-title="common.reverseOrderHint">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-primary" id="arrange-button">Update Layout</button>
+                    <button class="btn btn-primary" id="arrange-button" data-i18n="arrange.update"></button>
                 </div>
             </div>
 
             <!-- Distribute Panel -->
             <div class="panel" id="panel-distribute">
-                <h3>Even Spacing</h3>
+                <h3 data-i18n="spacing.even"></h3>
                 <div class="toolbar">
-                    <button class="btn" id="distribute-horizontal-button">Horizontal</button>
-                    <button class="btn" id="distribute-vertical-button">Vertical</button>
+                    <button class="btn" id="distribute-horizontal-button" data-i18n="spacing.horizontal"></button>
+                    <button class="btn" id="distribute-vertical-button" data-i18n="spacing.vertical"></button>
                 </div>
-                <h3>Spacing Paste</h3>
+                <h3 data-i18n="spacing.paste"></h3>
                 <!-- Horizontal -->
                 <div class="grid">
                     <div class="input-group">
-                        <label>Horizontal (mm):</label>
+                        <label data-i18n="spacing.horizontalValue"></label>
                         <input type="number" id="spacing-value-horizontal" step="0.1" value="0">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn" id="copy-spacing-horizontal-button">Copy</button>
-                    <button class="btn" id="move-left-horizontal-button">Move Left</button>
-                    <button class="btn" id="move-right-horizontal-button">Move Right</button>
+                    <button class="btn" id="copy-spacing-horizontal-button" data-i18n="common.copy"></button>
+                    <button class="btn" id="move-left-horizontal-button" data-i18n="spacing.moveLeft"></button>
+                    <button class="btn" id="move-right-horizontal-button" data-i18n="spacing.moveRight"></button>
                 </div>
                 <!-- Vertical -->
                 <div class="grid">
                     <div class="input-group">
-                        <label>Vertical (mm):</label>
+                        <label data-i18n="spacing.verticalValue"></label>
                         <input type="number" id="spacing-value-vertical" step="0.1" value="0">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn" id="copy-spacing-vertical-button">Copy</button>
-                    <button class="btn" id="move-top-vertical-button">Move Top</button>
-                    <button class="btn" id="move-bottom-vertical-button">Move Bottom</button>
+                    <button class="btn" id="copy-spacing-vertical-button" data-i18n="common.copy"></button>
+                    <button class="btn" id="move-top-vertical-button" data-i18n="spacing.moveTop"></button>
+                    <button class="btn" id="move-bottom-vertical-button" data-i18n="spacing.moveBottom"></button>
                 </div>
             </div>
 
@@ -437,12 +443,12 @@
                 <div class="toolbar">
                     <div class="swap-grid">
                         <div class="swap-col">
-                            <button class="btn" id="swap-tl-button">Swap Top-Left</button>
-                            <button class="btn" id="swap-bl-button">Swap Bottom-Left</button>
+                            <button class="btn" id="swap-tl-button" data-i18n="swap.topLeft"></button>
+                            <button class="btn" id="swap-bl-button" data-i18n="swap.bottomLeft"></button>
                         </div>
                         <div class="swap-col">
-                            <button class="btn" id="swap-tr-button">Swap Top-Right</button>
-                            <button class="btn" id="swap-br-button">Swap Bottom-Right</button>
+                            <button class="btn" id="swap-tr-button" data-i18n="swap.topRight"></button>
+                            <button class="btn" id="swap-br-button" data-i18n="swap.bottomRight"></button>
                         </div>
                     </div>
                 </div>
@@ -452,34 +458,34 @@
             <div class="panel" id="panel-labels">
                 <div class="grid">
                     <div class="input-group">
-                        <label>Font Family:</label>
+                        <label data-i18n="labels.fontFamily"></label>
                         <select id="font-family">
                             <option value="ArialMT">Arial</option>
                             <option value="TimesNewRomanPSMT">Times New Roman</option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>Font Size(pt):</label>
+                        <label data-i18n="labels.fontSize"></label>
                         <input type="number" id="font-size" value="8" min="1">
                     </div>
                     <div class="input-group">
-                        <label>Font Bold:</label>
-                        <input type="checkbox" id="font-bold" title="Make label text bold">
+                        <label data-i18n="labels.fontBold"></label>
+                        <input type="checkbox" id="font-bold" data-i18n-title="labels.fontBoldHint">
                     </div>
                     <div class="input-group">
-                        <label>Font Color:</label>
-                        <input type="color" id="font-color" value="#000000" title="Font color">
+                        <label data-i18n="labels.fontColor"></label>
+                        <input type="color" id="font-color" value="#000000" data-i18n-title="labels.fontColorHint">
                     </div>
                     <div class="input-group">
-                        <label>Offset X(pt):</label>
+                        <label data-i18n="labels.offsetX"></label>
                         <input type="number" id="label-offset-x" value="-6" title="">
                     </div>
                     <div class="input-group">
-                        <label>Offset Y(pt) :</label>
+                        <label data-i18n="labels.offsetY"></label>
                         <input type="number" id="label-offset-y" value="-6" title="">
                     </div>
                     <div class="input-group">
-                        <label>Label Template:</label>
+                        <label data-i18n="labels.template"></label>
                         <select id="label-template">
                             <option value="a">a</option>
                             <option value="A">A</option>
@@ -493,109 +499,120 @@
 
                     <!-- New: Start Count for Labels -->
                     <div class="input-group">
-                        <label>Label Index</label>
+                        <label data-i18n="labels.index"></label>
                         <input type="number" id="label-start-count" value="1" min="1" style="flex: 0 1 60px;">
-                        <button class="btn" id="undo-label-index" title="Undo to previous label index"
+                        <button class="btn" id="undo-label-index" data-i18n-title="labels.undoIndexHint"
                             style="flex: 0 0 auto; padding: 6px 10px;">↶</button>
-                        <input type="checkbox" id="auto-update-index" checked title="Update automatically">
+                        <input type="checkbox" id="auto-update-index" checked data-i18n-title="labels.autoIndexHint">
                     </div>
                     <div class="input-group">
-                        <label>Preview:</label>
+                        <label data-i18n="labels.preview"></label>
                         <label id="label-preview" style="color: var(--primary); font-weight: bold;">a</label>
                     </div>
 
                     <!-- New: Order options for Labels -->
                     <div class="input-group">
-                        <label>Order:</label>
+                        <label data-i18n="common.order"></label>
                         <select id="labels-order">
-                            <option value="grid" selected title="Auto-detect rows: top-to-bottom, left-to-right within each row (reading order)">grid order</option>
-                            <option value="stacking" title="Follow the layer stacking order of the selected objects">stacking order</option>
-                            <option value="horizontal" title="Sort strictly from left to right">horizontal order</option>
-                            <option value="vertical" title="Sort strictly from top to bottom">vertical order</option>
+                            <option value="grid" selected data-i18n-title="order.gridHint" data-i18n="order.grid"></option>
+                            <option value="stacking" data-i18n-title="order.stackingHint" data-i18n="order.stacking"></option>
+                            <option value="horizontal" data-i18n-title="order.horizontalHint" data-i18n="order.horizontal"></option>
+                            <option value="vertical" data-i18n-title="order.verticalHint" data-i18n="order.vertical"></option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>Reverse order</label>
-                        <input type="checkbox" id="labels-reverse-order" title="Reverse ordered list">
+                        <label data-i18n="common.reverseOrder"></label>
+                        <input type="checkbox" id="labels-reverse-order" data-i18n-title="common.reverseOrderHint">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn" id="filter-text-button" title="Select text frames from selected objects">Select
-                        Only Text</button>
+                    <button class="btn" id="filter-text-button" data-i18n-title="selection.textOnlyHint" data-i18n="labels.selectText"></button>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-primary" id="add-label-button" title="Add labels to selected objects">Add
-                        Labels</button>
-                    <button class="btn" id="update-label-button" title="Update labels of selected text frames">Update
-                        Labels</button>
+                    <button class="btn btn-primary" id="add-label-button" data-i18n-title="labels.addHint" data-i18n="labels.add"></button>
+                    <button class="btn" id="update-label-button" data-i18n-title="labels.updateHint" data-i18n="labels.update"></button>
                 </div>
             </div>
             <!-- Size Formater Panel -->
             <div class="panel" id="panel-size">
                 <div class="grid">
                     <div class="input-group">
-                        <label for="size-w">Width (mm):</label>
+                        <label for="size-w" data-i18n="size.width"></label>
                         <input type="number" id="size-w" value="0" style="flex: 0 1 60px;">
-                        <input type="checkbox" id="use-size-w" checked title="Use Width">
+                        <input type="checkbox" id="use-size-w" checked data-i18n-title="size.useWidth">
                     </div>
                     <div class="input-group">
-                        <label for="size-h">Height (mm):</label>
+                        <label for="size-h" data-i18n="size.height"></label>
                         <input type="number" id="size-h" value="0" style="flex: 0 1 60px;">
-                        <input type="checkbox" id="use-size-h" checked title="Use Height">
+                        <input type="checkbox" id="use-size-h" checked data-i18n-title="size.useHeight">
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn" id="copy-size-button">Copy Size</button>
-                    <button class="btn btn-primary" id="paste-size-button">Paste Size</button>
+                    <button class="btn" id="copy-size-button" data-i18n="size.copy"></button>
+                    <button class="btn btn-primary" id="paste-size-button" data-i18n="size.paste"></button>
                 </div>
             </div>
             <!-- Add Border Panel -->
             <div class="panel" id="panel-border">
                 <div class="grid">
                     <div class="input-group">
-                        <label for="border-color">Color:</label>
+                        <label for="border-color" data-i18n="border.color"></label>
                         <input type="color" id="border-color" value="#000000">
                     </div>
                     <div class="input-group">
-                        <label for="border-thickness">Thickness (pt):</label>
+                        <label for="border-thickness" data-i18n="border.thickness"></label>
                         <input type="number" id="border-thickness" value="1" min="0.1" step="0.1">
                     </div>
                     <div class="input-group">
-                        <label for="border-dash">Dash Gap (pt):</label>
+                        <label for="border-dash" data-i18n="border.dash"></label>
                         <input type="number" id="border-dash" value="0" min="0" step="0.1"
-                            title="0 = solid; >0 sets dash gap in points">
+                            data-i18n-title="border.dashHint">
                     </div>
                     <div class="input-group">
-                        <label for="auto-group-border">Auto Group:</label>
+                        <label for="auto-group-border" data-i18n="border.autoGroup"></label>
                         <input type="checkbox" id="auto-group-border" checked>
                     </div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-primary" id="add-border-button">Add Border</button>
+                    <button class="btn btn-primary" id="add-border-button" data-i18n="tabs.border"></button>
                 </div>
             </div>
             <!-- Selection Panel -->
             <div class="panel" id="panel-selection">
-                <h3>Selection Filter</h3>
+                <h3 data-i18n="selection.filter"></h3>
                 <div class="toolbar">
-                    <button class="btn btn-primary" id="select-text-only-button" title="Select text frames from selected objects">Select Text Only</button>
-                    <button class="btn" id="exclude-text-button" title="Exclude text frames from current selection">Exclude Text</button>
+                    <button class="btn btn-primary" id="select-text-only-button" data-i18n-title="selection.textOnlyHint" data-i18n="selection.textOnly"></button>
+                    <button class="btn" id="exclude-text-button" data-i18n-title="selection.excludeTextHint" data-i18n="selection.excludeText"></button>
                 </div>
+            </div>
+            <!-- Settings Panel -->
+            <div class="panel" id="panel-settings">
+                <div class="grid">
+                    <div class="input-group">
+                        <label for="language" data-i18n="settings.language"></label>
+                        <select id="language">
+                            <option value="en" selected data-i18n="settings.english"></option>
+                            <option value="zh_CN" data-i18n="settings.chinese"></option>
+                        </select>
+                    </div>
+                </div>
+                <p data-i18n="settings.languageHint"></p>
             </div>
             <!-- About Panel -->
             <div class="panel" id="panel-about">
-                <h3>About This Plugin</h3>
-                <p>Author: Achuan-2</p>
-                <p>GitHub: <a href="https://github.com/Achuan-2/illustrator_sci_toolbox" target="_blank"
+                <h3 data-i18n="about.title"></h3>
+                <p data-i18n="about.author"></p>
+                <p><span data-i18n="about.github"></span> <a href="https://github.com/Achuan-2/illustrator_sci_toolbox" target="_blank"
                         style="color: var(--primary); text-decoration: none;">https://github.com/Achuan-2/illustrator_sci_toolbox</a>
                 </p>
-                <p>Like this plugin? Feel free to support my work with a donation.</p>
-                <img src="../icons/donate.webp" width="80%">
+                <p data-i18n="about.donation"></p>
+                <img src="../icons/donate.webp" width="80%" data-i18n-alt="about.donationAlt">
             </div>
         </div>
     </div>
 
     <!-- Dependencies -->
+    <script type="text/javascript" src="i18n.js"></script>
     <script type="text/javascript" src="CSInterface.js" defer></script>
     <script type="text/javascript" src="../host/index.jsx" defer></script>
 
@@ -605,6 +622,7 @@
         var PluginSettings = {
             // 默认设置
             defaults: {
+                language: "en",
                 fontFamily: "ArialMT",
                 fontSize: 8,
                 fontBold: false,
@@ -621,6 +639,7 @@
             save: function () {
                 try {
                     var settings = {
+                        language: I18n.normalizeLanguage(document.getElementById('language').value),
                         fontFamily: document.getElementById('font-family').value,
                         fontSize: parseFloat(document.getElementById('font-size').value),
                         fontBold: document.getElementById('font-bold').checked,
@@ -646,6 +665,7 @@
                         var settings = JSON.parse(saved);
 
                         // 应用保存的设置
+                        I18n.setLanguage(settings.language || this.defaults.language);
                         document.getElementById('font-family').value = settings.fontFamily || this.defaults.fontFamily;
                         document.getElementById('font-size').value = settings.fontSize || this.defaults.fontSize;
                         document.getElementById('font-bold').checked = settings.fontBold !== undefined ? settings.fontBold : this.defaults.fontBold;
@@ -658,6 +678,8 @@
                         document.getElementById('auto-update-index').checked = settings.autoUpdateIndex !== undefined ? settings.autoUpdateIndex : this.defaults.autoUpdateIndex;
 
                         console.log('Settings loaded successfully');
+                    } else {
+                        I18n.setLanguage(this.defaults.language);
                     }
                 } catch (e) {
                     console.log('Failed to load settings:', e);
@@ -667,6 +689,7 @@
 
             // 应用默认设置
             applyDefaults: function () {
+                I18n.setLanguage(this.defaults.language);
                 document.getElementById('font-family').value = this.defaults.fontFamily;
                 document.getElementById('font-size').value = this.defaults.fontSize;
                 document.getElementById('font-bold').checked = this.defaults.fontBold;
@@ -682,6 +705,22 @@
             // 初始化设置管理
             init: function () {
                 var self = this;
+
+                // Restore the language before the deferred host handlers initialize.
+                // Other settings retain their existing load-time initialization.
+                try {
+                    var saved = JSON.parse(localStorage.getItem('illustrator_sci_plugin_settings') || '{}');
+                    I18n.setLanguage(saved.language || self.defaults.language);
+                } catch (e) {
+                    I18n.setLanguage(self.defaults.language);
+                }
+
+                document.getElementById('language').addEventListener('change', function () {
+                    I18n.setLanguage(this.value);
+                    // Save immediately so closing the panel also retains the selection.
+                    clearTimeout(self.saveTimeout);
+                    self.save();
+                });
 
                 // 页面加载时恢复设置
                 window.addEventListener('load', function () {
@@ -778,6 +817,7 @@
                 else if (hash === 'border') target = 'panel-border';
                 else if (hash === 'swap') target = 'panel-swap';
                 else if (hash === 'selection') target = 'panel-selection';
+                else if (hash === 'settings') target = 'panel-settings';
                 else if (hash === 'about') target = 'panel-about';
 
                 tabs.forEach(t => t.classList.toggle('active', t.dataset.target === target));

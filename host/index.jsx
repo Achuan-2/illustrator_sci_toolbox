@@ -178,11 +178,11 @@ function handleCopyPosition() {
 
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`copyRelativePosition("${corner}", "${order}", ${revOrder}, ${useArtboardRefCheckbox && useArtboardRefCheckbox.checked})`, function (result) {
-        deltaXInput.placeholder = 'ΔX'; // Reset placeholder
-        deltaYInput.placeholder = 'ΔY';
+        I18n.bind(deltaXInput, 'placeholder', 'relative.deltaXPlaceholder'); // Reset placeholder
+        I18n.bind(deltaYInput, 'placeholder', 'relative.deltaYPlaceholder');
 
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
             return;
         }
 
@@ -202,8 +202,8 @@ function handleCopyPosition() {
                     } else if (data.length > 1) {
                         deltaXInput.value = '';
                         deltaYInput.value = '';
-                        deltaXInput.placeholder = 'Multiple Values (' + data.length + ')';
-                        deltaYInput.placeholder = 'Multiple Values (' + data.length + ')';
+                        I18n.bind(deltaXInput, 'placeholder', 'relative.multipleValues', { count: data.length });
+                        I18n.bind(deltaYInput, 'placeholder', 'relative.multipleValues', { count: data.length });
                     } else {
                         deltaXInput.value = '0.00';
                         deltaYInput.value = '0.00';
@@ -213,7 +213,7 @@ function handleCopyPosition() {
                     deltaYInput.value = '0.00';
                 }
             } catch (e) {
-                alert("Failed to parse position data: " + e.message);
+                alert(I18n.t("errors.parsePosition", { message: e.message }));
                 copiedDeltasJSON = '[]';
                 deltaXInput.value = '0.00';
                 deltaYInput.value = '0.00';
@@ -237,11 +237,11 @@ function handlePastePosition() {
         overrideDeltaX = parseFloat(deltaXStr);
         overrideDeltaY = -parseFloat(deltaYStr); // 取反以补偿显示时的取反操作
         if (isNaN(overrideDeltaX) || isNaN(overrideDeltaY)) {
-            alert("Invalid number format for ΔX or ΔY.");
+            alert(I18n.t("errors.invalidDelta"));
             return;
         }
     } else if (!copiedDeltasJSON || copiedDeltasJSON === '[]') {
-        alert("No position data has been copied, and no override values are set.");
+        alert(I18n.t("errors.noCopiedPosition"));
         return;
     }
 
@@ -255,7 +255,7 @@ function handlePastePosition() {
     var script = `pasteRelativePosition('${copiedDeltasJSON}', ${reverse}, "${corner}", "${order}", ${revOrder}, ${useOverride ? overrideDeltaX : 'null'}, ${useOverride ? overrideDeltaY : 'null'}, ${allowMismatchPasteCheckbox && allowMismatchPasteCheckbox.checked}, ${useArtboardRefCheckbox && useArtboardRefCheckbox.checked})`;
     csInterface.evalScript(script, function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         }
     });
 }
@@ -284,11 +284,11 @@ function handleArrange() {
         if (isNaN(heightVal)) heightVal = 0;
 
         if (useWidth && widthVal < 0) {
-            alert("Please specify a valid uniform width");
+            alert(I18n.t("errors.uniformWidth"));
             return;
         }
         if (useHeight && heightVal < 0) {
-            alert("Please specify a valid uniform height");
+            alert(I18n.t("errors.uniformHeight"));
             return;
         }
     }
@@ -315,7 +315,9 @@ function handleArrange() {
         )
     `, function (result) {
         if (result === 'EvalScript error.') {
-            alert('Error executing the script');
+            alert(I18n.t("errors.script"));
+        } else if (result && result.indexOf("Error:") === 0) {
+            alert(I18n.formatError(result));
         } else if (result) {
             try {
                 var res = typeof result === 'string' ? JSON.parse(result) : result;
@@ -334,7 +336,7 @@ function handleCopySize() {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript('copySize()', function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
             return;
         }
         if (result && result !== 'EvalScript error.') {
@@ -343,7 +345,7 @@ function handleCopySize() {
                 sizeWInput.value = parseFloat(size.width).toFixed(3);
                 sizeHInput.value = parseFloat(size.height).toFixed(3);
             } catch (e) {
-                alert("Failed to parse size data: " + e.message);
+                alert(I18n.t("errors.parseSize", { message: e.message }));
             }
         }
     });
@@ -357,12 +359,12 @@ function handlePasteSize() {
     var useH = useSizeHCheckbox.checked;
 
     if ((useW && isNaN(width)) || (useH && isNaN(height))) {
-        alert("Please enter a valid width and height for the selected options.");
+        alert(I18n.t("errors.invalidSize"));
         return;
     }
 
     if (!useW && !useH) {
-        alert("Please select at least one dimension (Width or Height) to paste.");
+        alert(I18n.t("errors.selectDimension"));
         return;
     }
 
@@ -370,9 +372,9 @@ function handlePasteSize() {
     var script = `pasteSize(${width || 0}, ${height || 0}, ${useW}, ${useH})`;
     csInterface.evalScript(script, function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else if (result === 'EvalScript error.') {
-            alert('Error executing the pasteSize script.');
+            alert(I18n.t("errors.scriptNamed", { script: "pasteSize" }));
         }
     });
 }
@@ -413,9 +415,9 @@ function handleAddLabel() {
         )
     `, function (result) {
         if (result === 'EvalScript error.') {
-            alert('Error executing the script');
+            alert(I18n.t("errors.script"));
         } else if (result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else {
             // Update the start count with the new count only if auto-update is enabled
             if (autoUpdateIndexCheckbox && autoUpdateIndexCheckbox.checked) {
@@ -463,9 +465,9 @@ function handleUpdateLabel() {
         )
     `, function (result) {
         if (result === 'EvalScript error.') {
-            alert('Error executing the script');
+            alert(I18n.t("errors.script"));
         } else if (result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else {
             // 解析返回结果，如果包含更新的文本框数量，则更新Label Index
             try {
@@ -503,9 +505,9 @@ function handleFilterText() {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript('filterTextFrames()', function (result) {
         if (result === 'EvalScript error.') {
-            alert('Error executing the script');
+            alert(I18n.t("errors.script"));
         } else if (result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else {
             // 解析结果显示筛选信息
             try {
@@ -513,7 +515,7 @@ function handleFilterText() {
                 if (filterInfo.length === 2 && filterInfo[0] === "Success") {
                     var textCount = parseInt(filterInfo[1]);
                     if (textCount === 0) {
-                        alert('没有找到文本框对象');
+                        alert(I18n.t("errors.noTextFrames"));
                     } else {
                         console.log('已筛选出 ' + textCount + ' 个文本框');
                     }
@@ -580,9 +582,9 @@ function handleSwapCorner(corner) {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`swapSelectedPositions("${corner}")`, function (result) {
         if (result && result.indexOf && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else if (result === 'EvalScript error.') {
-            alert('Error executing the swapSelectedPositions script.');
+            alert(I18n.t("errors.scriptNamed", { script: "swapSelectedPositions" }));
         }
     });
 }
@@ -591,9 +593,9 @@ function handleDistributeSpacing(orientation) {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`distributeSpacing("${orientation}")`, function (result) {
         if (result && result.indexOf && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else if (result === 'EvalScript error.') {
-            alert('Error executing the distributeSpacing script.');
+            alert(I18n.t("errors.scriptNamed", { script: "distributeSpacing" }));
         }
     });
 }
@@ -603,7 +605,7 @@ function handleCopySpacing(direction) {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`copySpacing("${direction}")`, function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
             return;
         }
         if (result && result !== 'EvalScript error.') {
@@ -621,16 +623,16 @@ function handlePasteSpacing(direction, spacingValue, moveLeftOrTop) {
     var spacing = parseFloat(spacingValue);
 
     if (isNaN(spacing)) {
-        alert("Please enter a valid spacing value.");
+        alert(I18n.t("errors.invalidSpacing"));
         return;
     }
 
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`pasteSpacing("${direction}", ${spacing}, ${moveLeftOrTop})`, function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else if (result === 'EvalScript error.') {
-            alert('Error executing the pasteSpacing script.');
+            alert(I18n.t("errors.scriptNamed", { script: "pasteSpacing" }));
         }
     });
 }
@@ -642,8 +644,8 @@ function enterLabelEditingMode() {
     labelOffsetYInput.classList.add("editing-mode");
 
     // Set tooltips for editing mode
-    labelOffsetXInput.title = "更改数值，将实时移动标签位置";
-    labelOffsetYInput.title = "更改数值，将实时移动标签位置";
+    I18n.bind(labelOffsetXInput, "title", "labels.editingHint");
+    I18n.bind(labelOffsetYInput, "title", "labels.editingHint");
 }
 
 function exitLabelEditingMode() {
@@ -651,7 +653,9 @@ function exitLabelEditingMode() {
     labelOffsetYInput.classList.remove("editing-mode");
 
     // Clear tooltips when exiting editing mode
+    labelOffsetXInput.removeAttribute("data-i18n-title");
     labelOffsetXInput.title = "";
+    labelOffsetYInput.removeAttribute("data-i18n-title");
     labelOffsetYInput.title = "";
 }
 
@@ -702,14 +706,14 @@ function handleAddBorder() {
     var dash = parseFloat(borderDashInput && borderDashInput.value) || 0;
     var autoGroup = autoGroupBorderCheckbox && autoGroupBorderCheckbox.checked;
     if (isNaN(thickness) || thickness <= 0) {
-        alert("Invalid thickness value.");
+        alert(I18n.t("errors.invalidThickness"));
         return;
     }
 
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`addBorder("${color}", ${thickness}, ${dash}, ${autoGroup})`, function (result) {
         if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         }
     });
 }
@@ -719,9 +723,9 @@ function handleFilterSelection(mode) {
     csInterface.evalScript(`$.evalFile("${csInterface.getSystemPath(SystemPath.EXTENSION)}/jsx/arrange.jsx")`);
     csInterface.evalScript(`filterSelection("${mode}")`, function (result) {
         if (result === 'EvalScript error.') {
-            alert('Error executing the script');
+            alert(I18n.t("errors.script"));
         } else if (result && result.indexOf("Error:") === 0) {
-            alert(result);
+            alert(I18n.formatError(result));
         } else if (result && result.indexOf("Success|") === 0) {
             var msg = result.split('|')[1];
             console.log("Selection filter:", msg);

@@ -1,4 +1,14 @@
 // Illustrator ExtendScript Functions
+// Return translation keys to the panel; ExtendScript does not load UI locales.
+// URI encoding preserves separators and Unicode in dynamic error arguments.
+function sciError(key, args) {
+    var result = "Error: " + key;
+    for (var i = 0; args && i < args.length; i++) {
+        result += "|" + encodeURIComponent(String(args[i]));
+    }
+    return result;
+}
+
 // Helper function to convert mm to points
 function mmToPoints(mm) {
     return mm * 2.83464567;
@@ -602,14 +612,13 @@ function autoArrangeLayout(selection, rowGapPt, colGapPt, useWidth, wValPt, useH
 }
 
 function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal, order, reverseOrder, autoLayout, alignEdges, layoutWidth, sizeMode) {
-    if (app.documents.length === 0) return;
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (selection.length === 0) {
-        alert("Please select items to arrange");
-        return;
+        return sciError("errors.selectArrange");
     }
 
     if (!sizeMode) {
@@ -846,13 +855,13 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
 }
 
 function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOffsetY, labelTemplate, fontColor, order, reverseOrder, startCount, sessionId) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (selection.length === 0) {
-        return "Error: Please select items to label";
+        return sciError("errors.selectLabel");
     }
 
     startCount = parseInt(startCount) || 1;
@@ -898,7 +907,7 @@ function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOf
                     textFrame.textRange.characterAttributes.textFont = app.textFonts.getByName(fontFamily);
                 }
             } catch (e) {
-                return "Error: Font not found: " + fontFamily;
+                return sciError("errors.fontNotFound", [fontFamily]);
             }
 
             // Set font color
@@ -921,20 +930,20 @@ function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOf
             var payload = '{"sid":' + (sessionId || 0) + ',"baseL":' + v.left + ',"baseT":' + v.top + '}';
             try { textFrame.note = payload; } catch (e) { }
         } catch (e) {
-            return "Error: Error adding label to item " + (i + 1) + ": " + e.message;
+            return sciError("errors.addLabel", [i + 1, e.message]);
         }
     }
     return (startCount + ordered.length).toString();
 }
 
 function updateLabelIndex(fontFamily, fontSize, fontBold, labelTemplate, fontColor, order, reverseOrder, startCount) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (selection.length === 0) {
-        return "Error: 需要选中label所在的文本框";
+        return sciError("errors.selectLabelFrames");
     }
 
     // 筛选出textframe类型
@@ -946,7 +955,7 @@ function updateLabelIndex(fontFamily, fontSize, fontBold, labelTemplate, fontCol
     }
 
     if (textFrames.length === 0) {
-        return "Error: 需要选中label所在的文本框";
+        return sciError("errors.selectLabelFrames");
     }
 
     startCount = parseInt(startCount) || 1;
@@ -1019,7 +1028,7 @@ function updateLabelIndex(fontFamily, fontSize, fontBold, labelTemplate, fontCol
                 textFrame.textRange.characterAttributes.fillColor = defaultColor;
             }
         } catch (e) {
-            return "Error: Error updating text frame " + (j + 1) + ": " + e.message;
+            return sciError("errors.updateTextFrame", [j + 1, e.message]);
         }
     }
 
@@ -1027,13 +1036,13 @@ function updateLabelIndex(fontFamily, fontSize, fontBold, labelTemplate, fontCol
 }
 
 function filterTextFrames() {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (selection.length === 0) {
-        return "Error: 请先选择一些对象";
+        return sciError("errors.selectObjects");
     }
 
     // 筛选出所有的文本框
@@ -1045,7 +1054,7 @@ function filterTextFrames() {
     }
 
     if (textFrames.length === 0) {
-        return "Error: 选中的对象中没有文本框";
+        return sciError("errors.noTextFrames");
     }
 
     // 清空当前选择
@@ -1060,13 +1069,13 @@ function filterTextFrames() {
 }
 
 function filterSelection(type) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (!selection || selection.length === 0) {
-        return "Error: Please select objects first.";
+        return sciError("errors.selectObjects");
     }
 
     var textItems = [];
@@ -1102,7 +1111,7 @@ function filterSelection(type) {
 
     if (type === "textOnly") {
         if (textItems.length === 0) {
-            return "Error: No text frames found in current selection.";
+            return sciError("errors.noTextFrames");
         }
         doc.selection = null;
         for (var t = 0; t < textItems.length; t++) {
@@ -1111,7 +1120,7 @@ function filterSelection(type) {
         return "Success|" + textItems.length;
     } else if (type === "excludeText") {
         if (nonTextItems.length === 0) {
-            return "Error: No non-text objects found in current selection.";
+            return sciError("errors.noNonTextObjects");
         }
         doc.selection = null;
         for (var n = 0; n < nonTextItems.length; n++) {
@@ -1120,17 +1129,17 @@ function filterSelection(type) {
         return "Success|" + nonTextItems.length;
     }
 
-    return "Error: Unknown filter mode";
+    return sciError("errors.unknownFilter");
 }
 
 function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (!selection || selection.length === 0) {
-        return "Error: Please select at least one item.";
+        return sciError("errors.selectOne");
     }
 
     // 当仅选中 1 个对象时：复制其“相对于画板”的位置（按所选角点）
@@ -1227,7 +1236,7 @@ function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
 }
 
 function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder, overrideDeltaX, overrideDeltaY, allowMismatch, useArtboardRef) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     // 允许 0 值作为覆盖坐标（只要不是 null 且是数字）
     var useOverride = (overrideDeltaX !== null && overrideDeltaY !== null &&
@@ -1251,7 +1260,7 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
     // 绝对位置粘贴：支持 单对象 abs、abs 数组、或在 useArtboardRef 勾选下使用覆盖坐标
     if (isAbs || isAbsArray || (useArtboardRef && useOverride)) {
         if (!selection || selection.length === 0) {
-            return "Error: Please select items to move.";
+            return sciError("errors.selectMove");
         }
 
         // 使用排序后的选择，保证与复制/用户期望的一致顺序
@@ -1324,7 +1333,7 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
         // abs 数组：每个对象使用对应条目的画板相对坐标（可循环）
         var absArr = data;
         if ((orderedAbs.length !== absArr.length) && !allowMismatch) {
-            return "Error: The number of items to move (" + orderedAbs.length + ") does not match the saved data count (" + absArr.length + ").";
+            return sciError("errors.countMismatch", [orderedAbs.length, absArr.length]);
         }
         for (var k = 0; k < orderedAbs.length; k++) {
             var entry = absArr[k % absArr.length];
@@ -1360,24 +1369,24 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
     if (useOverride) {
         deltas = [{ deltaX: overrideDeltaX, deltaY: overrideDeltaY }];
     } else {
-        if (!deltasJSON) return "Error: No relative position data provided.";
+        if (!deltasJSON) return sciError("errors.noRelativeData");
         try {
             deltas = data || eval('(' + deltasJSON + ')');
-            if (!deltas || typeof deltas.length === "undefined") throw new Error("Invalid data format.");
+            if (!deltas || typeof deltas.length === "undefined") return sciError("errors.invalidDataFormat");
         } catch (e) {
-            return "Error: Invalid relative position data. " + e.message;
+            return sciError("errors.invalidRelativeData", [e.message]);
         }
         if (deltas.length === 0) {
-            return "Error: No relative position data provided.";
+            return sciError("errors.noRelativeData");
         }
     }
 
     if (!selection || selection.length < 2) {
-        return "Error: Please select at least two items.";
+        return sciError("errors.selectTwoOrMore");
     }
 
     if (!useOverride && (selection.length - 1 !== deltas.length) && !allowMismatch) {
-        return "Error: The number of items to move (" + (selection.length - 1) + ") does not match the saved data count (" + deltas.length + ").";
+        return sciError("errors.countMismatch", [selection.length - 1, deltas.length]);
     }
 
     var ord = order || "stacking";
@@ -1431,9 +1440,9 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
 }
 
 function copySize() {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var selection = app.activeDocument.selection;
-    if (selection.length === 0) return "Error: Please select an item.";
+    if (selection.length === 0) return sciError("errors.selectItem");
 
     var item = selection[0];
     var info = getVisibleInfo(item);
@@ -1446,12 +1455,12 @@ function copySize() {
 }
 
 function pasteSize(width, height, useW, useH) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var selection = app.activeDocument.selection;
-    if (selection.length === 0) return "Error: Please select items to resize.";
+    if (selection.length === 0) return sciError("errors.selectResize");
 
-    if (!useW && !useH) return "Success: No action taken.";
+    if (!useW && !useH) return "Success";
 
     var targetWidthPt = useW ? mmToPoints(width) : 0;
     var targetHeightPt = useH ? mmToPoints(height) : 0;
@@ -1491,10 +1500,10 @@ function pasteSize(width, height, useW, useH) {
  * Returns "Success" or "Error: ..."
  */
 function swapSelectedPositions(corner) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var selection = app.activeDocument.selection;
     if (!selection || selection.length !== 2) {
-        return "Error: Please select exactly two items.";
+        return sciError("errors.selectExactlyTwo");
     }
 
     corner = corner || "TL";
@@ -1543,7 +1552,7 @@ function swapSelectedPositions(corner) {
         }
         b.translate(aCorner.x - bX, aCorner.y - bY);
     } catch (e) {
-        return "Error: " + e.message;
+        return sciError("errors.details", [e.message]);
     }
 
     return "Success";
@@ -1556,10 +1565,10 @@ function swapSelectedPositions(corner) {
  * gaps between adjacent visible edges are equal.
  */
 function distributeSpacing(direction) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var selection = app.activeDocument.selection;
     if (!selection || selection.length < 3) {
-        return "Error: Please select at least three items.";
+        return sciError("errors.selectThreeOrMore");
     }
 
     var dir = direction || "horizontal";
@@ -1638,10 +1647,10 @@ function distributeSpacing(direction) {
  * Returns JSON string: { horizontal: <mm>, vertical: <mm>, euclidean: <mm> }
  */
 function measureSpacing() {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var sel = app.activeDocument.selection;
     if (!sel || sel.length !== 2) {
-        return "Error: Please select exactly two items.";
+        return sciError("errors.selectExactlyTwo");
     }
 
     var a = sel[0];
@@ -1704,10 +1713,10 @@ function measureSpacing() {
  * Returns spacing in mm as string.
  */
 function copySpacing(direction) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var sel = app.activeDocument.selection;
     if (!sel || sel.length !== 2) {
-        return "Error: Please select exactly two items.";
+        return sciError("errors.selectExactlyTwo");
     }
 
     // Sort the two items from top to bottom or left to right
@@ -1738,10 +1747,10 @@ function copySpacing(direction) {
  * moveLeftOrTop: boolean, if true, move left/top items instead of right/bottom
  */
 function pasteSpacing(direction, spacingMm, moveLeftOrTop) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
     var sel = app.activeDocument.selection;
     if (!sel || sel.length < 2) {
-        return "Error: Please select at least two items.";
+        return sciError("errors.selectTwoOrMore");
     }
 
     var spacingPt = mmToPoints(spacingMm);
@@ -1811,13 +1820,13 @@ function pasteSpacing(direction, spacingMm, moveLeftOrTop) {
  * thickness: stroke width in points
  */
 function addBorder(color, thickness, dash, autoGroup) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var selection = doc.selection;
 
     if (selection.length === 0) {
-        return "Error: Please select items to add border.";
+        return sciError("errors.selectBorder");
     }
 
     for (var i = 0; i < selection.length; i++) {
@@ -1937,7 +1946,7 @@ function addBorder(color, thickness, dash, autoGroup) {
 
 
 function updateLabelOffsets(offsetX, offsetY, sessionId) {
-    if (app.documents.length === 0) return "Error: No document open.";
+    if (app.documents.length === 0) return sciError("errors.noDocument");
 
     var doc = app.activeDocument;
     var validCount = 0;
