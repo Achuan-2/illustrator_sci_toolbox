@@ -309,6 +309,31 @@ async function createPanel(
   return { window, requests, alerts, element, input, click, flush };
 }
 
+test('zoom automatic update switch persists and gates background host polling', async () => {
+  const panel = await createPanel();
+  try {
+    const control = panel.element('default-zoom-auto-update') as unknown as HTMLInputElement;
+    assert.equal(control.checked, true);
+    await panel.click(control.id);
+    assert.equal(control.checked, false);
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).zoomAutoUpdate, false);
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
+    await pause();
+    assert.equal(panel.requests.filter((request) => request.operation === 'syncZoomTracker').length, 0);
+    await panel.click(control.id);
+    await pause();
+    assert.ok(panel.requests.some((request) => request.operation === 'syncZoomTracker'));
+    await panel.click(control.id);
+    const count = panel.requests.length;
+    await pause();
+    assert.equal(panel.requests.length, count);
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.window.document.querySelector(`label[for="${control.id}"]`)?.textContent, '放大图自动更新');
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 test('checkbox activation survives the browser checkpoint between click and change', async () => {
   const panel = await createPanel();
   try {
@@ -700,6 +725,7 @@ test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the i
 });
 
 test('standalone zoom window renders standalone root and opens session', async () => {
+  const updates: { type: string; enabled: boolean }[] = [];
   const session = {
     data: {
       sourceWidth: 500,
@@ -734,7 +760,12 @@ test('standalone zoom window renders standalone root and opens session', async (
   const panel = await createPanel(
     undefined,
     false,
-    'http://localhost:3000/main/index.html#zoom-window'
+    'http://localhost:3000/main/index.html#zoom-window',
+    (window) => {
+      (window as any).__adobe_cep__.dispatchEvent = (event: { type: string }) => {
+        updates.push({ type: event.type, enabled: JSON.parse(window.localStorage.getItem(storageKey)!).zoomAutoUpdate });
+      };
+    }
   );
   try {
     panel.window.localStorage.setItem(
@@ -751,6 +782,11 @@ test('standalone zoom window renders standalone root and opens session', async (
     assert.ok(panel.window.document.querySelector('.zoom-standalone-root'));
     assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
     assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
+
+    await panel.click('zoom-auto-update');
+    assert.equal((panel.element('zoom-auto-update') as unknown as HTMLInputElement).checked, false);
+    assert.deepEqual(updates.at(-1), { type: 'com.example.achuanPlugin.settingsUpdate', enabled: false },
+      'Notify the main panel only after saving the automatic update preference');
 
     await panel.input('zoom-line-width', '4');
     panel.window.dispatchEvent(new panel.window.StorageEvent('storage', {
@@ -779,6 +815,7 @@ test('standalone zoom window renders standalone root and opens session', async (
     assert.equal(editedEntry.strokeWidth, 4);
     assert.equal(editedEntry.placement, 'left');
     assert.equal(editedEntry.preservesLayout, false, 'Changing placement must release the saved layout');
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).zoomAutoUpdate, false);
   } finally {
     await panel.window.happyDOM.close();
   }

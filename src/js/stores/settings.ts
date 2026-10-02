@@ -22,6 +22,7 @@ export interface Settings {
   zoomPlacement: string;
   zoomGuideLineExtent: string;
   zoomKeepSquare: boolean;
+  zoomAutoUpdate: boolean;
 }
 
 export const storageKey = 'illustrator_sci_plugin_settings';
@@ -44,7 +45,8 @@ export const defaults: Settings = {
   zoomAddGuideLines: false,
   zoomPlacement: 'right',
   zoomGuideLineExtent: 'acrossImages',
-  zoomKeepSquare: true
+  zoomKeepSquare: true,
+  zoomAutoUpdate: true
 };
 
 export function normalizeSettings(value: unknown): Settings {

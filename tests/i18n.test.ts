@@ -79,7 +79,8 @@ test('language, zero offsets and false values survive persistence and reopening'
     labelOffsetX: 0,
     labelOffsetY: 0,
     fontBold: false,
-    autoUpdateIndex: false
+    autoUpdateIndex: false,
+    zoomAutoUpdate: false
   }));
   dispose();
   const reopened = readSettings(storage);
@@ -87,6 +88,7 @@ test('language, zero offsets and false values survive persistence and reopening'
   assert.equal(reopened.labelOffsetX, 0);
   assert.equal(reopened.labelOffsetY, 0);
   assert.equal(reopened.autoUpdateIndex, false);
+  assert.equal(reopened.zoomAutoUpdate, false);
   const saved = stored.get(storageKey);
   settings.set(defaults);
   assert.equal(

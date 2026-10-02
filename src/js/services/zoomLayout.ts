@@ -291,7 +291,7 @@ export function calculateZoomLayout(
 ): Map<ZoomEntry, Rect> {
   const result = new Map<ZoomEntry, Rect>();
 
-  // 1. Preserve existing layout for entries that were saved and untouched placement
+  // Keep the live position and size of saved zooms until placement is changed.
   for (const entry of entries) {
     if (entry.region.width <= 0 || entry.region.height <= 0) continue;
     if (entry.preservesLayout && entry.originalZoomRegion) {
@@ -302,15 +302,6 @@ export function calculateZoomLayout(
         width: old.width * source.width,
         height: old.height * source.height
       };
-      const cropW = entry.region.width * source.width;
-      const cropH = entry.region.height * source.height;
-      if (cropW > 0 && cropH > 0) {
-        if (entry.placement === 'left' || entry.placement === 'right') {
-          bounds.width = (bounds.height * cropW) / cropH;
-        } else {
-          bounds.height = (bounds.width * cropH) / cropW;
-        }
-      }
       result.set(entry, bounds);
     }
   }

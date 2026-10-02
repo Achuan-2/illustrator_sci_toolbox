@@ -139,6 +139,14 @@
           bind:checked={$settings.zoomUseRectangleColor}
         />
       </div>
+      <div class="input-group">
+        <label for="default-zoom-auto-update">{$t('zoom.autoUpdate')}</label>
+        <input
+          type="checkbox"
+          id="default-zoom-auto-update"
+          bind:checked={$settings.zoomAutoUpdate}
+        />
+      </div>
     </div>
   </fieldset>
 

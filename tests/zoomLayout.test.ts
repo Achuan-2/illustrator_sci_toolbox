@@ -124,6 +124,24 @@ test('getZoomBounds positions bounds correctly according to placement', () => {
   assert.equal(bottom.top, 100 + 100 + 10);
 });
 
+test('calculateZoomLayout preserves the live size of an existing zoom when its crop has a different aspect ratio', () => {
+  const source = { left: 20, top: 10, width: 200, height: 100 };
+  const entry: ZoomEntry = {
+    recordKey: 'saved', name: '放大图 1',
+    region: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+    regionRotation: 0, strokeColor: '#ff0000', strokeWidth: 1.5,
+    strokeDash: 'dash', useRectangleColor: true, addGuideLines: true,
+    placement: 'right', guideLineExtent: 'acrossImages',
+    originalZoomRegion: { x: 1.2, y: 0.3, width: 0.7, height: 0.8 },
+    originalZoomRotation: 0, preservesLayout: true
+  };
+  const expected = { left: 260, top: 40, width: 140, height: 80 };
+  for (const placement of ['left', 'right', 'top', 'bottom'] as const) {
+    entry.placement = placement;
+    assert.deepEqual(calculateZoomLayout(source, [entry], 14).get(entry), expected);
+  }
+});
+
 test('calculateZoomLayout arranges multiple zoom images outward without overlapping', () => {
   const source = { left: 0, top: 0, width: 200, height: 100 };
   const gap = 10;

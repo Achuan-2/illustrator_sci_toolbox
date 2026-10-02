@@ -211,6 +211,7 @@
   "zoom.placementTop": "Top",
   "zoom.placementBottom": "Bottom",
   "zoom.useRectColor": "Use Rectangle Stroke Color",
+  "zoom.autoUpdate": "Automatically Update Zoom Images",
   "zoom.guideSettings": "Guide Line Settings",
   "zoom.addGuides": "Add Guide Lines",
   "zoom.guideExtent": "Line Range:",

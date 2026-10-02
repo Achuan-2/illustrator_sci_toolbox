@@ -842,6 +842,23 @@
     renderAll();
   }
 
+  function notifySettingsUpdate() {
+    try {
+      window.__adobe_cep__?.dispatchEvent?.({
+        type: 'com.example.achuanPlugin.settingsUpdate',
+        scope: 'APPLICATION',
+        data: ''
+      });
+    } catch {}
+  }
+
+  function handleAutoUpdateChange(event: Event) {
+    const enabled = (event.currentTarget as HTMLInputElement).checked;
+    settings.update((value) => ({ ...value, zoomAutoUpdate: enabled }));
+    // Persist before notifying the main panel that owns background polling.
+    notifySettingsUpdate();
+  }
+
   async function handleConfirm() {
     if (!canConfirm || confirming) return;
     confirming = true;
@@ -867,18 +884,7 @@
         deletedKeys: $state.snapshot(deletedKeys)
       });
 
-      try {
-        if (
-          typeof window !== 'undefined' &&
-          window.__adobe_cep__?.dispatchEvent
-        ) {
-          window.__adobe_cep__.dispatchEvent({
-            type: 'com.example.achuanPlugin.settingsUpdate',
-            scope: 'APPLICATION',
-            data: ''
-          });
-        }
-      } catch {}
+      notifySettingsUpdate();
 
       closeZoomWindow();
     } catch (err: any) {
@@ -1105,6 +1111,17 @@
                       onchange={renderAll}
                     />
                     {$t('zoom.useRectColor')}
+                  </label>
+                </div>
+                <div class="control-group checkbox-group">
+                  <label>
+                    <input
+                      id="zoom-auto-update"
+                      type="checkbox"
+                      bind:checked={$settings.zoomAutoUpdate}
+                      onchange={handleAutoUpdateChange}
+                    />
+                    {$t('zoom.autoUpdate')}
                   </label>
                 </div>
               </div>

@@ -8,8 +8,9 @@ const hostSource = fs.readFileSync('dist/cep/jsx/index.js', 'utf8');
 
 // Model Illustrator's tag-name limit, inherited tags, nested clipping and
 // transforms about uncropped bounds. Pixel rendering needs the real host.
-function fixture() {
+function fixture(strokedPosition = false, undoSupport = false) {
   const items: any[] = [];
+  let transformCalls = 0;
   let selectionOrder: any[] = [];
   const layer: any = {
     typename: 'Layer',
@@ -63,6 +64,28 @@ function fixture() {
       keepRemovedReferenceReadable() {
         readableAfterRemoval = true;
       },
+      captureNativeState() {
+        return {
+          box: { ...box }, parent: this.parent, selected: this.selected,
+          tags: this.tags.map((tag: any) => ({ name: tag.name, value: tag.value })),
+          children: [...(this.pageItems ?? [])],
+          points: this.points?.map((point: number[]) => [...point])
+        };
+      },
+      restoreNativeState(state: any) {
+        Object.assign(box, state.box);
+        removed = false;
+        this.parent = state.parent;
+        this.selected = state.selected;
+        this.tags.splice(0);
+        for (const tag of state.tags) Object.assign(this.tags.add(), tag);
+        if (this.pageItems) this.pageItems.splice(0, this.pageItems.length, ...state.children);
+        if (state.points) {
+          this.points = state.points.map((point: number[]) => [...point]);
+          this.pathPoints = this.points.map((anchor: number[]) => ({ anchor }));
+        }
+      },
+      markNativeRemoved() { removed = true; },
       parent,
       layer,
       selected: false,
@@ -86,13 +109,15 @@ function fixture() {
         return [box.left, box.top, box.left + box.width, box.top - box.height];
       },
       get left() {
-        return this.geometricBounds[0];
+        const stroke = strokedPosition && type === 'PathItem' && this.stroked ? this.strokeWidth / 2 : 0;
+        return this.geometricBounds[0] - stroke;
       },
       set left(value: number) {
         this.translate(value - this.left, 0);
       },
       get top() {
-        return this.geometricBounds[1];
+        const stroke = strokedPosition && type === 'PathItem' && this.stroked ? this.strokeWidth / 2 : 0;
+        return this.geometricBounds[1] + stroke;
       },
       set top(value: number) {
         this.translate(0, value - this.top);
@@ -134,9 +159,11 @@ function fixture() {
         }
       },
       resize(horizontal: number, vertical: number) {
+        transformCalls++;
         this.transform(horizontal / 100, vertical / 100, this.geometricBounds);
       },
       translate(dx: number, dy: number) {
+        transformCalls++;
         this.transform(1, 1, [0, 0], dx, dy);
       },
       duplicate(destination = this.parent) {
@@ -228,11 +255,54 @@ function fixture() {
   };
   layer.parent = document;
   document.selection = [source];
+  const undoStack: any[] = [], redoStack: any[] = [];
+  let historyUsed = false, undoCalls = 0, redoCalls = 0;
+  function snapshotNative() {
+    const state = items.map((artwork) => ({ artwork, state: artwork.captureNativeState() }));
+    const signature = JSON.stringify(state.map(({ state: value }) => [
+      value.box, value.tags, value.points, value.selected,
+      value.children.map((child: any) => items.indexOf(child))
+    ]));
+    return { state, signature, children: [...layer.pageItems], selection: [...selectionOrder] };
+  }
+  function restoreNative(snapshot: ReturnType<typeof snapshotNative>) {
+    const live = snapshot.state.map(({ artwork }) => artwork);
+    for (const artwork of items) if (!live.includes(artwork)) artwork.markNativeRemoved();
+    items.splice(0, items.length, ...live);
+    for (const { artwork, state } of snapshot.state) artwork.restoreNativeState(state);
+    layer.pageItems.splice(0, layer.pageItems.length, ...snapshot.children);
+    selectionOrder = [...snapshot.selection];
+  }
+  function commitNative<T>(task: () => T): T {
+    if (!undoSupport) return task();
+    const before = snapshotNative();
+    historyUsed = false;
+    const result = task();
+    const after = snapshotNative();
+    if (!historyUsed && before.signature !== after.signature) {
+      undoStack.push({ before, after });
+      redoStack.splice(0);
+    }
+    return result;
+  }
+  function nativeUndo() {
+    undoCalls++;
+    historyUsed = true;
+    const transaction = undoStack.pop();
+    if (transaction) { restoreNative(transaction.before); redoStack.push(transaction); }
+  }
+  function nativeRedo() {
+    redoCalls++;
+    historyUsed = true;
+    const transaction = redoStack.pop();
+    if (transaction) { restoreNative(transaction.after); undoStack.push(transaction); }
+  }
   // CEP panels can have separate ExtendScript caches for the same document.
   const forkHost = () => {
     const context = vm.createContext({
       $: {},
-      app: { documents: [document], activeDocument: document },
+      app: { documents: [document], activeDocument: document,
+        ...(undoSupport ? { undo: nativeUndo, redo: nativeRedo } : {}) },
       RGBColor: function (this: any) {
         this.typename = 'RGBColor';
       },
@@ -246,12 +316,12 @@ function fixture() {
     const reload = () => vm.runInContext(hostSource, context);
     reload();
     const call = (operation: string, args: unknown[] = []) =>
-      JSON.parse(
+      commitNative(() => JSON.parse(
         context.$[hostNamespace].call(
           operation,
           encodeURIComponent(JSON.stringify(args))
         )
-      );
+      ));
     const apply = (entries: any[], deletedKeys: string[] = []) =>
       call('applyZoomImages', [JSON.stringify({ entries, deletedKeys })]);
     const inspect = (...targets: any[]) => {
@@ -274,7 +344,13 @@ function fixture() {
     forkHost,
     item,
     captures,
-    find
+    find,
+    userEdit: commitNative,
+    nativeUndo,
+    nativeRedo,
+    get undoCalls() { return undoCalls; },
+    get redoCalls() { return redoCalls; },
+    get transformCalls() { return transformCalls; }
   };
 }
 
@@ -291,6 +367,327 @@ function entry(index: number) {
     placement: 'right'
   };
 }
+
+function assertBounds(actual: number[], expected: number[]) {
+  assert.equal(actual.length, expected.length);
+  for (let i = 0; i < actual.length; i++) {
+    assert.ok(Math.abs(actual[i] - expected[i]) < 0.001,
+      `Coordinate ${i}: expected ${expected[i]}, got ${actual[i]}`);
+  }
+}
+
+function trackedFixture(count = 1) {
+  const host = fixture();
+  host.apply(Array.from({ length: count }, (_, i) => ({
+    ...entry(i), addGuideLines: true, guideLineExtent: 'acrossImages'
+  })));
+  const zooms = [...host.document.selection];
+  const records = zooms.map((zoom) => {
+    const key = zoom.tags.find((tag: any) => tag.name.startsWith('ILST_ZOOM_ITEM_'))
+      .name.substring('ILST_ZOOM_ITEM_'.length);
+    return { key, zoom, marker: host.find('ILST_ZOOM_MARKER_', key), mask: zoom.pageItems[0] };
+  });
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  return { host, records };
+}
+
+function undoFixture() {
+  const host = fixture(false, true);
+  host.apply([{ ...entry(0), addGuideLines: true, guideLineExtent: 'acrossImages' }]);
+  const key = host.document.selection[0].tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
+  host.call('syncZoomTracker');
+  const snapshot = () => {
+    const zoom = host.find('ILST_ZOOM_ITEM_', key);
+    const marker = host.find('ILST_ZOOM_MARKER_', key);
+    return {
+      source: [...host.source.geometricBounds],
+      marker: marker ? [...marker.geometricBounds] : null,
+      zoom: zoom ? [...zoom.pageItems[0].geometricBounds] : null,
+      duplicate: zoom ? [...zoom.pageItems[2].geometricBounds] : null,
+      guides: [1, 2].map((number) => host.find(`ILST_ZOOM_GUIDE${number}_`, key)?.points.map((point: number[]) => [...point]) ?? null),
+      sourceTag: host.source.tags.find((tag: any) => tag.name === 'ILST_ZOOM_SRC_' + key)?.value ?? null
+    };
+  };
+  return { host, key, snapshot };
+}
+
+test('one undo and redo restore the user source move together with its automatic marker and guide update', () => {
+  const { host, snapshot } = undoFixture();
+  const before = snapshot();
+  host.userEdit(() => host.source.translate(35, -25));
+  host.call('syncZoomTracker');
+  const after = snapshot();
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), before);
+  assert.equal(host.undoCalls, 2, 'Undo the automatic update and its verified source move');
+  for (let i = 0; i < 3; i++) host.call('syncZoomTracker');
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), after);
+  assert.equal(host.redoCalls, 2);
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), before, 'A redone edit must remain undoable');
+});
+
+test('undo and redo preserve crop coordinates after a user edits its marker', () => {
+  const { host, key, snapshot } = undoFixture();
+  const before = snapshot();
+  const marker = host.find('ILST_ZOOM_MARKER_', key);
+  host.userEdit(() => { marker.translate(20, -10); marker.width *= 1.5; });
+  host.call('syncZoomTracker');
+  const after = snapshot();
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), before);
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), after);
+});
+
+test('undoing zoom deletion revives document associations instead of deleting the restored artwork again', () => {
+  const { host, key, snapshot } = undoFixture();
+  const before = snapshot();
+  host.userEdit(() => host.find('ILST_ZOOM_ITEM_', key).remove());
+  host.call('syncZoomTracker');
+  const deleted = snapshot();
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), before);
+  for (let i = 0; i < 3; i++) host.call('syncZoomTracker');
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), deleted);
+});
+
+test('an unrelated command between the source edit and polling keeps its own undo and redo', () => {
+  const { host, snapshot } = undoFixture();
+  const before = snapshot();
+  const other = host.item('PathItem', 300, 100, 10, 10);
+  const otherBefore = [...other.geometricBounds];
+  host.userEdit(() => host.source.translate(35, -25));
+  host.userEdit(() => other.translate(10, -15));
+  const otherAfter = [...other.geometricBounds];
+  host.call('syncZoomTracker');
+  const after = snapshot();
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(other.geometricBounds, otherAfter, 'Put back a probe that undid an unrelated command');
+  const calls = host.undoCalls;
+  for (let i = 0; i < 3; i++) host.call('syncZoomTracker');
+  assert.equal(host.undoCalls, calls, 'Do not repeatedly probe the blocked history');
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(other.geometricBounds, otherBefore);
+  host.nativeUndo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), before);
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(other.geometricBounds, otherBefore, 'Do not automatically redo an unrelated command');
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  host.nativeRedo();
+  host.call('syncZoomTracker');
+  assert.deepEqual(snapshot(), after);
+  assert.deepEqual(other.geometricBounds, otherAfter);
+});
+
+test('manually moving a marker back does not trigger automatic undo without a rolled-back history tag', () => {
+  const { host, key } = undoFixture();
+  host.userEdit(() => host.source.translate(35, -25));
+  host.call('syncZoomTracker');
+  const marker = host.find('ILST_ZOOM_MARKER_', key);
+  host.userEdit(() => marker.translate(-35, 25));
+  host.call('syncZoomTracker');
+  assert.equal(host.undoCalls, 0);
+  assert.deepEqual(host.source.geometricBounds, [35, 75, 135, -25]);
+  assertBounds(marker.geometricBounds, [10, 90, 20, 80]);
+});
+
+test('source tracking uses geometric coordinates for stroked markers and zoom borders', () => {
+  const host = fixture(true);
+  host.apply([{ ...entry(0), strokeWidth: 4 }]);
+  const zoom = host.document.selection[0];
+  const key = zoom.tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
+  const marker = host.find('ILST_ZOOM_MARKER_', key);
+  const before = [...marker.geometricBounds];
+  host.call('syncZoomTracker');
+  host.source.translate(35, -20);
+  host.source.resize(140, 80);
+  host.call('syncZoomTracker');
+  assertBounds(marker.geometricBounds, [35 + before[0] * 1.4, 80 + (before[1] - 100) * 0.8,
+    35 + before[2] * 1.4, 80 + (before[3] - 100) * 0.8]);
+  assertBounds(zoom.pageItems[1].geometricBounds, zoom.pageItems[0].geometricBounds);
+});
+
+test('source translation, enlargement and reduction keep zooms fixed while their markers follow the source', () => {
+  const { host, records } = trackedFixture(2);
+  const before = records.map(({ marker, mask }) => ({
+    marker: [...marker.geometricBounds], zoom: [...mask.geometricBounds]
+  }));
+  host.source.translate(40, -30);
+  const callsBeforeSync = host.transformCalls;
+  const duplicateBounds = records.map(({ zoom }) => [...zoom.pageItems[2].geometricBounds]);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  const moved = (bounds: number[]) => [bounds[0] + 40, bounds[1] - 30, bounds[2] + 40, bounds[3] - 30];
+  for (let i = 0; i < records.length; i++) {
+    assertBounds(records[i].marker.geometricBounds, moved(before[i].marker));
+    assertBounds(records[i].mask.geometricBounds, before[i].zoom);
+    assertBounds(records[i].zoom.pageItems[2].geometricBounds, duplicateBounds[i]);
+  }
+  assert.equal(host.transformCalls - callsBeforeSync, records.length,
+    'Source translation transforms only each marker, leaving every zoom child untouched');
+  for (const [horizontal, vertical] of [[200, 150], [25, 40]]) {
+    const oldSource = [...host.source.geometricBounds];
+    const oldMarkers = records.map(({ marker }) => [...marker.geometricBounds]);
+    host.source.resize(horizontal, vertical);
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    const resized = (bounds: number[]) => [
+      oldSource[0] + (bounds[0] - oldSource[0]) * horizontal / 100,
+      oldSource[1] + (bounds[1] - oldSource[1]) * vertical / 100,
+      oldSource[0] + (bounds[2] - oldSource[0]) * horizontal / 100,
+      oldSource[1] + (bounds[3] - oldSource[1]) * vertical / 100
+    ];
+    for (let i = 0; i < records.length; i++) {
+      const { marker, mask, zoom } = records[i];
+      assertBounds(marker.geometricBounds, resized(oldMarkers[i]));
+      assertBounds(mask.geometricBounds, before[i].zoom);
+      const duplicate = zoom.pageItems.find((child: any) => child.typename === 'RasterItem');
+      const scaleX = mask.width / marker.width;
+      const scaleY = mask.height / marker.height;
+      assertBounds(duplicate.geometricBounds, [
+        mask.left - (marker.left - host.source.left) * scaleX,
+        mask.top + (host.source.top - marker.top) * scaleY,
+        mask.left - (marker.left - host.source.left) * scaleX + host.source.width * scaleX,
+        mask.top + (host.source.top - marker.top) * scaleY - host.source.height * scaleY
+      ]);
+    }
+  }
+  const calls = host.transformCalls;
+  for (let i = 0; i < 4; i++) host.call('syncZoomTracker');
+  assert.equal(host.transformCalls, calls, 'Idle polling must not transform artwork');
+});
+
+test('moving and resizing a marker updates its cropped image and preserves the revised region on source movement', () => {
+  const { host, records: [{ zoom, marker, mask }] } = trackedFixture();
+  const before = [...mask.geometricBounds];
+  const duplicate = zoom.pageItems.find((child: any) => child.typename === 'RasterItem');
+  const oldImageLeft = duplicate.left;
+  marker.translate(20, -15);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(mask.geometricBounds, before);
+  assert.ok(duplicate.left < oldImageLeft, 'The crop must pan with the source rectangle');
+  marker.width *= 2;
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(mask.geometricBounds, before);
+  const editedMarker = [...marker.geometricBounds];
+  const editedZoom = [...mask.geometricBounds];
+  host.source.translate(-35, 25);
+  host.call('syncZoomTracker');
+  const moved = (bounds: number[]) => [bounds[0] - 35, bounds[1] + 25, bounds[2] - 35, bounds[3] + 25];
+  assertBounds(marker.geometricBounds, moved(editedMarker));
+  assertBounds(mask.geometricBounds, editedZoom);
+});
+
+test('moving source, marker and zoom together does not apply the source movement twice', () => {
+  const { host, records: [{ zoom, marker, mask }] } = trackedFixture();
+  host.source.translate(40, -25);
+  marker.translate(40, -25);
+  zoom.translate(40, -25);
+  const expectedMarker = [...marker.geometricBounds];
+  const expectedZoom = [...mask.geometricBounds];
+  const calls = host.transformCalls;
+  host.call('syncZoomTracker');
+  assertBounds(marker.geometricBounds, expectedMarker);
+  assertBounds(mask.geometricBounds, expectedZoom);
+  assert.equal(host.transformCalls, calls, 'A matching combined move needs no extra object transforms');
+});
+
+test('source translation keeps a manually resized and repositioned zoom fixed and reconnects guides', () => {
+  const { host, records: [{ key, zoom, marker, mask }] } = trackedFixture();
+  zoom.resize(75, 60);
+  zoom.translate(-mask.left, -40 - mask.top);
+  host.call('syncZoomTracker');
+  const movedBounds = [...mask.geometricBounds];
+  assertBounds(host.find('ILST_ZOOM_GUIDE1_', key).points[1], [mask.left, mask.top]);
+  assertBounds(host.find('ILST_ZOOM_GUIDE2_', key).points[1], [mask.left + mask.width, mask.top]);
+  host.source.translate(50, 10);
+  host.call('syncZoomTracker');
+  assertBounds(mask.geometricBounds, movedBounds);
+  assertBounds(host.find('ILST_ZOOM_GUIDE1_', key).points[1], [mask.left, mask.top]);
+  assertBounds(host.find('ILST_ZOOM_GUIDE2_', key).points[1], [mask.left + mask.width, mask.top]);
+  assertBounds(host.find('ILST_ZOOM_GUIDE1_', key).points[0], [marker.left, marker.top - marker.height]);
+  assertBounds(host.find('ILST_ZOOM_GUIDE2_', key).points[0], [marker.left + marker.width, marker.top - marker.height]);
+});
+
+for (const [horizontal, vertical] of [[180, 140], [60, 45]]) {
+  test(`manual zoom resize to ${horizontal}% by ${vertical}% survives source resize, marker edits and reopened confirmation`, () => {
+    const { host, records: [{ key, zoom, marker, mask }] } = trackedFixture();
+    zoom.resize(horizontal, vertical);
+    const expected = [...mask.geometricBounds];
+    host.call('syncZoomTracker');
+    assertBounds(mask.geometricBounds, expected);
+    host.source.resize(160, 130);
+    host.call('syncZoomTracker');
+    assertBounds(mask.geometricBounds, expected);
+    marker.width *= 1.4;
+    host.call('syncZoomTracker');
+    assertBounds(mask.geometricBounds, expected);
+    const loaded = host.inspect(host.source).existingEntries;
+    host.reload();
+    assert.equal(host.apply(loaded).data, 'Success');
+    for (let i = 0; i < 4; i++) host.call('syncZoomTracker');
+    assertBounds(host.find('ILST_ZOOM_ITEM_', key).pageItems[0].geometricBounds, expected);
+  });
+}
+
+test('resizing the source and zoom together preserves the explicit zoom size without applying the source scale twice', () => {
+  const { host, records: [{ zoom, marker, mask }] } = trackedFixture();
+  const anchor = [...host.source.geometricBounds];
+  host.source.resize(180, 150);
+  marker.transform(1.8, 1.5, anchor);
+  zoom.resize(140, 120);
+  const expectedMarker = [...marker.geometricBounds];
+  const expectedZoom = [...mask.geometricBounds];
+  host.call('syncZoomTracker');
+  assertBounds(marker.geometricBounds, expectedMarker);
+  assertBounds(mask.geometricBounds, expectedZoom);
+});
+
+for (const reload of [false, true]) {
+  test(`deleting a zoom cleans its own marker and guides with ${reload ? 'a cold' : 'an existing'} tracking cache`, () => {
+    const { host, records } = trackedFixture(2);
+    const unrelated = host.item('PathItem', 30, 30, 5, 5);
+    records[0].zoom.remove();
+    if (reload) host.reload();
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    for (const prefix of ['ILST_ZOOM_SRC_', 'ILST_ZOOM_MARKER_', 'ILST_ZOOM_GUIDE1_', 'ILST_ZOOM_GUIDE2_']) {
+      assert.equal(host.find(prefix, records[0].key), undefined);
+      assert.ok(host.find(prefix, records[1].key));
+    }
+    assert.ok(host.items.includes(unrelated));
+    assert.ok(host.items.includes(host.source));
+  });
+}
+
+test('an already-running tracker discovers newly created zooms from another editor', () => {
+  const { host } = trackedFixture();
+  const otherSource = host.item('RasterItem', 300, 100, 100, 100);
+  const editor = host.forkHost();
+  editor.inspect(otherSource);
+  editor.apply([entry(0)]);
+  const zoom = host.document.selection[0];
+  const mask = zoom.pageItems[0];
+  const before = [...mask.geometricBounds];
+  host.call('syncZoomTracker');
+  otherSource.translate(30, -15);
+  host.call('syncZoomTracker');
+  assertBounds(mask.geometricBounds, before);
+  const key = zoom.tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
+  assertBounds(host.find('ILST_ZOOM_MARKER_', key).geometricBounds, [340, 75, 350, 65]);
+});
 
 for (const count of [1, 2]) {
   test(`creating ${count} zoom image(s) selects finished clipping groups and keeps masks above borders`, () => {

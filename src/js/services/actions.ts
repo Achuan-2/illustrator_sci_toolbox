@@ -395,6 +395,7 @@ export const actions = {
     });
   },
   syncZoom: () => {
+    if (!get(settings).zoomAutoUpdate) return Promise.resolve();
     if (!zoomSyncPending) {
       zoomSyncPending = bridge
         .call('syncZoomTracker')

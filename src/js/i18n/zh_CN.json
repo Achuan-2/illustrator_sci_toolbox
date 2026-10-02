@@ -211,6 +211,7 @@
   "zoom.placementTop": "上侧",
   "zoom.placementBottom": "下侧",
   "zoom.useRectColor": "使用矩形描边颜色",
+  "zoom.autoUpdate": "放大图自动更新",
   "zoom.guideSettings": "辅助线设置",
   "zoom.addGuides": "添加辅助线",
   "zoom.guideExtent": "绘制范围：",

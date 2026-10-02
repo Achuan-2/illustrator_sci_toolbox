@@ -2323,16 +2323,21 @@ function readZoomEntries(doc, sourceItem) {
 // Transform using the visible source extent. GroupItem.left/top describe the
 // uncropped artwork, which may be far outside its clipping mask.
 function positionZoomDuplicate(duplicate, sourceBounds, markerBounds, zoomBounds) {
-    var scale = (zoomBounds[2] - zoomBounds[0]) / (markerBounds[2] - markerBounds[0]);
+    var scaleX = (zoomBounds[2] - zoomBounds[0]) / (markerBounds[2] - markerBounds[0]);
+    var scaleY = (zoomBounds[1] - zoomBounds[3]) / (markerBounds[1] - markerBounds[3]);
     var visible = getVisibleBounds(duplicate) || duplicate.geometricBounds;
-    var currentWidth = visible[2] - visible[0];
-    var resizeScale = (sourceBounds[2] - sourceBounds[0]) * scale / currentWidth;
-    duplicate.resize(resizeScale * 100, resizeScale * 100, true, true, true, true,
-        resizeScale * 100, Transformation.TOPLEFT);
+    var resizeX = (sourceBounds[2] - sourceBounds[0]) * scaleX / (visible[2] - visible[0]);
+    var resizeY = (sourceBounds[1] - sourceBounds[3]) * scaleY / (visible[1] - visible[3]);
+    if (Math.abs(resizeX - 1) > 0.000001 || Math.abs(resizeY - 1) > 0.000001) {
+        duplicate.resize(resizeX * 100, resizeY * 100, true, true, true, true,
+            Math.sqrt(resizeX * resizeY) * 100, Transformation.TOPLEFT);
+    }
     visible = getVisibleBounds(duplicate) || duplicate.geometricBounds;
-    var left = zoomBounds[0] - (markerBounds[0] - sourceBounds[0]) * scale;
-    var top = zoomBounds[1] + (sourceBounds[1] - markerBounds[1]) * scale;
-    duplicate.translate(left - visible[0], top - visible[1]);
+    var left = zoomBounds[0] - (markerBounds[0] - sourceBounds[0]) * scaleX;
+    var top = zoomBounds[1] + (sourceBounds[1] - markerBounds[1]) * scaleY;
+    if (Math.abs(left - visible[0]) > 0.000001 || Math.abs(top - visible[1]) > 0.000001) {
+        duplicate.translate(left - visible[0], top - visible[1]);
+    }
 }
 
 function getZoomEndpoints(regionCorners, zoomCorners, placement) {
@@ -2647,6 +2652,8 @@ function applyZoomImages(payloadJson) {
         // before it can mistake an edited zoom for a deletion and remove tags.
         _zoomTrackedGroups = [];
         _zoomTrackedDocName = null;
+        _zoomTrackedDocument = null;
+        resetZoomTrackingHistory();
     }
     return "Success";
 }
@@ -2702,11 +2709,8 @@ function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, cr
         var eb = [sLeft + old.x * sWidth, sTop - old.y * sHeight,
             sLeft + (old.x + old.width) * sWidth, sTop - (old.y + old.height) * sHeight];
         if (edited && edited.region.width > 0 && edited.region.height > 0) {
-            if (edited.placement === "left" || edited.placement === "right") {
-                eb[2] = eb[0] + (eb[1] - eb[3]) * edited.region.width * sWidth / (edited.region.height * sHeight);
-            } else {
-                eb[3] = eb[1] - (eb[2] - eb[0]) * edited.region.height * sHeight / (edited.region.width * sWidth);
-            }
+            // Reopening the editor must preserve the live output rectangle,
+            // including a size that the user changed directly in Illustrator.
             preservedBounds[saved.recordKey] = eb;
         }
         occupiedBounds.push(eb);
@@ -2748,10 +2752,7 @@ function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, cr
                 marker.stroked = true;
             }
         } else {
-            marker.left = mLeft;
-            marker.top = mTop;
-            marker.width = mWidth;
-            marker.height = mHeight;
+            setZoomRectangleBounds(marker, [mLeft, mTop, mRight, mBottom]);
         }
 
         marker.strokeWidth = entry.strokeWidth;
@@ -2881,6 +2882,256 @@ function cancelZoomTarget() {
 
 var _zoomTrackedGroups = [];
 var _zoomTrackedDocName = null;
+var _zoomTrackedDocument = null;
+var _zoomUndoHistory = [];
+var _zoomRedoHistory = [];
+var _zoomLastTrackingState = null;
+var _zoomHistoryPictures = {};
+var _zoomHistoryTag = "ILST_ZOOM_UNDO";
+
+function resetZoomTrackingHistory() {
+    _zoomUndoHistory = [];
+    _zoomRedoHistory = [];
+    _zoomLastTrackingState = null;
+    _zoomHistoryPictures = {};
+}
+
+function zoomItemInIndex(index, item) {
+    for (var i = 0; item && i < index.items.length; i++) {
+        if (index.items[i] === item) return true;
+    }
+    return false;
+}
+
+function zoomHistoryBounds(item) {
+    if (!item) return null;
+    var bounds = getVisibleBounds(item) || item.geometricBounds;
+    return [bounds[0], bounds[1], bounds[2], bounds[3]];
+}
+
+function zoomHistoryGuide(line) {
+    if (!line) return null;
+    var points = [];
+    for (var i = 0; i < line.pathPoints.length; i++) {
+        var anchor = line.pathPoints[i].anchor;
+        points.push([anchor[0], anchor[1]]);
+    }
+    return points;
+}
+
+function captureZoomTrackingState(index) {
+    var keys = {}, rows = {};
+    var maps = [index.pictures, index.records, index.markers, index.guides1, index.guides2];
+    for (var i = 0; i < maps.length; i++) {
+        for (var key in maps[i]) keys[key] = true;
+    }
+    for (var key in index.pictures) _zoomHistoryPictures[key] = index.pictures[key];
+    for (var key in _zoomHistoryPictures) keys[key] = true;
+    for (var key in keys) {
+        var picture = _zoomHistoryPictures[key];
+        if (!zoomItemInIndex(index, picture)) picture = null;
+        var record = index.records[key], duplicate = null;
+        if (record) {
+            for (var c = 0; c < record.zoom.pageItems.length; c++) {
+                var child = record.zoom.pageItems[c];
+                if (child.typename !== "PathItem") duplicate = child;
+            }
+        }
+        var row = {
+            picture: zoomHistoryBounds(picture),
+            marker: zoomHistoryBounds(index.markers[key]),
+            zoom: zoomHistoryBounds(record && record.zoom),
+            duplicate: zoomHistoryBounds(duplicate),
+            guide1: zoomHistoryGuide(index.guides1[key]),
+            guide2: zoomHistoryGuide(index.guides2[key]),
+            recordValue: record ? record.value : null,
+            sourceTag: picture ? getTag(picture, "ILST_ZOOM_SRC_" + key) : null
+        };
+        if (row.marker || row.zoom || row.guide1 || row.guide2 || row.sourceTag) rows[key] = row;
+    }
+    return rows;
+}
+
+function sameZoomTrackingState(first, second) {
+    if (first === second) return true;
+    if (typeof first !== typeof second || first === null || second === null) return false;
+    if (typeof first === "number") return Math.abs(first - second) < 0.01;
+    if (typeof first !== "object") return false;
+    if (first instanceof Array && first.length !== second.length) return false;
+    for (var key in first) {
+        if (!sameZoomTrackingState(first[key], second[key])) return false;
+    }
+    for (var key in second) {
+        if (typeof first[key] === "undefined") return false;
+    }
+    return true;
+}
+
+function rebindZoomTrackingHistory(doc, index) {
+    // Undo can revive artwork with new native references. Read the document,
+    // without writing tags or geometry, so Illustrator keeps its redo stack.
+    _zoomTrackedGroups = [];
+    for (var key in index.records) {
+        if (!index.pictures[key] || !index.markers[key]) continue;
+        var record = index.records[key];
+        _zoomTrackedGroups.push(readZoomTrackingRecord(key, index.pictures[key], index.markers[key], record.zoom, record.value));
+    }
+    _zoomLastTrackingState = captureZoomTrackingState(index);
+}
+
+function restoreZoomTrackingHistory(doc, index) {
+    var undo = null;
+    var redo = _zoomRedoHistory.length ? _zoomRedoHistory[_zoomRedoHistory.length - 1] : null;
+    var state = null;
+    // Several native undos can arrive between two background polls. Locate
+    // the matching transaction rather than assuming only the last one moved.
+    for (var h = _zoomUndoHistory.length - 1; h >= 0; h--) {
+        var candidate = _zoomUndoHistory[h];
+        if (!zoomItemInIndex(index, candidate.anchor) || getTag(candidate.anchor, _zoomHistoryTag) !== candidate.beforeToken) continue;
+        if (!state) state = captureZoomTrackingState(index);
+        if (sameZoomTrackingState(state, candidate.beforeAuto) ||
+            (candidate.beforeUser && sameZoomTrackingState(state, candidate.beforeUser))) {
+            while (_zoomUndoHistory.length > h + 1) _zoomRedoHistory.push(_zoomUndoHistory.pop());
+            undo = candidate;
+            break;
+        }
+    }
+    if (undo) {
+        if (undo.beforeUser && sameZoomTrackingState(state, undo.beforeUser)) {
+            // The user already undid both records before the next poll.
+            _zoomRedoHistory.push(_zoomUndoHistory.pop());
+            rebindZoomTrackingHistory(doc, index);
+            return true;
+        }
+        if (sameZoomTrackingState(state, undo.beforeAuto)) {
+            if (!undo.blocked && undo.beforeUser && typeof app.undo === "function") {
+                app.undo();
+                var restored = readCurrentZoomRecords(doc);
+                if (sameZoomTrackingState(captureZoomTrackingState(restored), undo.beforeUser)) {
+                    _zoomRedoHistory.push(_zoomUndoHistory.pop());
+                    rebindZoomTrackingHistory(doc, restored);
+                    return true;
+                }
+                // Another user command can sit between the edit and our poll.
+                // Put it back immediately; never keep an unrelated undo.
+                app.redo();
+            }
+            undo.blocked = true;
+            // Do not mistake restored markers for new user edits, or write a
+            // replacement transaction that would erase the native redo stack.
+            return true;
+        }
+    }
+    if (redo && zoomItemInIndex(index, redo.anchor)) {
+        var token = getTag(redo.anchor, _zoomHistoryTag);
+        if (token === redo.afterToken || token === redo.beforeToken) {
+            if (!state) state = captureZoomTrackingState(index);
+            if (token === redo.afterToken && sameZoomTrackingState(state, redo.afterAuto)) {
+                _zoomUndoHistory.push(_zoomRedoHistory.pop());
+                rebindZoomTrackingHistory(doc, index);
+                return true;
+            }
+            if (token === redo.beforeToken && sameZoomTrackingState(state, redo.beforeAuto)) {
+                if (!redo.redoBlocked && typeof app.redo === "function") {
+                    app.redo();
+                    var restored = readCurrentZoomRecords(doc);
+                    if (sameZoomTrackingState(captureZoomTrackingState(restored), redo.afterAuto)) {
+                        _zoomUndoHistory.push(_zoomRedoHistory.pop());
+                        rebindZoomTrackingHistory(doc, restored);
+                        return true;
+                    }
+                    app.undo();
+                }
+                redo.redoBlocked = true;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function recordZoomTrackingHistory(doc, beforeAuto, beforeUser, index) {
+    var afterAuto = captureZoomTrackingState(index);
+    if (!sameZoomTrackingState(beforeAuto, afterAuto)) {
+        var anchor = null;
+        for (var key in _zoomHistoryPictures) {
+            if (zoomItemInIndex(index, _zoomHistoryPictures[key])) {
+                anchor = _zoomHistoryPictures[key];
+                break;
+            }
+        }
+        if (anchor) {
+            var token = createZoomRecordKey(doc), oldToken = getTag(anchor, _zoomHistoryTag);
+            // This tag is written in the same host transaction as the derived
+            // artwork. Its rollback proves that the user undid our update.
+            addTag(anchor, _zoomHistoryTag, token);
+            if (getTag(anchor, _zoomHistoryTag) === token) {
+                _zoomUndoHistory.push({ anchor: anchor, beforeToken: oldToken, afterToken: token,
+                    beforeUser: beforeUser, beforeAuto: beforeAuto, afterAuto: afterAuto });
+                if (_zoomUndoHistory.length > 50) _zoomUndoHistory.shift();
+            }
+        }
+        _zoomRedoHistory = [];
+    }
+    _zoomLastTrackingState = afterAuto;
+}
+
+function zoomBoundsChanged(bounds, previous) {
+    for (var i = 0; i < 4; i++) {
+        if (Math.abs(bounds[i] - previous[i]) > 0.01) return true;
+    }
+    return false;
+}
+
+function relativeZoomBounds(bounds, sourceBounds) {
+    var width = sourceBounds[2] - sourceBounds[0];
+    var height = sourceBounds[1] - sourceBounds[3];
+    return {
+        x: (bounds[0] - sourceBounds[0]) / width,
+        y: (sourceBounds[1] - bounds[1]) / height,
+        width: (bounds[2] - bounds[0]) / width,
+        height: (bounds[1] - bounds[3]) / height
+    };
+}
+
+function absoluteZoomBounds(relative, sourceBounds) {
+    var width = sourceBounds[2] - sourceBounds[0];
+    var height = sourceBounds[1] - sourceBounds[3];
+    var left = sourceBounds[0] + relative.x * width;
+    var top = sourceBounds[1] - relative.y * height;
+    return [left, top, left + relative.width * width, top - relative.height * height];
+}
+
+function setZoomRectangleBounds(rectangle, bounds) {
+    var current = rectangle.geometricBounds;
+    var width = bounds[2] - bounds[0];
+    var height = bounds[1] - bounds[3];
+    // Avoid unnecessary native transforms, which can create undo entries.
+    if (Math.abs(current[2] - current[0] - width) > 0.01 || Math.abs(current[1] - current[3] - height) > 0.01) {
+        rectangle.resize(width / (current[2] - current[0]) * 100,
+            height / (current[1] - current[3]) * 100, true, true, true, true, 100, Transformation.TOPLEFT);
+    }
+    // PathItem.left/top include the stroke extent in Illustrator. Translate
+    // from geometric bounds so styled markers and borders stay on the crop.
+    current = rectangle.geometricBounds;
+    if (Math.abs(current[0] - bounds[0]) > 0.01 || Math.abs(current[1] - bounds[1]) > 0.01) {
+        rectangle.translate(bounds[0] - current[0], bounds[1] - current[1]);
+    }
+}
+
+function refreshTrackedZoomImage(group, sourceBounds, markerBounds, zoomBounds) {
+    var duplicate = null, mask = null, border = null;
+    for (var i = 0; i < group.zoom.pageItems.length; i++) {
+        var child = group.zoom.pageItems[i];
+        if (child.clipping) mask = child;
+        else if (child.typename === "PathItem") border = child;
+        else duplicate = child;
+    }
+    if (!duplicate || !mask) return;
+    positionZoomDuplicate(duplicate, sourceBounds, markerBounds, zoomBounds);
+    setZoomRectangleBounds(mask, zoomBounds);
+    if (border) setZoomRectangleBounds(border, zoomBounds);
+}
 
 function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
     var p = getVisibleBounds(picture) || picture.geometricBounds;
@@ -2903,31 +3154,64 @@ function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
         lastPBounds: [p[0], p[1], p[2], p[3]],
         lastMBounds: [m[0], m[1], m[2], m[3]],
         lastZBounds: [z[0], z[1], z[2], z[3]],
-        relRegion: {
-            x: (m[0] - p[0]) / (p[2] - p[0]),
-            y: (p[1] - m[1]) / (p[1] - p[3]),
-            width: (m[2] - m[0]) / (p[2] - p[0]),
-            height: (m[1] - m[3]) / (p[1] - p[3])
-        }
+        relRegion: relativeZoomBounds(m, p)
     };
 }
 
 function readCurrentZoomRecords(doc) {
-    var records = {};
+    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [] };
     // Build one index per poll instead of looking up each cached zoom through
     // its old native reference. Some host references remain readable after a
     // replacement even though they no longer belong to the document.
     for (var i = 0; i < doc.pageItems.length; i++) {
         var item = doc.pageItems[i];
-        if (item.typename !== "GroupItem") continue;
+        index.items.push(item);
         for (var t = 0; t < item.tags.length; t++) {
             var tag = item.tags[t];
             if (tag.name.indexOf("ILST_ZOOM_ITEM_") === 0) {
-                records[tag.name.substring(15)] = { zoom: item, value: tag.value };
+                index.records[tag.name.substring(15)] = { zoom: item, value: tag.value };
+            } else if (tag.name.indexOf("ILST_ZOOM_SRC_") === 0) {
+                index.pictures[tag.name.substring(14)] = item;
+                index.keys[tag.name.substring(14)] = true;
+            } else if (tag.name.indexOf("ILST_ZOOM_MARKER_") === 0) {
+                index.markers[tag.name.substring(17)] = item;
+                index.keys[tag.name.substring(17)] = true;
+            } else if (tag.name.indexOf("ILST_ZOOM_GUIDE1_") === 0) {
+                index.guides1[tag.name.substring(17)] = item;
+                index.keys[tag.name.substring(17)] = true;
+            } else if (tag.name.indexOf("ILST_ZOOM_GUIDE2_") === 0) {
+                index.guides2[tag.name.substring(17)] = item;
+                index.keys[tag.name.substring(17)] = true;
             }
         }
     }
-    return records;
+    return index;
+}
+
+function removeDeletedZoomAssociations(index) {
+    // Document tags also allow cleanup after a panel/script restart, when no
+    // cached native reference to the deleted zoom remains.
+    for (var key in index.keys) {
+        if (index.records[key]) continue;
+        try { if (index.guides1[key]) index.guides1[key].remove(); } catch (e) {}
+        try { if (index.guides2[key]) index.guides2[key].remove(); } catch (e) {}
+        var marker = index.markers[key];
+        if (marker) {
+            var shared = false;
+            for (var t = 0; t < marker.tags.length; t++) {
+                var name = marker.tags[t].name;
+                if (name.indexOf("ILST_ZOOM_MARKER_") === 0 && index.records[name.substring(17)]) {
+                    shared = true;
+                    break;
+                }
+            }
+            try {
+                if (shared) deleteTag(marker, "ILST_ZOOM_MARKER_" + key);
+                else marker.remove();
+            } catch (e) {}
+        }
+        try { if (index.pictures[key]) deleteTag(index.pictures[key], "ILST_ZOOM_SRC_" + key); } catch (e) {}
+    }
 }
 
 function syncZoomTracker() {
@@ -2938,174 +3222,82 @@ function syncZoomTracker() {
     if (findItemByTag(doc, "ILST_ZOOM_ACTIVE_TARGET")) return "OK";
     var docName = "";
     try { docName = doc.name; } catch (e) { return "OK"; }
-    var currentRecords = readCurrentZoomRecords(doc);
-
-    if (_zoomTrackedDocName !== docName || _zoomTrackedGroups.length === 0) {
+    var index = readCurrentZoomRecords(doc);
+    if (_zoomTrackedDocument !== doc || _zoomTrackedDocName !== docName) {
+        _zoomTrackedDocument = doc;
         _zoomTrackedDocName = docName;
         _zoomTrackedGroups = [];
-        try {
-            for (var p = 0; p < doc.pageItems.length; p++) {
-                var it = doc.pageItems[p];
-                for (var t = 0; t < it.tags.length; t++) {
-                    var tg = it.tags[t];
-                    if (tg.name.indexOf("ILST_ZOOM_ITEM_") === 0) {
-                        var key = tg.name.substring(15);
-                        var marker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + key);
-                        var picture = findItemByTag(doc, "ILST_ZOOM_SRC_" + key);
-                        if (marker && picture) {
-                            var tracked = readZoomTrackingRecord(key, picture, marker, it, tg.value);
-                            _zoomTrackedGroups.push(tracked);
-                            refreshZoomGuideLines(doc, key, picture, marker, it, tracked, false);
-                        }
-                    }
-                }
-            }
-        } catch (e) {}
+        resetZoomTrackingHistory();
     }
-
-    if (_zoomTrackedGroups.length === 0) return "OK";
-
+    if (restoreZoomTrackingHistory(doc, index)) return "OK";
+    var cached = {};
+    for (var c = 0; c < _zoomTrackedGroups.length; c++) cached[_zoomTrackedGroups[c].key] = _zoomTrackedGroups[c];
+    for (var key in index.records) {
+        if (cached[key] && cached[key].recordValue !== index.records[key].value) {
+            resetZoomTrackingHistory();
+            break;
+        }
+    }
+    var beforeAuto = captureZoomTrackingState(index);
+    var beforeUser = _zoomLastTrackingState;
+    removeDeletedZoomAssociations(index);
     var remaining = [];
-    for (var i = 0; i < _zoomTrackedGroups.length; i++) {
-        var group = _zoomTrackedGroups[i];
-        var currentRecord = currentRecords[group.key];
-        if (currentRecord && currentRecord.value !== group.recordValue) {
+    for (var key in index.records) {
+        var currentRecord = index.records[key];
+        var picture = index.pictures[key];
+        var marker = index.markers[key];
+        if (!picture || !marker) continue;
+        var group = cached[key];
+        if (!group || currentRecord.value !== group.recordValue) {
             // Another CEP window may have replaced the zoom with the same key.
             // Check the document before treating an old reference as deletion.
-            var currentMarker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + group.key);
-            var currentPicture = findItemByTag(doc, "ILST_ZOOM_SRC_" + group.key);
-            if (!currentMarker || !currentPicture) continue;
-            group = readZoomTrackingRecord(group.key, currentPicture, currentMarker, currentRecord.zoom, currentRecord.value);
+            group = readZoomTrackingRecord(key, picture, marker, currentRecord.zoom, currentRecord.value);
             remaining.push(group);
             try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false); } catch (e) {}
             continue;
         }
         // Keep cached positions for movement detection, but use the live object.
-        if (currentRecord) group.zoom = currentRecord.zoom;
-
-        if (!currentRecord) {
-            var g1 = findItemByTag(doc, "ILST_ZOOM_GUIDE1_" + group.key);
-            if (g1) { try { g1.remove(); } catch (e) {} }
-            var g2 = findItemByTag(doc, "ILST_ZOOM_GUIDE2_" + group.key);
-            if (g2) { try { g2.remove(); } catch (e) {} }
-
-            var markerShared = false;
-            for (var j = 0; j < _zoomTrackedGroups.length; j++) {
-                if (j !== i && _zoomTrackedGroups[j].marker === group.marker) {
-                    markerShared = true;
-                    break;
-                }
-            }
-            if (!markerShared) {
-                try { group.marker.remove(); } catch (e) {}
-            }
-            try { deleteTag(group.picture, "ILST_ZOOM_SRC_" + group.key); } catch (e) {}
-            continue;
-        }
-
-        var markerLive = true;
-        try { var t2 = group.marker.typename; } catch (e) { markerLive = false; }
-        var picLive = true;
-        try { var t3 = group.picture.typename; } catch (e) { picLive = false; }
-        if (!markerLive || !picLive) continue;
-
+        group.zoom = currentRecord.zoom;
+        group.picture = picture;
+        group.marker = marker;
         remaining.push(group);
 
         var pBounds = getVisibleBounds(group.picture) || group.picture.geometricBounds;
         var mBounds = getVisibleBounds(group.marker) || group.marker.geometricBounds;
         var zBounds = getVisibleBounds(group.zoom) || group.zoom.geometricBounds;
 
-        var pChanged = (Math.abs(pBounds[0] - group.lastPBounds[0]) > 0.01 ||
-                        Math.abs(pBounds[1] - group.lastPBounds[1]) > 0.01 ||
-                        Math.abs(pBounds[2] - group.lastPBounds[2]) > 0.01 ||
-                        Math.abs(pBounds[3] - group.lastPBounds[3]) > 0.01);
-
-        var mChanged = (Math.abs(mBounds[0] - group.lastMBounds[0]) > 0.01 ||
-                        Math.abs(mBounds[1] - group.lastMBounds[1]) > 0.01 ||
-                        Math.abs(mBounds[2] - group.lastMBounds[2]) > 0.01 ||
-                        Math.abs(mBounds[3] - group.lastMBounds[3]) > 0.01);
-
-        var zChanged = (Math.abs(zBounds[0] - group.lastZBounds[0]) > 0.01 ||
-                        Math.abs(zBounds[1] - group.lastZBounds[1]) > 0.01 ||
-                        Math.abs(zBounds[2] - group.lastZBounds[2]) > 0.01 ||
-                        Math.abs(zBounds[3] - group.lastZBounds[3]) > 0.01);
+        var pChanged = zoomBoundsChanged(pBounds, group.lastPBounds);
+        var mChanged = zoomBoundsChanged(mBounds, group.lastMBounds);
+        var zChanged = zoomBoundsChanged(zBounds, group.lastZBounds);
+        if (!pChanged && !mChanged && !zChanged) continue;
+        if (pBounds[2] <= pBounds[0] || pBounds[1] <= pBounds[3]) continue;
 
         if (pChanged) {
-            var pw = pBounds[2] - pBounds[0];
-            var ph = pBounds[1] - pBounds[3];
-            var newML = pBounds[0] + group.relRegion.x * pw;
-            var newMT = pBounds[1] - group.relRegion.y * ph;
-            var newMW = group.relRegion.width * pw;
-            var newMH = group.relRegion.height * ph;
-            group.marker.left = newML;
-            group.marker.top = newMT;
-            group.marker.width = newMW;
-            group.marker.height = newMH;
-            mBounds = [newML, newMT, newML + newMW, newMT - newMH];
-            group.lastPBounds = [pBounds[0], pBounds[1], pBounds[2], pBounds[3]];
-            group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
+            mBounds = absoluteZoomBounds(group.relRegion, pBounds);
+            setZoomRectangleBounds(group.marker, mBounds);
+            // Source transforms drive only the marker and guide endpoints.
+            // The output rectangle keeps its live size and position, including
+            // a simultaneous manual transform of the zoom itself.
             mChanged = true;
         }
 
-        if (mChanged) {
-            var hasOverlap = (mBounds[2] > pBounds[0] && mBounds[0] < pBounds[2] &&
-                              mBounds[1] > pBounds[3] && mBounds[3] < pBounds[1]);
-            if (hasOverlap) {
-                var mW = mBounds[2] - mBounds[0];
-                var mH = mBounds[1] - mBounds[3];
-                if (mW > 0 && mH > 0) {
-                    var mAspect = mW / mH;
-                    var curZW = zBounds[2] - zBounds[0];
-                    var curZH = zBounds[1] - zBounds[3];
-                    var newZW = curZW, newZH = curZH;
-                    if (group.placement === "left" || group.placement === "right") {
-                        newZW = curZH * mAspect;
-                    } else {
-                        newZH = curZW / mAspect;
-                    }
-                    var newZBounds = [zBounds[0], zBounds[1], zBounds[0] + newZW, zBounds[1] - newZH];
-
-                    try {
-                        var dup = null, clipRect = null, borderRect = null;
-                        for (var itemIdx = 0; itemIdx < group.zoom.pageItems.length; itemIdx++) {
-                            var child = group.zoom.pageItems[itemIdx];
-                            if (child.clipping) clipRect = child;
-                            else if (child.typename === "PathItem" && !child.clipping) borderRect = child;
-                            else dup = child;
-                        }
-                        if (dup && clipRect) {
-                            positionZoomDuplicate(dup, pBounds, mBounds, newZBounds);
-                            clipRect.left = zBounds[0];
-                            clipRect.top = zBounds[1];
-                            clipRect.width = newZW;
-                            clipRect.height = newZH;
-                            if (borderRect) {
-                                borderRect.left = zBounds[0];
-                                borderRect.top = zBounds[1];
-                                borderRect.width = newZW;
-                                borderRect.height = newZH;
-                            }
-                            zBounds = newZBounds;
-                            group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
-                        }
-                    } catch (e) {}
-
-                    group.relRegion = {
-                        x: (mBounds[0] - pBounds[0]) / (pBounds[2] - pBounds[0]),
-                        y: (pBounds[1] - mBounds[1]) / (pBounds[1] - pBounds[3]),
-                        width: mW / (pBounds[2] - pBounds[0]),
-                        height: mH / (pBounds[1] - pBounds[3])
-                    };
-                }
+        var mW = mBounds[2] - mBounds[0];
+        var mH = mBounds[1] - mBounds[3];
+        if (mW > 0 && mH > 0) {
+            // Marker edits change the crop inside the current output bounds.
+            // Proportional source/marker transforms leave that crop unchanged.
+            if (!pChanged || zChanged) {
+                refreshTrackedZoomImage(group, pBounds, mBounds, zBounds);
             }
-            group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
+            group.relRegion = relativeZoomBounds(mBounds, pBounds);
         }
-
-        if (mChanged || zChanged || pChanged) {
-            try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false); } catch (e) {}
-            group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
-        }
+        zBounds = getVisibleBounds(group.zoom) || group.zoom.geometricBounds;
+        group.lastPBounds = [pBounds[0], pBounds[1], pBounds[2], pBounds[3]];
+        group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
+        group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
+        refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false);
     }
     _zoomTrackedGroups = remaining;
+    recordZoomTrackingHistory(doc, beforeAuto, beforeUser, readCurrentZoomRecords(doc));
     return "OK";
 }
