@@ -85,6 +85,30 @@ test('swap panel shows nine icon buttons in anchor order and dispatches each anc
   }
 });
 
+test('relative position center option is translated and reaches copy and paste operations', async () => {
+  const panel = await createPanel();
+  try {
+    const select = panel.element('relative-corner') as unknown as HTMLSelectElement;
+    assert.equal(select.value, 'TL');
+    const option = panel.window.document.querySelector('#relative-corner option[value="C"]');
+    assert.ok(option);
+    assert.equal(option.textContent, 'Center');
+    await panel.input('relative-corner', 'C');
+    await panel.click('copy-pos-button');
+    assert.equal(panel.requests.at(-1)?.operation, 'copyRelativePosition');
+    assert.equal(panel.requests.at(-1)?.args[0], 'C');
+    await panel.click('paste-pos-button');
+    assert.equal(panel.requests.at(-1)?.operation, 'pasteRelativePosition');
+    assert.equal(panel.requests.at(-1)?.args[2], 'C');
+    await panel.input('language', 'zh_CN');
+    assert.equal(option.textContent, '中心');
+    assert.equal(select.value, 'C');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 test('explanation icons support hover, pinned clicks, single-popup dismissal and dynamic translations', async () => {
   const panel = await createPanel();
   try {

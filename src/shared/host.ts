@@ -1,5 +1,5 @@
-export type Corner = 'TL' | 'TR' | 'BL' | 'BR';
-export type SwapAnchor = Corner | 'TC' | 'LC' | 'C' | 'RC' | 'BC';
+export type Corner = 'TL' | 'TR' | 'BL' | 'BR' | 'C';
+export type SwapAnchor = Corner | 'TC' | 'LC' | 'RC' | 'BC';
 export type Order = 'grid' | 'stacking' | 'horizontal' | 'vertical';
 export type Direction = 'horizontal' | 'vertical';
 export type AlignmentMode =

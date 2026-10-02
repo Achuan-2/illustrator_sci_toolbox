@@ -40,6 +40,7 @@
         <option value="TR">{$t('corners.topRight')}</option>
         <option value="BL">{$t('corners.bottomLeft')}</option>
         <option value="BR">{$t('corners.bottomRight')}</option>
+        <option value="C">{$t('corners.center')}</option>
       </select>
     </div>
 

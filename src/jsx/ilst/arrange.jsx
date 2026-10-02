@@ -1148,6 +1148,7 @@ function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
         var b = getVisibleBounds(it) || it.visibleBounds;
         var x, y;
         switch (corner) {
+            case "C": x = (b[0] + b[2]) / 2; y = (b[1] + b[3]) / 2; break;
             case "TR": x = b[2]; y = b[1]; break;
             case "BL": x = b[0]; y = b[3]; break;
             case "BR": x = b[2]; y = b[3]; break;
@@ -1176,6 +1177,7 @@ function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
             var bb = getVisibleBounds(it) || it.visibleBounds;
             var cx, cy;
             switch (corner) {
+                case "C": cx = (bb[0] + bb[2]) / 2; cy = (bb[1] + bb[3]) / 2; break;
                 case "TR": cx = bb[2]; cy = bb[1]; break;
                 case "BL": cx = bb[0]; cy = bb[3]; break;
                 case "BR": cx = bb[2]; cy = bb[3]; break;
@@ -1215,8 +1217,12 @@ function copyRelativePosition(corner, order, reverseOrder, useArtboardRef) {
         var objB = getVisibleBounds(objItem) || objItem.visibleBounds;
 
         var x1, y1, x2, y2;
-        // 基于角点取坐标
+        // 基于参考角或中心取坐标
         switch (corner) {
+            case "C":
+                x1 = (refB[0] + refB[2]) / 2; y1 = (refB[1] + refB[3]) / 2;
+                x2 = (objB[0] + objB[2]) / 2; y2 = (objB[1] + objB[3]) / 2;
+                break;
             case "TR": x1 = refB[2]; y1 = refB[1]; x2 = objB[2]; y2 = objB[1]; break;
             case "BL": x1 = refB[0]; y1 = refB[3]; x2 = objB[0]; y2 = objB[3]; break;
             case "BR": x1 = refB[2]; y1 = refB[3]; x2 = objB[2]; y2 = objB[3]; break;
@@ -1282,6 +1288,9 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
                 var targetYAbs = objAbRect[1] - mmToPoints(oy);
 
                 switch (corner) {
+                    case "C":
+                        obj.translate(targetXAbs - (objB[0] + objB[2]) / 2, targetYAbs - (objB[1] + objB[3]) / 2);
+                        break;
                     case "TR":
                         obj.translate(targetXAbs - objB[2], targetYAbs - objB[1]);
                         break;
@@ -1313,6 +1322,9 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
                 var targetYAbs1 = objAbRect1[1] - mmToPoints(targetYmm);
 
                 switch (corner) {
+                    case "C":
+                        obj1.translate(targetXAbs1 - (objB1[0] + objB1[2]) / 2, targetYAbs1 - (objB1[1] + objB1[3]) / 2);
+                        break;
                     case "TR":
                         obj1.translate(targetXAbs1 - objB1[2], targetYAbs1 - objB1[1]);
                         break;
@@ -1346,6 +1358,9 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
             var targetYAbs2 = objAbRect2[1] - mmToPoints(entry.y);
 
             switch (corner) {
+                case "C":
+                    obj2.translate(targetXAbs2 - (objB2[0] + objB2[2]) / 2, targetYAbs2 - (objB2[1] + objB2[3]) / 2);
+                    break;
                 case "TR":
                     obj2.translate(targetXAbs2 - objB2[2], targetYAbs2 - objB2[1]);
                     break;
@@ -1417,6 +1432,11 @@ function pasteRelativePosition(deltasJSON, reverse, corner, order, reverseOrder,
         var newX, newY;
 
         switch (corner) {
+            case "C":
+                newX = (refBounds[0] + refBounds[2]) / 2 + deltaXPt;
+                newY = (refBounds[1] + refBounds[3]) / 2 + deltaYPt;
+                objectToMove.translate(newX - (objBounds[0] + objBounds[2]) / 2, newY - (objBounds[1] + objBounds[3]) / 2);
+                break;
             case "TR":
                 newX = refBounds[2] + deltaXPt; newY = refBounds[1] + deltaYPt;
                 objectToMove.translate(newX - objBounds[2], newY - objBounds[1]);

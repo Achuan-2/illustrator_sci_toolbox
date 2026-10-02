@@ -20,6 +20,7 @@
   "corners.topRight": "右上角",
   "corners.bottomLeft": "左下角",
   "corners.bottomRight": "右下角",
+  "corners.center": "中心",
   "order.grid": "网格顺序",
   "order.stacking": "图层顺序",
   "order.horizontal": "水平顺序",

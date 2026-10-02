@@ -20,6 +20,7 @@
   "corners.topRight": "Top-Right",
   "corners.bottomLeft": "Bottom-Left",
   "corners.bottomRight": "Bottom-Right",
+  "corners.center": "Center",
   "order.grid": "Grid Order",
   "order.stacking": "Stacking Order",
   "order.horizontal": "Horizontal Order",
