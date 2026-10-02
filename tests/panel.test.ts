@@ -60,6 +60,31 @@ test('arrangement icon buttons dispatch every alignment and distribution mode wi
   }
 });
 
+test('swap panel shows nine icon buttons in anchor order and dispatches each anchor', async () => {
+  const panel = await createPanel();
+  try {
+    const anchors = ['TL', 'TC', 'TR', 'LC', 'C', 'RC', 'BL', 'BC', 'BR'];
+    const buttons = [...panel.window.document.querySelectorAll('#panel-swap .swap-button')];
+    assert.deepEqual(buttons.map((button) => button.id), anchors.map((anchor) => `swap-${anchor.toLowerCase()}-button`));
+    for (const anchor of anchors) {
+      const button = panel.element(`swap-${anchor.toLowerCase()}-button`);
+      assert.equal(button.querySelectorAll('svg .swap-object').length, 2);
+      assert.equal(button.querySelectorAll('svg .reference-mark').length, 2);
+      assert.ok(button.querySelector('svg .swap-arrows'));
+      assert.equal(button.getAttribute('title'), button.getAttribute('aria-label'));
+      await panel.click(button.id);
+      assert.deepEqual(panel.requests.at(-1), { operation: 'swapSelectedPositions', args: [anchor] });
+    }
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.element('swap-c-button').getAttribute('title'), '交换居中');
+    assert.equal(panel.element('swap-lc-button').getAttribute('title'), '交换左居中');
+    assert.equal(panel.element('swap-rc-button').getAttribute('title'), '交换右居中');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 async function createPanel(saved?: string, legacy = false) {
   const window = new Window({ url: 'http://localhost:3000/main/index.html' });
   // happy-dom 20 implements :checked only for INPUT. Svelte also uses it for

@@ -5,9 +5,9 @@ import { t } from '../i18n';
 import { bridge, HostError } from './bridge';
 import type {
   AlignmentMode,
-  Corner,
   Direction,
-  DistributionMode
+  DistributionMode,
+  SwapAnchor
 } from '../../shared/host';
 
 const number = (value: unknown, fallback = 0): number =>
@@ -317,9 +317,9 @@ export const actions = {
     run(async () => {
       await bridge.call('filterSelection', mode);
     }),
-  swap: (corner: Corner) =>
+  swap: (anchor: SwapAnchor) =>
     run(async () => {
-      await bridge.call('swapSelectedPositions', corner);
+      await bridge.call('swapSelectedPositions', anchor);
     }),
   distribute: (direction: Direction) =>
     run(async () => {

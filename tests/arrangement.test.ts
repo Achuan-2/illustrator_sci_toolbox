@@ -188,7 +188,10 @@ test('missing documents, insufficient selections and invalid modes return locali
   );
   app.activeDocument.selection = items.slice(0, 2);
   for (const mode of Object.keys(targets)) {
-    assert.deepEqual(call('distributeObjects', mode), { ok: true, data: 'Success' });
+    assert.deepEqual(call('distributeObjects', mode), {
+      ok: true,
+      data: 'Success'
+    });
   }
   assert.deepEqual(
     items.map((entry) => entry.geometricBounds),
@@ -208,4 +211,76 @@ test('equal-gap distribution remains distinct from center distribution', () => {
   assert.equal(call('distributeSpacing', 'horizontal').ok, true);
   assert.equal(items[1].geometricBounds[0] - items[0].geometricBounds[2], 35);
   assert.equal(items[2].geometricBounds[0] - items[1].geometricBounds[2], 35);
+});
+
+const swapDeltas: Record<string, [number, number]> = {
+  TL: [55, -45],
+  TC: [50, -45],
+  TR: [45, -45],
+  LC: [55, -55],
+  C: [50, -55],
+  RC: [45, -55],
+  BL: [55, -65],
+  BC: [50, -65],
+  BR: [45, -65]
+};
+
+for (const [mode, [dx, dy]] of Object.entries(swapDeltas)) {
+  test(`swap ${mode} exchanges anchors of unequal objects without resizing and reverses on a second swap`, () => {
+    const { app, items, call } = fixture();
+    app.activeDocument.selection = items.slice(0, 2);
+    const before = items.map((entry) => [...entry.geometricBounds]);
+    assert.deepEqual(call('swapSelectedPositions', mode), {
+      ok: true,
+      data: 'Success'
+    });
+    for (let index = 0; index < 2; index++) {
+      const sign = index === 0 ? 1 : -1;
+      assert.deepEqual(
+        items[index].geometricBounds,
+        before[index].map(
+          (value, axis) => value + sign * (axis % 2 === 0 ? dx : dy)
+        )
+      );
+    }
+    assert.deepEqual(items[2].geometricBounds, before[2]);
+    assert.equal(call('swapSelectedPositions', mode).ok, true);
+    assert.deepEqual(
+      items.map((entry) => entry.geometricBounds),
+      before
+    );
+  });
+}
+
+test('center swap uses the clipping path rather than hidden group contents', () => {
+  const { app, items, call } = fixture();
+  const clip = Object.assign(item([30, 80, 50, 60]), { clipping: true });
+  const group = {
+    typename: 'GroupItem',
+    clipped: true,
+    pageItems: [clip, item([-100, 200, 300, -300])],
+    translate(dx: number, dy: number) {
+      this.pageItems.forEach((child) => child.translate(dx, dy));
+    }
+  };
+  app.activeDocument.selection = [items[0], group] as unknown as typeof items;
+  assert.equal(call('swapSelectedPositions', 'C').ok, true);
+  assert.deepEqual(items[0].geometricBounds, [25, 80, 55, 60]);
+  assert.deepEqual(clip.geometricBounds, [-35, 120, -15, 100]);
+});
+
+test('swap requires exactly two objects and leaves other selections untouched', () => {
+  const { app, items, call } = fixture();
+  const before = items.map((entry) => [...entry.geometricBounds]);
+  for (const count of [0, 1, 3]) {
+    app.activeDocument.selection = items.slice(0, count);
+    assert.equal(
+      call('swapSelectedPositions', 'C').error,
+      'errors.selectExactlyTwo'
+    );
+    assert.deepEqual(
+      items.map((entry) => entry.geometricBounds),
+      before
+    );
+  }
 });

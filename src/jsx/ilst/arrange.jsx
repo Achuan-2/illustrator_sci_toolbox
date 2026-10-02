@@ -1491,12 +1491,9 @@ function pasteSize(width, height, useW, useH) {
 }
 
 /**
- * Swap positions of exactly two selected items based on their visible top-left corners.
- * Returns "Success" or "Error: ..." string for host to handle.
- */
-/**
- * Swap positions of exactly two selected items based on a chosen corner.
- * corner: "TL" | "TR" | "BL" | "BR" (defaults to "TL")
+ * Swap positions of exactly two selected items using one of nine visible anchors.
+ * corner: "TL" | "TC" | "TR" | "LC" | "C" | "RC" | "BL" | "BC" | "BR"
+ * Defaults to "TL"; neither item's size changes.
  * Returns "Success" or "Error: ..."
  */
 function swapSelectedPositions(corner) {
@@ -1514,43 +1511,30 @@ function swapSelectedPositions(corner) {
     var ia = getVisibleInfo(a);
     var ib = getVisibleInfo(b);
 
-    // Helper to get corner coords
-    function cornerCoords(info, c) {
+    function anchorCoords(info, c) {
+        var centerX = (info.left + info.right) / 2;
+        var centerY = (info.top + info.bottom) / 2;
         switch (c) {
+            case "TC": return { x: centerX, y: info.top };
             case "TR": return { x: info.right, y: info.top };
+            case "LC": return { x: info.left, y: centerY };
+            case "C": return { x: centerX, y: centerY };
+            case "RC": return { x: info.right, y: centerY };
             case "BL": return { x: info.left, y: info.bottom };
+            case "BC": return { x: centerX, y: info.bottom };
             case "BR": return { x: info.right, y: info.bottom };
             default: // "TL"
                 return { x: info.left, y: info.top };
         }
     }
 
-    var aCorner = cornerCoords(ia, corner);
-    var bCorner = cornerCoords(ib, corner);
+    var aAnchor = anchorCoords(ia, corner);
+    var bAnchor = anchorCoords(ib, corner);
 
-    // Move each item so its chosen corner becomes the other's original corner
+    // Snapshot both anchors before moving either item, including clipped groups.
     try {
-        // For item a: move its corner to bCorner
-        var aBounds = getVisibleBounds(a) || a.visibleBounds;
-        var aX, aY;
-        switch (corner) {
-            case "TR": aX = aBounds[2]; aY = aBounds[1]; break;
-            case "BL": aX = aBounds[0]; aY = aBounds[3]; break;
-            case "BR": aX = aBounds[2]; aY = aBounds[3]; break;
-            default: aX = aBounds[0]; aY = aBounds[1]; break; // TL
-        }
-        a.translate(bCorner.x - aX, bCorner.y - aY);
-
-        // For item b: move its corner to aCorner
-        var bBounds = getVisibleBounds(b) || b.visibleBounds;
-        var bX, bY;
-        switch (corner) {
-            case "TR": bX = bBounds[2]; bY = bBounds[1]; break;
-            case "BL": bX = bBounds[0]; bY = bBounds[3]; break;
-            case "BR": bX = bBounds[2]; bY = bBounds[3]; break;
-            default: bX = bBounds[0]; bY = bBounds[1]; break; // TL
-        }
-        b.translate(aCorner.x - bX, aCorner.y - bY);
+        a.translate(bAnchor.x - aAnchor.x, bAnchor.y - aAnchor.y);
+        b.translate(aAnchor.x - bAnchor.x, aAnchor.y - bAnchor.y);
     } catch (e) {
         return sciError("errors.details", [e.message]);
     }

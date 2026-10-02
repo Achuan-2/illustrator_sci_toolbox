@@ -1,4 +1,5 @@
 export type Corner = 'TL' | 'TR' | 'BL' | 'BR';
+export type SwapAnchor = Corner | 'TC' | 'LC' | 'C' | 'RC' | 'BC';
 export type Order = 'grid' | 'stacking' | 'horizontal' | 'vertical';
 export type Direction = 'horizontal' | 'vertical';
 export type AlignmentMode =
@@ -70,7 +71,7 @@ export interface HostArguments {
   updateLabelOffsets: [number, number, number];
   filterTextFrames: [];
   filterSelection: ['textOnly' | 'excludeText'];
-  swapSelectedPositions: [Corner];
+  swapSelectedPositions: [SwapAnchor];
   distributeSpacing: [Direction];
   alignObjects: [AlignmentMode];
   distributeObjects: [DistributionMode];

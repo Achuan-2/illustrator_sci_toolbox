@@ -70,6 +70,8 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 - Swap Positions of Two Shapes
 
+  Choose one of nine anchors in the icon grid: top-left/center/right, left-center/center/right-center, or bottom-left/center/right. Both objects keep their original dimensions.
+
   Uses
 
   - A group of images is already laid out, copy a set, then use the swap position function to replace the new images with the original ones.
