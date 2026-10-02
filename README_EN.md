@@ -87,7 +87,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## 3 How to Use This Plugin
 
-1. Download the plugin zip or zxp file (choose one): [https://github.com/Achuan-2/illustrator_sci_plugin/releases](https://github.com/Achuan-2/illustrator_sci_plugin/releases)
+1. Download the ZXP installer or ZIP distribution from [GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases). The migrated extension targets Illustrator 2024 or later.
 
     <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 
@@ -109,22 +109,14 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
     
     【Method 2: ZIP File Installation】
 
-    Download the zip file, extract it to a folder, and copy to the Adobe CEP extensions folder:
-
-    - Windows (Recommended per-user directory, no admin rights required):
-      - Press `Win+R`, enter `%APPDATA%\Adobe\CEP\extensions` and press Enter (Full path: `C:\Users\<Username>\AppData\Roaming\Adobe\CEP\extensions`, create `CEP\extensions` if it does not exist).
-      - Or system-wide directory: `C:\Program Files\Common Files\Adobe\CEP\extensions`
-    - MacOS:
-      - User directory: `~/Library/Application Support/Adobe/CEP/extensions`
-      - System directory: `/Library/Application Support/Adobe/CEP/extensions`
-    - How to confirm the path is correct: If the path is correct, other extension folders may already be present (or you can create one).
+    The ZIP contains the signed ZXP installer and documentation. Extract it and install the included `.zxp` using Method 1. Do not copy the ZIP distribution directory into the CEP extensions folder. Source development uses the generated `dist/cep` directory; see [Development and release](docs/development.md).
 
     Remember to restart Illustrator after installation!!!
    
     【Set PlayerDebugMode】
    
    - **Method 1 (ZXP Installer)**: The latest version has been repackaged with clean signing and timestamping, so setting `PlayerDebugMode` is usually **not required**.
-   - **Method 2 (ZIP Manual Extraction)**: Due to Adobe's security policy for direct folder copying, if the panel appears blank, enable debug mode using either method below:
+   - **Source development**: Enable PlayerDebugMode for the generated development extension. For an installed ZXP, first confirm that installation succeeded before troubleshooting a blank panel:
     
     - Windows Solution (Choose one):
       - **Recommended (One-Click)**: Double-click the `开启PlayerDebugMode.reg` file in the plugin root directory and click "Yes" to merge into registry.
@@ -152,6 +144,10 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
     - The window can be dragged to the sidebar for convenient use.
 
       <img alt="PixPin_2025-08-06_13-26-22" src="https://fastly.jsdelivr.net/gh/Achuan-2/PicBed@pic/assets/PixPin_2025-08-06_13-26-22-20250806132631-ib04jm0.png" style="width: 384px;" />​
+
+## Development and release
+
+The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, `pnpm build`, then `pnpm dev`. Frontend changes use HMR; host script changes rebuild and reload the panel. Version tags trigger GitHub Actions to publish ZIP and ZXP packages with the matching CHANGELOG entry. See [Development and release](docs/development.md) for setup and verification boundaries.
 
 ## ❤️Powered by Love
 

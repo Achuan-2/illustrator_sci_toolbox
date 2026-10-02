@@ -1,7 +1,0 @@
-    <ExtensionList>
-        <Extension Id="com.example.achuanPlugin.panel">
-           <HostList>
-               <Host Name="ILST" Port="8088"/>
-            </HostList>
-        </Extension>
-    </ExtensionList>    

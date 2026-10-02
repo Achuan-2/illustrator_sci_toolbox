@@ -3,5 +3,10 @@
 *.zip
 build/
 dist_temp/
+node_modules/
+dist/
+.svelte-kit/
+.cache/
+release-notes.md
 .DS_Store
 Thumbs.db

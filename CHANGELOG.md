@@ -1,3 +1,11 @@
+## Unreleased
+
+- ♻️ 迁移到 Bolt CEP + Svelte + TypeScript，分离界面、设置和 Illustrator 宿主调用
+- ⚡ 支持前端 HMR，以及宿主代码修改后的重新构建与面板刷新
+- 🐛 修复宿主入口配置和零值设置恢复，保留现有功能及中英文文案
+- 👷 使用 GitHub Actions 按版本 tag 发布 ZIP、ZXP 和对应版本说明
+- 🔧 最低构建目标调整为 Illustrator 2024，ZIP 改为包含 ZXP 和文档的分发包
+
 ## v2.4.2 / 20261001
 
 - ✨ 新增语言切换功能，支持切换中英文界面

@@ -1,0 +1,41 @@
+{
+  "name": "illustrator-sci-toolbox",
+  "version": "2.4.2",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@10.30.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "check": "cross-env SCI_CHECK=true svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.config.json && tsc -p tsconfig.host.json",
+    "test": "vite build && node --import tsx --test tests/*.test.ts",
+    "build": "pnpm check && vite build",
+    "zxp": "pnpm check && cross-env ZXP_PACKAGE=true vite build",
+    "zip": "pnpm check && cross-env ZIP_PACKAGE=true vite build",
+    "symlink": "cross-env BOLT_ACTION=symlink vite",
+    "delsymlink": "cross-env BOLT_ACTION=delsymlink vite",
+    "release:notes": "node scripts/release-notes.mjs",
+    "verify:package": "node scripts/verify-package.mjs"
+  },
+  "dependencies": {
+    "svelte": "^5.33.14"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.1.0",
+    "@types/node": "^22.15.30",
+    "acorn": "^8.15.0",
+    "cross-env": "^7.0.3",
+    "fflate": "^0.8.2",
+    "happy-dom": "^20.14.5",
+    "prettier": "^3.9.9",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte-check": "^4.2.1",
+    "tsx": "^4.19.4",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-cep-plugin": "2.2.3"
+  }
+}

@@ -1,0 +1,273 @@
+:root {
+  --bg: #1f1f1f;
+  --bg-panel: #262626;
+  --bg-panel-2: #2d2d2d;
+  --text: #eaeaea;
+  --muted: #b8b8b8;
+  --primary: #4ea1ff;
+  --primary-600: #3188ea;
+  --border: #3a3a3a;
+  --danger: #ff5c5c;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --spacing: 10px;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* 让根容器在 CEP 面板内可自适应宽度与高度 */
+.app {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-width: 100px;
+  /* 防止过窄挤压到不可用 */
+}
+
+/* 侧栏按标签内容确定宽度，不随当前面板的内容收缩 */
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--border);
+  padding: 8px 6px;
+  background: var(--bg);
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.tab {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab:hover {
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--primary);
+  color: #0d1117;
+}
+
+/* 内容区：填满剩余空间并允许滚动 */
+.content {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px;
+  overflow: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* 面板容器：使用 block 切换可见，但内部采用自适应布局 */
+.panel {
+  display: none;
+  min-width: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.panel.active {
+  display: block;
+}
+
+/* 关于页的长链接在内容区内换行，避免撑宽面板 */
+#panel-about {
+  overflow-wrap: break-word;
+}
+
+.panel h3 {
+  margin: 10 0 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.panel h4 {
+  margin: 5px 0px 5px;
+  font-weight: 100;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* 表单区域改为响应式网格：根据宽度自动填充列 */
+.grid {
+  display: grid;
+  /* grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); */
+  gap: 10px 14px;
+  align-items: start;
+}
+
+/* 输入行：标签与控件在宽时同排，窄时换行 */
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  /* 允许在窄宽度时换行 */
+}
+
+label {
+  color: var(--muted);
+  flex-shrink: 0;
+  /* 防止标签被压缩 */
+  white-space: nowrap;
+}
+
+/* 为特定面板的标签设置宽度 */
+#panel-size .input-group > label {
+  flex-basis: 75px;
+}
+
+/* 控件尽量占据剩余空间，避免固定像素宽度导致溢出 */
+input[type='number'],
+input[type='text'],
+select {
+  flex: 1 1 100px;
+  /* min-width: 80px; */
+  padding: 6px 8px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  outline: none;
+  width: auto;
+  /* 覆盖旧的固定宽度 */
+}
+
+/* 颜色选择器样式 */
+input[type='color'] {
+  flex: 0 0 40px;
+  width: 16px;
+  height: 16px;
+  padding: 2px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
+input[type='checkbox'] {
+  transform: scale(1.1);
+}
+
+/* 按钮区域：自动换行并留出间距 */
+.btn {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.btn:hover {
+  filter: brightness(1.1);
+}
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary-600);
+  color: #0d1117;
+}
+
+.btn-danger {
+  background: #3a2323;
+  border-color: #5a2b2b;
+  color: #ffcccc;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Swap panel: two-column layout (left col: TL,BL ; right col: TR,BR) */
+.swap-grid {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.swap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 小型辅助行：保持可换行 */
+.row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  height: 8px;
+}
+
+/* 当前面板名称：显示在内容区顶部 */
+.panel-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text);
+}
+
+/* Label offset editing mode styles */
+.input-group input.editing-mode {
+  border-color: var(--danger);
+  background: rgba(255, 92, 92, 0.1);
+  color: #ffcccc;
+}
+
+#root {
+  height: 100%;
+}
+[hidden] {
+  display: none !important;
+}
+button.tab {
+  font: inherit;
+  text-align: left;
+  border: none;
+  background: transparent;
+}
+button.tab.active {
+  background: var(--primary);
+}

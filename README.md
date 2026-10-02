@@ -137,7 +137,7 @@
 
 ### 3.1 下载插件
 
-下载插件zip或zxp文件（选一个就好）：[https://github.com/Achuan-2/illustrator_sci_plugin/releases](https://github.com/Achuan-2/illustrator_sci_plugin/releases)
+下载插件 ZXP 安装包或 ZIP 分发包：[GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases)。迁移后的版本面向 Illustrator 2024 及以上。
 
   <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 
@@ -160,16 +160,7 @@
     
 #### 方法二：zip文件安装
 
-下载zip文件后，解压为文件夹，复制到 Adobe 插件目录。安装后重启 illustrator 即完成安装
-
-不同系统的Adobe 插件目录：
-
-- Windows：
-
-  - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车。
-- MacOS：
-
-  - 目录：`~/Library/Application Support/Adobe/CEP/extensions`
+迁移后 ZIP 包含签名 ZXP 和使用文档。解压后，将其中的 `.zxp` 按方法一安装；不要将 ZIP 解压目录直接复制到 Adobe 插件目录。源码开发使用构建后的 `dist/cep`，具体操作见[开发与发布文档](docs/development.md)。
    
 
 ### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）
@@ -201,6 +192,10 @@
 - 窗口可以拖拽到侧栏方便使用
 
   ![](https://fastly.jsdelivr.net/gh/Achuan-2/PicBed/assets/20260816181518-2026-08-16.png)
+
+## 5 开发与发布
+
+项目已迁移到 Bolt CEP + Svelte + TypeScript。使用 pnpm，运行 `pnpm install`、`pnpm build`、`pnpm dev` 开始开发；前端支持 HMR，宿主脚本修改触发重新构建和面板刷新。版本 tag 通过 GitHub Actions 自动发布 ZIP、ZXP 和对应 CHANGELOG，详见[开发与发布文档](docs/development.md)。
 
 ## ❤️用爱发电
 

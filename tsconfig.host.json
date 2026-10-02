@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES5",
+    "module": "None",
+    "types": [],
+    "lib": ["ES5"],
+    "noEmit": true
+  },
+  "include": ["src/jsx/index.ts"]
+}

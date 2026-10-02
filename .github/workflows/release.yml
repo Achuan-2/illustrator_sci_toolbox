@@ -1,0 +1,44 @@
+name: ZIP and ZXP Release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate tag and extract CHANGELOG
+        run: pnpm release:notes
+      - run: pnpm check
+      - run: pnpm test
+      # Bolt's ZIP command also builds and signs the ZXP. Do not rebuild afterward.
+      - name: Build both release packages with Bolt CEP
+        run: pnpm zip
+      - name: Verify contents, versions and ZXP signature
+        run: pnpm verify:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sci-toolbox-${{ github.ref_name }}
+          path: |
+            dist/zip/*.zip
+            dist/zxp/*.zxp
+          if-no-files-found: error
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/zip/*.zip
+            dist/zxp/*.zxp
