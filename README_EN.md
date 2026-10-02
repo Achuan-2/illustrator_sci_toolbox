@@ -87,7 +87,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## 3 How to Use This Plugin
 
-1. Download the ZXP installer or ZIP distribution from [GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases). The migrated extension targets Illustrator 2024 or later.
+1. Download the ZXP installer or ZIP distribution from [GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases). The installer targets Illustrator CC 2018 (22.0) or later; individual host versions still require testing.
 
     <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 

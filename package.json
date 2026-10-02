@@ -21,6 +21,7 @@
     "verify:package": "node scripts/verify-package.mjs"
   },
   "dependencies": {
+    "core-js": "^3.50.0",
     "svelte": "^5.33.14"
   },
   "devDependencies": {

@@ -10,8 +10,9 @@ const config: CEP_Config = {
   servePort: 5000,
   startingDebugPort: 8088,
   extensionManifestVersion: 6,
-  requiredRuntimeVersion: 11,
-  hosts: [{ name: 'ILST', version: '[28.0,99.9]' }],
+  // CC 2018 is the first Illustrator with CEP 8 / Chromium 57 (native Proxy).
+  requiredRuntimeVersion: 8,
+  hosts: [{ name: 'ILST', version: '[22.0,99.9]' }],
   type: 'Panel',
   parameters: [
     '--enable-nodejs',

@@ -117,6 +117,7 @@ body {
 .grid {
   display: grid;
   /* grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); */
+  grid-gap: 10px 14px;
   gap: 10px 14px;
   align-items: start;
 }
@@ -270,4 +271,34 @@ button.tab {
 }
 button.tab.active {
   background: var(--primary);
+}
+
+/* CEP 8–10 support grid gap, but need margins for flex spacing. */
+.no-flex-gap .tabs > * + * {
+  margin-top: 4px;
+}
+.no-flex-gap .content > * + * {
+  margin-top: 12px;
+}
+.no-flex-gap .input-group {
+  margin: -4px;
+}
+.no-flex-gap .input-group > *,
+.no-flex-gap .toolbar > * {
+  margin: 4px;
+}
+.no-flex-gap .toolbar {
+  margin: 4px -4px -4px;
+}
+.no-flex-gap .swap-col + .swap-col {
+  margin-left: 12px;
+}
+.no-flex-gap .swap-col > * + * {
+  margin-top: 8px;
+}
+.no-flex-gap .row {
+  margin: -7px;
+}
+.no-flex-gap .row > * {
+  margin: 7px;
 }

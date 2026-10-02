@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 import { Window } from 'happy-dom';
+import { parse } from 'acorn';
 import { hostNamespace } from '../src/shared/host.ts';
 
 const assets = fs.readdirSync('dist/cep/assets');
@@ -12,7 +13,7 @@ const bundle = fs.readFileSync(
 );
 const storageKey = 'illustrator_sci_plugin_settings';
 
-async function createPanel(saved?: string) {
+async function createPanel(saved?: string, legacy = false) {
   const window = new Window({ url: 'http://localhost:3000/main/index.html' });
   // happy-dom 20 implements :checked only for INPUT. Svelte also uses it for
   // selected OPTIONs; supply that missing browser behavior in this adapter.
@@ -62,6 +63,19 @@ async function createPanel(saved?: string) {
     }
   };
   Object.assign(window, { __adobe_cep__: adapter });
+  if (legacy) {
+    // Remove APIs absent from Chromium 57 in this isolated browser context.
+    window.eval(`
+      delete String.prototype.replaceAll;
+      delete Promise.allSettled;
+      delete Promise.prototype.finally;
+      // Shadow happy-dom's prototype method as well as its bound instance method.
+      Object.defineProperty(window, 'queueMicrotask', {
+        value: undefined, configurable: true, writable: true
+      });
+      delete window.globalThis;
+    `);
+  }
   window.eval(bundle);
   const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 5));
   await flush();
@@ -86,6 +100,34 @@ async function createPanel(saved?: string) {
   };
   return { window, requests, alerts, element, input, click, flush };
 }
+
+test('installed panel starts and calls the host without newer Chromium APIs', async () => {
+  // Chromium 57 supports ES2017; later syntax must be transpiled in the package.
+  parse(bundle, { ecmaVersion: 2017 });
+  const panel = await createPanel(undefined, true);
+  try {
+    assert.equal(panel.window.eval('globalThis === window'), true);
+    assert.equal(panel.window.eval('typeof queueMicrotask'), 'function');
+    assert.equal(panel.window.eval('"a.a".replaceAll("a", "b")'), 'b.b');
+    assert.equal(panel.window.eval('"a.a".replaceAll(/a/g, "b")'), 'b.b');
+    const settled = await panel.window.eval(
+      'Promise.allSettled([Promise.resolve(1), Promise.reject(2)])'
+    );
+    assert.equal(settled[0].value, 1);
+    assert.equal(settled[1].reason, 2);
+    assert.equal(
+      await panel.window.eval('Promise.resolve(3).finally(() => {})'),
+      3
+    );
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.element('copy-pos-button').textContent, '复制');
+    await panel.click('copy-size-button');
+    assert.equal(panel.requests.at(-1)?.operation, 'copySize');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
 
 test('production Svelte panel switches tabs and persists language without losing form edits', async () => {
   const panel = await createPanel();

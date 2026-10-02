@@ -137,7 +137,9 @@
 
 ### 3.1 下载插件
 
-下载插件 ZXP 安装包或 ZIP 分发包：[GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases)。迁移后的版本面向 Illustrator 2024 及以上。
+下载插件 ZXP 安装包或 ZIP 分发包：[GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases)。
+
+安装包的兼容目标为 Illustrator CC 2018（22.0）及以上，具体版本仍需实际验证。
 
   <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 

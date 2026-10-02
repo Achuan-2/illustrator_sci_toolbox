@@ -72,7 +72,8 @@ export default defineConfig(({ command }) => {
       outDir,
       // This directory is owned by this build; host output is emitted as an asset.
       emptyOutDir: true,
-      target: 'chrome88',
+      // Match installed CEP 8 builds; the development toolchain is separate.
+      target: 'chrome57',
       sourcemap: !isPackage,
       rollupOptions: {
         input: { main: path.resolve('src/js/main/index.html') },

@@ -26,6 +26,16 @@ assert.ok(
   manifest.includes('com.example.achuanPlugin.panel'),
   'Keep the installed panel ID'
 );
+assert.match(
+  manifest,
+  /<Host\s+Name="ILST"\s+Version="\[22\.0,99\.9\]"\s*\/>/,
+  'Installer must allow Illustrator CC 2018 and later'
+);
+assert.match(
+  manifest,
+  /<RequiredRuntime\s+Name="CSXS"\s+Version="8\.0"\s*\/>/,
+  'Installer must allow CEP 8 and later'
+);
 assert.ok(
   !manifest.includes('<ScriptPath>'),
   'Browser code must not execute as ExtendScript'

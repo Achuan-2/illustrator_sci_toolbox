@@ -1,6 +1,10 @@
 # 开发与发布
 
-项目基于 [Bolt CEP](https://github.com/hyperbrew/bolt-cep) 的 `vite-cep-plugin`、Svelte 5、TypeScript 和 Vite。使用 Node.js 22 或以上、项目指定的 pnpm；Illustrator 配置范围为 2024（28.0）及以上、CEP 11 及以上。这个范围是构建目标，实际兼容性仍需要记录宿主验收结果。
+项目基于 [Bolt CEP](https://github.com/hyperbrew/bolt-cep) 的 `vite-cep-plugin`、Svelte 5、TypeScript 和 Vite。开发环境使用 Node.js 22 或以上、项目指定的 pnpm；安装包的宿主范围为 Illustrator CC 2018（22.0）及以上、CEP 8 及以上，前端按 Chromium 57 编译。这个范围是兼容目标，实际兼容性仍需要记录宿主验收结果。
+
+生产入口先加载浏览器 API 补丁（`globalThis`、`queueMicrotask`、`replaceAll`、`Promise.allSettled` 和 `Promise.finally`），并检测 flex gap，为旧版 CEP 使用 margin 间距。宿主脚本继续保持 ES3。根据 [Adobe CEP 版本表](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_8.x/Documentation/CEP%208.0%20HTML%20Extension%20Cookbook.md)，CC 2017 及更早版本使用 Chromium 41 或更旧引擎，缺少 Svelte 5 所需的原生 Proxy，因此不在当前安装包范围内。扩大 manifest 范围不能解决这一限制。
+
+旧版 Illustrator 应使用 `pnpm build` 生成的静态产物或签名安装包验证；Vite 开发服务和 HMR 不属于旧版宿主的兼容承诺。开发工具的 Node.js 要求不影响安装包在 Illustrator 内的运行。
 
 ## 本地开发
 
