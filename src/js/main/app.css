@@ -219,15 +219,26 @@ input[type='checkbox'] {
   margin-top: 8px;
 }
 
-/* Keep a function and its explanation together when a toolbar wraps. */
-.help-action,
-.help-heading {
-  display: inline-flex;
-  align-items: center;
-}
-.help-action > .help-hint,
-.help-heading > .help-hint {
-  margin-left: 6px;
+/* Explanations float above scrollable panels without occupying form space. */
+.sci-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-2);
+  color: var(--text);
+  font: 13px/1.6 Arial, sans-serif;
+  font-weight: normal;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+  user-select: text;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
 /* Swap panel: two-column layout (left col: TL,BL ; right col: TR,BR) */

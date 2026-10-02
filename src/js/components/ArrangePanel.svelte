@@ -2,7 +2,7 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
-  import HelpHint from './HelpHint.svelte';
+  import { tooltip } from '../services/tooltip';
 
   const sizeHints = {
     original: 'arrange.originalHint',
@@ -18,18 +18,18 @@
       <input
         type="checkbox"
         id="auto-layout"
+        use:tooltip={$t('arrange.autoHint')}
         bind:checked={$workspace.autoLayout}
       />
-      <HelpHint id="auto-layout-help" text={$t('arrange.autoHint')} />
     </div>
     <div class="input-group" id="align-edges-group">
       <label for="align-edges">{$t('arrange.alignEdges')}</label>
       <input
         type="checkbox"
         id="align-edges"
+        use:tooltip={$t('arrange.alignEdgesHint')}
         bind:checked={$workspace.alignEdges}
       />
-      <HelpHint id="align-edges-help" text={$t('arrange.alignEdgesHint')} />
     </div>
     <div
       class="input-group"
@@ -40,10 +40,10 @@
       <input
         type="number"
         id="layout-width"
+        use:tooltip={$t('arrange.layoutWidthHint')}
         min="0"
         bind:value={$workspace.layoutWidth}
       />
-      <HelpHint id="layout-width-help" text={$t('arrange.layoutWidthHint')} />
     </div>
     <div class="input-group" id="columns-group" hidden={$workspace.autoLayout}>
       <label for="columns">{$t('arrange.columns')}</label>
@@ -78,15 +78,15 @@
     </div>
     <div class="input-group">
       <label for="arrange-size-mode">{$t('arrange.objectSize')}</label>
-      <select id="arrange-size-mode" bind:value={$workspace.sizeMode}>
+      <select
+        id="arrange-size-mode"
+        use:tooltip={$t(sizeHints[$workspace.sizeMode])}
+        bind:value={$workspace.sizeMode}
+      >
         <option value="original">{$t('arrange.original')}</option>
         <option value="auto">{$t('arrange.autoSize')}</option>
         <option value="custom">{$t('arrange.customSize')}</option>
       </select>
-      <HelpHint
-        id="arrange-size-mode-help"
-        text={$t(sizeHints[$workspace.sizeMode])}
-      />
     </div>
     <div
       class="input-group"
@@ -103,9 +103,9 @@
       <input
         type="checkbox"
         id="use-uniform-width"
+        use:tooltip={$t('arrange.useWidth')}
         bind:checked={$workspace.useUniformWidth}
       />
-      <HelpHint id="use-uniform-width-help" text={$t('arrange.useWidth')} />
     </div>
     <div
       class="input-group"
@@ -122,34 +122,31 @@
       <input
         type="checkbox"
         id="use-uniform-height"
+        use:tooltip={$t('arrange.useHeight')}
         bind:checked={$workspace.useUniformHeight}
       />
-      <HelpHint id="use-uniform-height-help" text={$t('arrange.useHeight')} />
     </div>
 
     <div class="input-group">
       <label for="arrange-order">{$t('common.order')}</label>
-      <select id="arrange-order" bind:value={$workspace.arrangeOrder}>
+      <select
+        id="arrange-order"
+        use:tooltip={$t(`order.${$workspace.arrangeOrder}Hint`)}
+        bind:value={$workspace.arrangeOrder}
+      >
         <option value="grid">{$t('order.grid')}</option>
         <option value="stacking">{$t('order.stacking')}</option>
         <option value="horizontal">{$t('order.horizontal')}</option>
         <option value="vertical">{$t('order.vertical')}</option>
       </select>
-      <HelpHint
-        id="arrange-order-help"
-        text={$t(`order.${$workspace.arrangeOrder}Hint`)}
-      />
     </div>
     <div class="input-group">
       <label for="arrange-reverse-order">{$t('common.reverseOrder')}</label>
       <input
         type="checkbox"
         id="arrange-reverse-order"
+        use:tooltip={$t('common.reverseOrderHint')}
         bind:checked={$workspace.arrangeReverseOrder}
-      />
-      <HelpHint
-        id="arrange-reverse-order-help"
-        text={$t('common.reverseOrderHint')}
       />
     </div>
   </div>

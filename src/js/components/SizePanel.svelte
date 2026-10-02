@@ -2,7 +2,7 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
-  import HelpHint from './HelpHint.svelte';
+  import { tooltip } from '../services/tooltip';
 </script>
 
 <div class="panel active" id="panel-size">
@@ -18,9 +18,9 @@
       <input
         type="checkbox"
         id="use-size-w"
+        use:tooltip={$t('size.useWidth')}
         bind:checked={$workspace.useSizeW}
       />
-      <HelpHint id="use-size-w-help" text={$t('size.useWidth')} />
     </div>
     <div class="input-group">
       <label for="size-h">{$t('size.height')}</label>
@@ -33,9 +33,9 @@
       <input
         type="checkbox"
         id="use-size-h"
+        use:tooltip={$t('size.useHeight')}
         bind:checked={$workspace.useSizeH}
       />
-      <HelpHint id="use-size-h-help" text={$t('size.useHeight')} />
     </div>
   </div>
   <div class="toolbar">

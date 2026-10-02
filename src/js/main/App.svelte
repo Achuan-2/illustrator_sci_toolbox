@@ -43,7 +43,7 @@
   }
   function endOffsetEditing(event: Event) {
     const target = event.target as HTMLElement;
-    if (target.closest('.help-hint, .help-popup')) return;
+    if (target.closest('.sci-tooltip')) return;
     if (!target.matches('input, select, button')) return;
     // Checkbox activation changes the DOM before click, but bind:checked saves
     // it on change. Wait for that binding before updating the shared workspace.

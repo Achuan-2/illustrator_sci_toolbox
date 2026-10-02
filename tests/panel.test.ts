@@ -109,72 +109,74 @@ test('relative position center option is translated and reaches copy and paste o
   }
 });
 
-test('explanation icons support hover, pinned clicks, single-popup dismissal and dynamic translations', async () => {
+test('hover explanations wait, dismiss, update translations and add no buttons', async () => {
   const panel = await createPanel();
   try {
+    assert.equal(panel.window.document.querySelector('.help-hint'), null);
+    assert.equal(panel.window.document.querySelector('.help-action'), null);
     const control = panel.element('reverse-move-checkbox') as unknown as HTMLInputElement;
     const checked = control.checked;
-    const icon = panel.element('reverse-move-help');
-    const content = 'reverse-move-help-content';
     const hostCalls = () => panel.requests.filter((request) => request.operation !== 'syncZoomTracker');
     const requests = hostCalls().length;
     const pause = (ms = 220) => new Promise((resolve) => setTimeout(resolve, ms));
-
-    icon.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    const popup = () => panel.window.document.querySelector('.sci-tooltip');
+    control.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
     await pause();
-    assert.equal(panel.window.document.getElementById(content), null, 'Quick hovering does not open help');
-    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
+    assert.equal(popup(), null, 'Quick hovering does not open an explanation');
+    control.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
     await pause(650);
-    assert.equal(panel.window.document.getElementById(content), null, 'Leaving cancels delayed help');
-    icon.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    assert.equal(popup(), null, 'Leaving cancels pending hover');
+    control.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
     await pause(650);
-    assert.equal(panel.element(content).getAttribute('role'), 'tooltip');
-    assert.equal(panel.element(content).parentElement, panel.window.document.body);
-    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
+    assert.equal(popup()?.getAttribute('role'), 'tooltip');
+    assert.equal(popup()?.parentElement, panel.window.document.body);
+    assert.equal(control.getAttribute('aria-describedby'), popup()?.id);
+    control.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
     await pause();
-    assert.equal(panel.window.document.getElementById(content), null);
+    assert.equal(popup(), null);
+    assert.equal(control.getAttribute('aria-describedby'), null);
 
-    await panel.click(icon.id);
-    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
-    await pause();
-    assert.ok(panel.window.document.getElementById(content), 'Clicked explanation stays open after the pointer leaves');
-    await panel.click(icon.id);
-    assert.equal(panel.window.document.getElementById(content), null);
-
-    await panel.click(icon.id);
-    await panel.click('allow-mismatch-paste-help');
-    assert.equal(panel.window.document.getElementById(content), null);
-    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 1);
-    panel.window.document.body.click();
-    await panel.flush();
-    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 0);
-
-    await panel.click('relative-order-help');
+    const order = panel.element('relative-order');
+    await panel.click(order.id);
+    await pause(650);
+    assert.equal(popup(), null, 'Clicking does not pin or open an explanation');
+    control.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await pause(650);
+    order.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await pause(650);
+    assert.equal(panel.window.document.querySelectorAll('.sci-tooltip').length, 1);
+    assert.equal(control.getAttribute('aria-describedby'), null);
     await panel.input('relative-order', 'horizontal');
-    assert.equal(panel.element('relative-order-help-content').textContent, 'Sort strictly from left to right');
+    assert.equal(popup()?.textContent, 'Sort strictly from left to right');
     await panel.input('language', 'zh_CN');
-    assert.equal(panel.element('relative-order-help').getAttribute('aria-label'), '查看提示');
-    assert.equal(panel.element('relative-order-help-content').textContent, '严格从左到右排序');
-    panel.element('relative-order-help').dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(popup()?.textContent, '严格从左到右排序');
+    order.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await panel.flush();
-    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 0);
+    assert.equal(popup(), null);
+    order.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await pause(650);
+    panel.window.dispatchEvent(new panel.window.Event('hashchange'));
+    await panel.flush();
+    assert.equal(popup(), null, 'Changing tabs dismisses floating explanations');
     assert.equal(control.checked, checked);
-    assert.equal(hostCalls().length, requests, 'Viewing help must not call Illustrator operations');
+    assert.equal(hostCalls().length, requests, 'Hovering must not call Illustrator operations');
     assert.deepEqual(panel.alerts, []);
   } finally {
     await panel.window.happyDOM.close();
   }
 });
 
-test('explanations fit narrow viewports and do not interrupt label live editing', async () => {
+test('hover explanations fit narrow viewports and preserve label live editing', async () => {
   const panel = await createPanel();
   try {
     Object.defineProperty(panel.window, 'innerWidth', { value: 220, configurable: true });
     Object.defineProperty(panel.window, 'innerHeight', { value: 180, configurable: true });
-    const icon = panel.element('auto-layout-help');
-    icon.getBoundingClientRect = () => ({ left: 185, top: 150, right: 207, bottom: 172, width: 22, height: 22 } as ReturnType<typeof icon.getBoundingClientRect>);
-    await panel.click(icon.id);
-    const popup = panel.element('auto-layout-help-content');
+    const control = panel.element('auto-layout');
+    control.getBoundingClientRect = () => ({ left: 185, top: 150, right: 207, bottom: 172, width: 22, height: 22 } as ReturnType<typeof control.getBoundingClientRect>);
+    control.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    const popup = panel.window.document.querySelector('.sci-tooltip')!;
+    assert.ok(popup);
     popup.getBoundingClientRect = () => ({ left: 0, top: 0, right: 204, bottom: 80, width: 204, height: 80 } as ReturnType<typeof popup.getBoundingClientRect>);
     panel.window.dispatchEvent(new panel.window.Event('resize'));
     await panel.flush();
@@ -185,13 +187,15 @@ test('explanations fit narrow viewports and do not interrupt label live editing'
     await panel.click('add-label-button');
     const offset = panel.element('label-offset-x');
     assert.equal(offset.classList.contains('editing-mode'), true);
-    panel.element('label-offset-x-help').focus();
-    await panel.click('label-offset-x-help');
+    offset.focus();
+    offset.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await new Promise((resolve) => setTimeout(resolve, 650));
     assert.equal(offset.classList.contains('editing-mode'), true);
-    assert.ok(panel.window.document.getElementById('label-offset-x-help-content'));
-    panel.element('label-offset-x-help').dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(panel.window.document.querySelector('.sci-tooltip')?.textContent, 'Change the value to move labels in real time');
+    offset.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await panel.flush();
     assert.equal(offset.classList.contains('editing-mode'), true);
+    assert.equal(panel.window.document.querySelector('.sci-tooltip'), null);
     await panel.input('label-offset-x', '3');
     assert.equal(panel.requests.at(-1)?.operation, 'updateLabelOffsets');
     assert.deepEqual(panel.alerts, []);
@@ -450,9 +454,10 @@ test('production controls preserve dynamic placeholders, arrange visibility and 
     assert.equal(panel.requests.at(-1)?.operation, 'updateLabelOffsets');
     assert.equal(panel.requests.at(-1)?.args[0], 0);
     await panel.input('language', 'en');
-    await panel.click('label-offset-x-help');
+    panel.element('label-offset-x').dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await new Promise((resolve) => setTimeout(resolve, 650));
     assert.equal(
-      panel.element('label-offset-x-help-content').textContent,
+      panel.window.document.querySelector('.sci-tooltip')?.textContent,
       'Change the value to move labels in real time'
     );
     await panel.click('copy-size-button');

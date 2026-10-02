@@ -2,7 +2,7 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
-  import HelpHint from './HelpHint.svelte';
+  import { tooltip } from '../services/tooltip';
 </script>
 
 <div class="panel active" id="panel-border">
@@ -30,11 +30,11 @@
       <input
         type="number"
         id="border-dash"
+        use:tooltip={$t('border.dashHint')}
         min="0"
         step="0.1"
         bind:value={$workspace.borderDash}
       />
-      <HelpHint id="border-dash-help" text={$t('border.dashHint')} />
     </div>
     <div class="input-group">
       <label for="auto-group-border">{$t('border.autoGroup')}</label>
