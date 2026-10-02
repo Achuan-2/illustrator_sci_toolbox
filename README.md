@@ -19,9 +19,9 @@
 
 ## 1 开发背景
 
-之前为了组会做ppt快速排图、导入markdown笔记，写了一个ppt插件，开源在Github，目前star数已经超过500 stars：[Achuan-2/SlideSCI](https://github.com/Achuan-2/SlideSCI)，博客：[SlideSCI README](https://mp.weixin.qq.com/s/_NrGwjJnEta0oT5a6EKdiA)
+之前为了组会做ppt快速排图、导入markdown笔记，写了一个ppt插件，开源在Github：[Achuan-2/SlideSCI](https://github.com/Achuan-2/SlideSCI)，博客：[SlideSCI README](https://mp.weixin.qq.com/s/_NrGwjJnEta0oT5a6EKdiA)
 
-最近在写论文，用adobe illustrator排图有时好累
+而写论文时，我还是用adobe illustrator来组图，但发现组图有时好累
 
 - 比如我需要不同图同一个位置添加同一个标注，原生非常麻烦，因为只能获取绝对位置，得自己计算相对位置
 - 比如我需要图片批量改宽高，全选图片后，输入具体值，但实际改的是整体大小，每个图片的大小并不是我输入的具体值
@@ -137,13 +137,19 @@
 
 ### 3.1 下载插件
 
-下载插件 ZXP 安装包或 ZIP 分发包：[GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases)。
+本插件安装包的兼容目标为 Illustrator CC 2018（22.0）及以上。
 
-安装包的兼容目标为 Illustrator CC 2018（22.0）及以上，具体版本仍需实际验证。
+下载插件 ZXP 安装包或 ZIP 分发包（选一个就好）
 
-  <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
+下载地址：
 
+GitHub Releases: https://github.com/Achuan-2/illustrator_sci_toolbox/releases
 
+<img width="1521" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
+
+百度网盘地址：https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit
+
+夸克网盘地址：https://pan.quark.cn/s/12bf0d38de47
 
 ### 3.2. 安装方法
 
@@ -162,7 +168,16 @@
     
 #### 方法二：zip文件安装
 
-ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹，将整个文件夹复制到 Adobe 插件目录，确保其中直接包含 `CSXS/manifest.xml`，安装后重启 Illustrator。
+ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹，将整个文件夹复制到 Adobe 插件目录，安装后重启 Illustrator。
+
+不同系统的Adobe 插件目录：
+
+- Windows：
+
+  - 按 `Win+R` 输入 `%APPDATA%\Adobe\CEP\extensions` 并回车。
+- MacOS：
+
+  - 目录：`~/Library/Application Support/Adobe/CEP/extensions`
    
 
 ### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）
@@ -197,7 +212,9 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 ## 5 开发与发布
 
-项目已迁移到 Bolt CEP + Svelte + TypeScript。使用 pnpm，运行 `pnpm install`、`pnpm build`、`pnpm dev` 开始开发；前端支持 HMR，宿主脚本修改触发重新构建和面板刷新。版本 tag 通过 GitHub Actions 自动发布 ZIP、ZXP 和对应 CHANGELOG，详见[开发与发布文档](docs/development.md)。
+项目架构为 Bolt CEP + Svelte + TypeScript。使用 pnpm，运行 `pnpm install`、`pnpm build`、`pnpm dev` 开始开发。前端支持 HMR，宿主脚本修改触发重新构建和面板刷新。
+
+版本 tag 通过 GitHub Actions 自动发布 ZIP、ZXP 和对应 CHANGELOG，详见[开发与发布文档](docs/development.md)。
 
 ## ❤️用爱发电
 
