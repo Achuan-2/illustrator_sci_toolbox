@@ -54,16 +54,16 @@ pnpm verify:package
 
 ## 打包与 GitHub Actions 发布
 
-`pnpm zxp` 生成签名安装包；`pnpm zip` 一次生成 ZXP 和包含该 ZXP、README、LICENSE、CHANGELOG 的 ZIP 分发包，两个文件来自同一次打包。
+`pnpm zxp` 生成签名安装包；`pnpm zip` 先生成签名 ZXP，再将同一文件复制为 `.zip`。两个文件内容完全相同，仅扩展名不同，分别用于安装器安装和手动解压安装。
 
 ```text
 dist/zxp/SCI-Toolbox-<version>.zxp
 dist/zip/SCI-Toolbox-<version>.zip
 ```
 
-ZIP 解压后需要安装其中的 ZXP，它不是供直接复制到 CEP 目录的扩展文件夹。本地调试可使用 `dist/cep`。
+ZIP 解压后，将整个扩展文件夹复制到 CEP 扩展目录，确保 `CSXS/manifest.xml` 位于该文件夹的直接子目录中。Windows 目录为 `%APPDATA%\Adobe\CEP\extensions`，macOS 目录为 `~/Library/Application Support/Adobe/CEP/extensions`。重启 Illustrator 后打开插件。本地调试可使用 `dist/cep`。
 
-版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交后推送同版本的 `v<version>` tag。`.github/workflows/release.yml` 会安装锁定依赖、验证 tag、执行检查和测试、调用 Bolt 打包、校验内容和 ZXP 签名，再创建或更新 GitHub Release，同时上传 ZIP、ZXP 和对应版本说明。签名要求时间戳服务器成功，失败会停止发布。
+版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交后推送同版本的 `v<version>` tag。`.github/workflows/release.yml` 会安装锁定依赖、验证 tag、执行检查和测试、调用 Bolt 签名并复制 ZIP、校验两个文件内容完全相同及 ZXP 签名，再创建或更新 GitHub Release，同时上传 ZIP、ZXP 和对应版本说明。签名要求时间戳服务器成功，失败会停止发布。
 
 普通分支提交及 PR 只运行 CI 检查。工作流使用仓库的 `GITHUB_TOKEN`，不需要本地 PowerShell 发布脚本或 `gh release`。构建、测试和打包命令本身不会提交代码、推送 tag 或发布 Release。
 

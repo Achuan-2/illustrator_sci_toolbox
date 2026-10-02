@@ -162,7 +162,7 @@
     
 #### 方法二：zip文件安装
 
-迁移后 ZIP 包含签名 ZXP 和使用文档。解压后，将其中的 `.zxp` 按方法一安装；不要将 ZIP 解压目录直接复制到 Adobe 插件目录。源码开发使用构建后的 `dist/cep`，具体操作见[开发与发布文档](docs/development.md)。
+ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹，将整个文件夹复制到 Adobe 插件目录，确保其中直接包含 `CSXS/manifest.xml`，安装后重启 Illustrator。
    
 
 ### 3.3 设置PlayerDebugMode（如果能正常使用可跳过）

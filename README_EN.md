@@ -109,7 +109,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
     
     【Method 2: ZIP File Installation】
 
-    The ZIP contains the signed ZXP installer and documentation. Extract it and install the included `.zxp` using Method 1. Do not copy the ZIP distribution directory into the CEP extensions folder. Source development uses the generated `dist/cep` directory; see [Development and release](docs/development.md).
+    The ZIP is identical to the signed ZXP, with only the file extension changed. Extract it into a folder and copy that folder into the CEP extensions directory: `%APPDATA%\Adobe\CEP\extensions` on Windows, or `~/Library/Application Support/Adobe/CEP/extensions` on macOS. Ensure `CSXS/manifest.xml` is directly inside the extension folder.
 
     Remember to restart Illustrator after installation!!!
    

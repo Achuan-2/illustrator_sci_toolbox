@@ -22,8 +22,8 @@ jobs:
         run: pnpm release:notes
       - run: pnpm check
       - run: pnpm test
-      # Bolt's ZIP command also builds and signs the ZXP. Do not rebuild afterward.
-      - name: Build both release packages with Bolt CEP
+      # Sign once, then copy the ZXP byte-for-byte as the manual installation ZIP.
+      - name: Build signed ZXP and manual installation ZIP
         run: pnpm zip
       - name: Verify contents, versions and ZXP signature
         run: pnpm verify:package

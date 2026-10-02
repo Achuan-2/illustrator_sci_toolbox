@@ -7,8 +7,7 @@ import cepConfig from './cep.config';
 import { buildExtendScript, hostSources, isHostSource } from './vite.es.config';
 
 const outDir = path.resolve('dist/cep');
-const isMetaPackage = process.env.ZIP_PACKAGE === 'true';
-const isPackage = isMetaPackage || process.env.ZXP_PACKAGE === 'true';
+const isPackage = process.env.ZXP_PACKAGE === 'true';
 const isCheck = process.env.SCI_CHECK === 'true';
 
 const options: CepOptions = {
@@ -17,7 +16,7 @@ const options: CepOptions = {
   cepDist: 'cep',
   isProduction: process.env.NODE_ENV === 'production',
   isPackage,
-  isMetaPackage,
+  isMetaPackage: false,
   isServe: false,
   debugReact: false,
   zxpOutput: path.resolve(`dist/zxp/SCI-Toolbox-${cepConfig.version}`),

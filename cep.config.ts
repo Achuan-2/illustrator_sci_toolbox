@@ -51,15 +51,7 @@ const config: CEP_Config = {
     jsxBin: 'off'
   },
   installModules: [],
-  copyAssets: ['icons', 'js/i18n/en.json', 'js/i18n/zh_CN.json'],
-  copyZipAssets: [
-    'README.md',
-    'README_EN.md',
-    'LICENSE',
-    'CHANGELOG.md',
-    'docs',
-    '开启PlayerDebugMode.reg'
-  ]
+  copyAssets: ['icons', 'js/i18n/en.json', 'js/i18n/zh_CN.json']
 };
 
 export default config;

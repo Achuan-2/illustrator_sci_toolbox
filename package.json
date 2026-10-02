@@ -14,7 +14,7 @@
     "test": "vite build && node --import tsx --test tests/*.test.ts",
     "build": "pnpm check && vite build",
     "zxp": "pnpm check && cross-env ZXP_PACKAGE=true vite build",
-    "zip": "pnpm check && cross-env ZIP_PACKAGE=true vite build",
+    "zip": "pnpm zxp && node scripts/create-zip-package.mjs",
     "symlink": "cross-env BOLT_ACTION=symlink vite",
     "delsymlink": "cross-env BOLT_ACTION=delsymlink vite",
     "release:notes": "node scripts/release-notes.mjs",

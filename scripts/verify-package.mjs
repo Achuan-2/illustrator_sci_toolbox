@@ -16,6 +16,8 @@ assert.ok(
   'Both release files must be nonempty'
 );
 
+assert.deepEqual(zip, zxp, 'ZIP must be a byte-for-byte copy of the signed ZXP');
+
 const extension = unzipSync(zxp);
 const manifest = strFromU8(extension['CSXS/manifest.xml']);
 assert.ok(
@@ -57,31 +59,6 @@ assert.ok(
   !Object.keys(extension).some((file) => file.endsWith('.map')),
   'Do not ship debug source maps'
 );
-
-const distribution = unzipSync(zip);
-const packedZxp = Object.entries(distribution).find(([file]) =>
-  file.endsWith('.zxp')
-);
-assert.ok(packedZxp, 'ZIP must contain the ZXP installer');
-assert.deepEqual(
-  Buffer.from(packedZxp[1]),
-  zxp,
-  'ZIP must contain the exact signed ZXP'
-);
-for (const filename of [
-  'README.md',
-  'README_EN.md',
-  'LICENSE',
-  'CHANGELOG.md',
-  'docs/development.md'
-]) {
-  assert.ok(
-    Object.keys(distribution).some(
-      (file) => file === filename || file.endsWith(`/${filename}`)
-    ),
-    `Missing distribution file: ${filename}`
-  );
-}
 
 const require = createRequire(import.meta.url);
 const pluginDir = path.dirname(require.resolve('vite-cep-plugin'));
