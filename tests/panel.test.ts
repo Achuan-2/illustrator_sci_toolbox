@@ -204,8 +204,14 @@ test('hover explanations fit narrow viewports and preserve label live editing', 
   }
 });
 
-async function createPanel(saved?: string, legacy = false) {
-  const window = new Window({ url: 'http://localhost:3000/main/index.html' });
+
+async function createPanel(
+  saved?: string,
+  legacy = false,
+  url = 'http://localhost:3000/main/index.html',
+  configure?: (window: Window) => void
+) {
+  const window = new Window({ url });
   // happy-dom 20 implements :checked only for INPUT. Svelte also uses it for
   // selected OPTIONs; supply that missing browser behavior in this adapter.
   const querySelector = window.HTMLSelectElement.prototype.querySelector;
@@ -240,7 +246,17 @@ async function createPanel(saved?: string, legacy = false) {
                 copySpacing: '1.234',
                 addLabelsToImages: '3',
                 updateLabelIndex: 'Success|2',
-                arrangeImages: '{"layoutWidth":50}'
+                arrangeImages: '{"layoutWidth":50}',
+                inspectZoomTarget: JSON.stringify({
+                  sourceWidth: 100,
+                  sourceHeight: 100,
+                  previewDataUrl:
+                    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+                  existingEntries: [],
+                  manualRect: null
+                }),
+                applyZoomImages: 'Success',
+                syncZoomTracker: 'OK'
               };
               return JSON.stringify({
                 ok: true,
@@ -254,6 +270,7 @@ async function createPanel(saved?: string, legacy = false) {
     }
   };
   Object.assign(window, { __adobe_cep__: adapter });
+  configure?.(window);
   if (legacy) {
     // Remove APIs absent from Chromium 57 in this isolated browser context.
     window.eval(`
@@ -470,6 +487,298 @@ test('production controls preserve dynamic placeholders, arrange visibility and 
       '12.345'
     );
     assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('zoom image tab renders preferences and opens modal on click', async () => {
+  const panel = await createPanel();
+  try {
+    // Switch to zoom tab
+    const tabs = panel.window.document.querySelectorAll('.tab');
+    let zoomTab: Element | null = null;
+    tabs.forEach((tab) => {
+      if (tab.textContent?.includes('Zoom') || tab.textContent?.includes('放大')) {
+        zoomTab = tab;
+      }
+    });
+    assert.ok(zoomTab, 'Zoom tab button should exist in tabs list');
+    (zoomTab as unknown as HTMLElement).click();
+    await panel.flush();
+
+    // Verify zoom panel is displayed
+    const makeZoomBtn = panel.element('make-zoom-button');
+    assert.ok(makeZoomBtn);
+
+    // Verify default inputs exist
+    assert.ok(panel.element('default-line-width'));
+    assert.ok(panel.element('default-placement'));
+
+    // Click make zoom button to open modal
+    await panel.click('make-zoom-button');
+    assert.equal(panel.requests.some((r) => r.operation === 'inspectZoomTarget'), true);
+
+    // Verify modal elements are created
+    const entrySelector = panel.element('entry-selector');
+    assert.ok(entrySelector);
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('zoom window opens before the host finishes capturing its preview', async () => {
+  let finishCapture: (() => void) | undefined;
+  let openingSession: any;
+  const panel = await createPanel(undefined, false, undefined, (window) => {
+    const cep = (window as any).__adobe_cep__;
+    const evaluate = cep.evalScript;
+    cep.getExtensions = () => JSON.stringify([{ id: 'com.example.achuanPlugin.zoom' }]);
+    cep.requestOpenExtension = () => {
+      openingSession = JSON.parse(window.localStorage.getItem('sci_zoom_session')!);
+    };
+    cep.evalScript = (script: string, callback: (result: string) => void) => {
+      if (script.includes('"inspectZoomTarget"')) {
+        finishCapture = () => evaluate(script, callback);
+      } else evaluate(script, callback);
+    };
+  });
+  try {
+    await panel.click('make-zoom-button');
+    assert.equal(openingSession.data, null, 'Loading session must be ready when the window opens');
+    assert.ok(finishCapture);
+    assert.equal((panel.element('make-zoom-button') as any).disabled, true);
+    finishCapture();
+    await panel.flush();
+    const readySession = JSON.parse(panel.window.localStorage.getItem('sci_zoom_session')!);
+    assert.ok(readySession.data.previewDataUrl);
+    assert.ok(readySession.timestamp > openingSession.timestamp);
+    assert.equal((panel.element('make-zoom-button') as any).disabled, false);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('zoom loads linked files with their MIME type and only deletes generated previews', async () => {
+  for (const temporary of [false, true]) {
+    const deleted: string[] = [];
+    let loadedUrl = '';
+    const filename = temporary ? 'D:/Temp/generated.png' : 'D:/user/original.jpg';
+    const mime = temporary ? 'image/png' : 'image/jpeg';
+    const panel = await createPanel(undefined, false, undefined, (window) => {
+      (window as any).require = (name: string) => {
+        if (name === 'fs') return {
+          existsSync: (path: string) => path === filename,
+          readFileSync: () => ({ toString: () => 'YWJj' }),
+          unlinkSync: (path: string) => deleted.push(path)
+        };
+        throw new Error(`Unexpected module: ${name}`);
+      };
+      (window as any).Image = class {
+        set src(value: string) { loadedUrl = value; }
+      };
+      const cep = (window as any).__adobe_cep__;
+      const evaluate = cep.evalScript;
+      cep.evalScript = (script: string, callback: (result: string) => void) => {
+        if (script.includes('"inspectZoomTarget"')) {
+          callback(JSON.stringify({ ok: true, data: JSON.stringify({
+            sourceWidth: 100, sourceHeight: 100,
+            previewPath: filename, previewMimeType: mime, previewIsTemporary: temporary,
+            existingEntries: [], manualRect: null
+          }) }));
+        } else evaluate(script, callback);
+      };
+    });
+    try {
+      await panel.click('make-zoom-button');
+      assert.equal(loadedUrl, `data:${mime};base64,YWJj`);
+      assert.deepEqual(deleted, temporary ? [filename] : [], 'The user-owned original must never be deleted');
+      assert.deepEqual(panel.alerts, []);
+    } finally {
+      await panel.window.happyDOM.close();
+    }
+  }
+});
+
+test('failed preview capture shows a dismissible translated error in the zoom dialog', async () => {
+  const panel = await createPanel(JSON.stringify({ language: 'zh_CN' }), false, undefined, (window) => {
+    const cep = (window as any).__adobe_cep__;
+    const evaluate = cep.evalScript;
+    cep.evalScript = (script: string, callback: (result: string) => void) => {
+      if (script.includes('"inspectZoomTarget"')) {
+        callback(JSON.stringify({ ok: false, error: 'errors.zoomNoSelection', args: [] }));
+      } else evaluate(script, callback);
+    };
+  });
+  try {
+    await panel.click('make-zoom-button');
+    const loading = panel.window.document.querySelector('.zoom-loading')!;
+    assert.equal(loading.querySelector('.text-danger')?.textContent, '请先选中图片。');
+    loading.querySelector('button')!.click();
+    await panel.flush();
+    assert.equal(panel.window.document.querySelector('.zoom-loading'), null);
+    assert.equal((panel.element('make-zoom-button') as any).disabled, false);
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the image', async () => {
+  let viewport = { width: 600, height: 400 };
+  let imageLoads = 0;
+  const draws: { canvas: any; args: any[] }[] = [];
+  const panel = await createPanel(undefined, true, undefined, (window) => {
+    // Simulate loaded image dimensions and canvas drawing, since happy-dom
+    // does not decode PNGs or perform browser layout.
+    (window as any).ResizeObserver = undefined;
+    (window as any).Image = class {
+      naturalWidth = 1000;
+      naturalHeight = 500;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        imageLoads++;
+        Promise.resolve().then(() => this.onload?.());
+      }
+    };
+    const prototype = window.HTMLCanvasElement.prototype;
+    Object.defineProperties(prototype, {
+      clientWidth: { get: () => viewport.width },
+      clientHeight: { get: () => viewport.height }
+    });
+    prototype.getBoundingClientRect = (() => ({ left: 0, top: 0, ...viewport })) as any;
+    prototype.getContext = function () {
+      const canvas = this;
+      return new Proxy({
+        drawImage: (...args: any[]) => draws.push({ canvas, args }),
+        measureText: () => ({ width: 40 })
+      }, { get: (target, key) => (target as any)[key] ?? (() => {}) }) as any;
+    };
+  });
+  try {
+    await panel.click('make-zoom-button');
+    const canvas = panel.window.document.querySelector('.canvas-wrapper canvas')!;
+    const confirm = panel.window.document.querySelector('.zoom-modal-footer .btn-primary') as any;
+    assert.equal(confirm.disabled, true);
+    canvas.dispatchEvent(new panel.window.MouseEvent('mousedown', { clientX: 70, clientY: 100, button: 0, bubbles: true }));
+    canvas.dispatchEvent(new panel.window.MouseEvent('mousemove', { clientX: 190, clientY: 220, bubbles: true }));
+    panel.window.dispatchEvent(new panel.window.MouseEvent('mouseup'));
+    await panel.flush();
+    assert.equal(confirm.disabled, false, 'Drawn region must enable Confirm without switching entries');
+    await panel.input('zoom-line-width', '2.5');
+    const add = panel.window.document.querySelector('.header-center .btn-secondary') as any;
+    add.click();
+    await panel.flush();
+    assert.equal(confirm.disabled, true, 'An unfinished new entry must disable Confirm');
+    (panel.window.document.querySelector('.header-center .btn-danger') as any).click();
+    await panel.flush();
+    assert.equal(confirm.disabled, false, 'Deleting the unfinished entry must restore validity');
+
+    viewport = { width: 900, height: 500 };
+    panel.window.dispatchEvent(new panel.window.Event('resize'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const imageDraw = draws.filter((draw) => draw.canvas === canvas).at(-1)!;
+    assert.deepEqual(imageDraw.args.slice(1), [12, 31, 876, 438]);
+    assert.equal(imageLoads, 1, 'Drawing, changing settings and resizing must reuse the loaded preview');
+
+    confirm.click();
+    await panel.flush();
+    const request = panel.requests.find((r) => r.operation === 'applyZoomImages');
+    assert.ok(request, 'Confirm must call the host');
+    const payload = JSON.parse(request.args[0] as string);
+    assert.equal(payload.entries.length, 1);
+    assert.equal(payload.entries[0].strokeWidth, 2.5);
+    assert.ok(Math.abs(payload.entries[0].region.width - 120 / 576) < 1e-6);
+    assert.ok(Math.abs(payload.entries[0].region.height - 120 / 288) < 1e-6);
+    assert.equal(panel.window.document.querySelector('.zoom-modal-window'), null);
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('standalone zoom window renders standalone root and opens session', async () => {
+  const session = {
+    data: {
+      sourceWidth: 500,
+      sourceHeight: 400,
+      previewDataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      existingEntries: [
+        {
+          recordKey: 'saved_zoom',
+          name: '放大图 1',
+          region: { x: 0.1, y: 0.1, width: 0.3, height: 0.3 },
+          regionRotation: 0,
+          strokeColor: '#ff0000',
+          strokeWidth: 1.5,
+          strokeDash: 'dash',
+          useRectangleColor: true,
+          addGuideLines: false,
+          placement: 'right',
+          guideLineExtent: 'acrossImages',
+          originalZoomRegion: { x: 1.1, y: 0, width: 0.8, height: 1 },
+          originalZoomRotation: 0,
+          preservesLayout: true
+        }
+      ],
+      manualRect: null
+    },
+    settings: {
+      language: 'zh_CN'
+    },
+    timestamp: Date.now()
+  };
+  const panel = await createPanel(
+    undefined,
+    false,
+    'http://localhost:3000/main/index.html#zoom-window'
+  );
+  try {
+    panel.window.localStorage.setItem(
+      'sci_zoom_session',
+      JSON.stringify(session)
+    );
+    panel.window.dispatchEvent(
+      new panel.window.StorageEvent('storage', {
+        key: 'sci_zoom_session',
+        newValue: JSON.stringify(session)
+      })
+    );
+    await panel.flush();
+    assert.ok(panel.window.document.querySelector('.zoom-standalone-root'));
+    assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
+    assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
+
+    await panel.input('zoom-line-width', '4');
+    panel.window.dispatchEvent(new panel.window.StorageEvent('storage', {
+      key: 'sci_zoom_session',
+      newValue: JSON.stringify(session)
+    }));
+    await panel.flush();
+    assert.equal((panel.element('zoom-line-width') as any).value, '4', 'Duplicate session notifications must preserve unsaved edits');
+
+    await panel.input('zoom-placement', 'left');
+
+    // Confirm button triggers applyZoomImages
+    const confirmBtn = panel.window.document.querySelector(
+      '.zoom-modal-footer .btn-primary'
+    ) as HTMLElement;
+    assert.ok(confirmBtn);
+    confirmBtn.click();
+    await panel.flush();
+    assert.equal(
+      panel.requests.some((r) => r.operation === 'applyZoomImages'),
+      true
+    );
+    const applied = panel.requests.find((r) => r.operation === 'applyZoomImages')!;
+    const editedEntry = JSON.parse(applied.args[0] as string).entries[0];
+    assert.equal(editedEntry.recordKey, 'saved_zoom');
+    assert.equal(editedEntry.strokeWidth, 4);
+    assert.equal(editedEntry.placement, 'left');
+    assert.equal(editedEntry.preservesLayout, false, 'Changing placement must release the saved layout');
   } finally {
     await panel.window.happyDOM.close();
   }

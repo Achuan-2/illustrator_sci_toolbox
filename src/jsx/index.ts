@@ -19,6 +19,10 @@ declare function alignObjects(...args: unknown[]): string;
 declare function distributeObjects(...args: unknown[]): string;
 declare function copySpacing(...args: unknown[]): string;
 declare function pasteSpacing(...args: unknown[]): string;
+declare function inspectZoomTarget(...args: unknown[]): string;
+declare function applyZoomImages(...args: unknown[]): string;
+declare function cancelZoomTarget(...args: unknown[]): string;
+declare function syncZoomTracker(...args: unknown[]): string;
 
 var methods: Record<string, (...args: unknown[]) => string> = {
   arrangeImages: arrangeImages,
@@ -37,7 +41,11 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   alignObjects: alignObjects,
   distributeObjects: distributeObjects,
   copySpacing: copySpacing,
-  pasteSpacing: pasteSpacing
+  pasteSpacing: pasteSpacing,
+  inspectZoomTarget: inspectZoomTarget,
+  applyZoomImages: applyZoomImages,
+  cancelZoomTarget: cancelZoomTarget,
+  syncZoomTracker: syncZoomTracker
 };
 
 $['com.example.achuanPlugin'] = {

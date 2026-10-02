@@ -8,6 +8,13 @@ import {
 export interface CepAdapter {
   evalScript(script: string, callback: (result: string) => void): void;
   getSystemPath(name: string): string;
+  getExtensionId?(): string;
+  getExtensions?(): string;
+  requestOpenExtension?(extensionId: string, params?: string): void;
+  closeExtension?(): void;
+  dispatchEvent?(event: { type: string; scope: string; data: string; [key: string]: unknown }): void;
+  addEventListener?(type: string, listener: (event: unknown) => void): void;
+  removeEventListener?(type: string, listener: (event: unknown) => void): void;
 }
 
 export class HostError extends Error {
@@ -49,10 +56,11 @@ export function createBridge(cep: CepAdapter | undefined) {
     if (!initialization) {
       const path = cep ? `${extensionPath(cep)}/jsx/index.js` : '';
       initialization = evaluate(
-        `try { $.evalFile(${JSON.stringify(path)}); "SCI_READY"; } catch (e) { "SCI_LOAD_ERROR"; }`
+        `try { $.evalFile(${JSON.stringify(path)}); "SCI_READY"; } catch (e) { "SCI_LOAD_ERROR: " + e.message + " (line " + e.line + ")"; }`
       )
         .then((result) => {
-          if (result !== 'SCI_READY') throw new HostError('errors.hostLoad');
+          if (result !== 'SCI_READY')
+            throw new HostError('errors.hostLoad', [result]);
         })
         .catch((error) => {
           initialization = undefined;

@@ -2051,4 +2051,1061 @@ function updateLabelOffsets(offsetX, offsetY, sessionId) {
     return "Success";
 }
 
+// -------------------------------------------------------------
+// ZOOM IMAGE FUNCTIONS (ES3 COMPATIBLE)
+// -------------------------------------------------------------
 
+function hexToRgb(hex) {
+    if (!hex) hex = "#ff0000";
+    if (hex.charAt(0) === '#') hex = hex.substring(1);
+    if (hex.length === 3) {
+        hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
+    }
+    var r = parseInt(hex.substring(0, 2), 16);
+    var g = parseInt(hex.substring(2, 4), 16);
+    var b = parseInt(hex.substring(4, 6), 16);
+    return {
+        r: isNaN(r) ? 255 : r,
+        g: isNaN(g) ? 0 : g,
+        b: isNaN(b) ? 0 : b
+    };
+}
+
+function applyStrokeColor(item, hex) {
+    var rgb = hexToRgb(hex);
+    var color = new RGBColor();
+    color.red = rgb.r;
+    color.green = rgb.g;
+    color.blue = rgb.b;
+    try {
+        item.strokeColor = color;
+    } catch (e) {
+        try {
+            var r1 = rgb.r / 255, g1 = rgb.g / 255, b1 = rgb.b / 255;
+            var c = 1 - r1, m = 1 - g1, y = 1 - b1;
+            var k = Math.min(c, Math.min(m, y));
+            var cmyk = new CMYKColor();
+            if (k >= 1.0) {
+                cmyk.cyan = 0; cmyk.magenta = 0; cmyk.yellow = 0; cmyk.black = 100;
+            } else {
+                var denom = (1 - k) || 1;
+                cmyk.cyan = Math.round(((c - k) / denom) * 100);
+                cmyk.magenta = Math.round(((m - k) / denom) * 100);
+                cmyk.yellow = Math.round(((y - k) / denom) * 100);
+                cmyk.black = Math.round(k * 100);
+            }
+            item.strokeColor = cmyk;
+        } catch (e2) {}
+    }
+}
+
+function applyStrokeDash(item, style, width) {
+    var w = (typeof width === 'number' && width > 0) ? width : 1.5;
+    try {
+        if (style === 'solid') {
+            item.strokeDashes = [];
+        } else if (style === 'dot') {
+            item.strokeDashes = [Math.max(0.5, w * 0.5), Math.max(1, w * 2)];
+        } else if (style === 'dashdot') {
+            item.strokeDashes = [Math.max(1, w * 4), Math.max(1, w * 1.5), Math.max(0.5, w * 1), Math.max(1, w * 1.5)];
+        } else if (style === 'dashdotdot') {
+            item.strokeDashes = [Math.max(1, w * 4), Math.max(1, w * 1.5), Math.max(0.5, w * 1), Math.max(1, w * 1.5), Math.max(0.5, w * 1), Math.max(1, w * 1.5)];
+        } else {
+            item.strokeDashes = [Math.max(1, w * 3), Math.max(1, w * 2)];
+        }
+    } catch (e) {}
+}
+
+function getColorHex(color) {
+    if (!color) return "#ff0000";
+    try {
+        var tName = color.typename;
+        if (tName === "RGBColor") {
+            var r = Math.round(color.red).toString(16);
+            var g = Math.round(color.green).toString(16);
+            var b = Math.round(color.blue).toString(16);
+            if (r.length < 2) r = "0" + r;
+            if (g.length < 2) g = "0" + g;
+            if (b.length < 2) b = "0" + b;
+            return "#" + r + g + b;
+        } else if (tName === "CMYKColor") {
+            var c = color.cyan / 100;
+            var m = color.magenta / 100;
+            var y = color.yellow / 100;
+            var k = color.black / 100;
+            var cr = Math.round(255 * (1 - c) * (1 - k));
+            var cg = Math.round(255 * (1 - m) * (1 - k));
+            var cb = Math.round(255 * (1 - y) * (1 - k));
+            var rs = cr.toString(16), gs = cg.toString(16), bs = cb.toString(16);
+            if (rs.length < 2) rs = "0" + rs;
+            if (gs.length < 2) gs = "0" + gs;
+            if (bs.length < 2) bs = "0" + bs;
+            return "#" + rs + gs + bs;
+        } else if (tName === "GrayColor") {
+            var v = Math.round(255 * (1 - color.gray / 100)).toString(16);
+            if (v.length < 2) v = "0" + v;
+            return "#" + v + v + v;
+        }
+    } catch (e) {}
+    return "#ff0000";
+}
+
+function getDashStyle(item) {
+    try {
+        var dashes = item.strokeDashes;
+        if (!dashes || dashes.length === 0) return "solid";
+        if (dashes.length === 2) {
+            if (dashes[0] <= dashes[1] * 0.6) return "dot";
+            return "dash";
+        }
+        if (dashes.length === 4) return "dashdot";
+        if (dashes.length === 6) return "dashdotdot";
+        return "dash";
+    } catch (e) {
+        return "dash";
+    }
+}
+
+function isPathRectangle(item) {
+    if (!item || item.typename !== "PathItem") return false;
+    try {
+        if (!item.closed) return false;
+        var pts = item.pathPoints;
+        if (!pts || pts.length !== 4) return false;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function addTag(item, name, value) {
+    try {
+        var tag = null;
+        try { tag = item.tags.getByName(name); } catch (e) {}
+        if (!tag) tag = item.tags.add();
+        tag.name = name;
+        tag.value = String(value);
+    } catch (e) {}
+}
+
+function getTag(item, name) {
+    try {
+        var tag = item.tags.getByName(name);
+        return tag ? tag.value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function deleteTag(item, name) {
+    try {
+        var tag = item.tags.getByName(name);
+        if (tag) tag.remove();
+    } catch (e) {}
+}
+
+function findItemByTag(doc, name) {
+    try {
+        for (var i = 0; i < doc.pageItems.length; i++) {
+            var it = doc.pageItems[i];
+            try {
+                var tag = it.tags.getByName(name);
+                if (tag) return it;
+            } catch (e) {}
+        }
+    } catch (docErr) {}
+    return null;
+}
+
+function clearZoomSessionTags(doc) {
+    for (var i = 0; i < doc.pageItems.length; i++) {
+        deleteTag(doc.pageItems[i], "ILST_ZOOM_ACTIVE_TARGET");
+        deleteTag(doc.pageItems[i], "ILST_ZOOM_ACTIVE_MANUAL");
+    }
+}
+
+function getZoomSelection(selection) {
+    var targets = [];
+    var manualRect = null;
+    for (var i = 0; selection && i < selection.length; i++) {
+        var item = selection[i];
+        if (selection.length === 2 && isPathRectangle(item)) {
+            manualRect = item;
+        } else if (item.typename === "RasterItem" || item.typename === "PlacedItem" || item.typename === "GroupItem") {
+            targets.push(item);
+        } else {
+            return { targets: [], manualRect: null };
+        }
+    }
+    // An ordinary rectangle is supported only alongside one image.
+    if (manualRect && targets.length !== 1) targets = [];
+    return { targets: targets, manualRect: manualRect };
+}
+
+function getActiveZoomTargets(doc) {
+    var targets = [];
+    for (var i = 0; i < doc.pageItems.length; i++) {
+        var item = doc.pageItems[i];
+        var order = getTag(item, "ILST_ZOOM_ACTIVE_TARGET");
+        if (order !== null) targets.push({ item: item, order: Number(order) });
+    }
+    targets.sort(function (a, b) { return a.order - b.order; });
+    var result = [];
+    for (var j = 0; j < targets.length; j++) result.push(targets[j].item);
+    return result;
+}
+
+function createZoomRecordKey(doc) {
+    // Illustrator rejects tag names longer than 30 characters. The longest
+    // prefix is ILST_ZOOM_MARKER_ (17), so keep the shared record key short.
+    var key;
+    do {
+        key = new Date().getTime().toString(36).slice(-8) + "_" + Math.floor(Math.random() * 1679616).toString(36);
+    } while (findItemByTag(doc, "ILST_ZOOM_ITEM_" + key));
+    return key;
+}
+
+// Duplicates must not impersonate the original source, its zooms, or the active
+// editor selection. Keep unrelated Illustrator/plugin tags intact.
+function clearCopiedZoomTags(item) {
+    for (var t = item.tags.length - 1; t >= 0; t--) {
+        if (item.tags[t].name.indexOf("ILST_ZOOM_") === 0) item.tags[t].remove();
+    }
+    if (item.typename === "GroupItem") {
+        for (var i = 0; i < item.pageItems.length; i++) {
+            var child = item.pageItems[i];
+            if (child.parent === item) clearCopiedZoomTags(child);
+        }
+    }
+}
+
+function readZoomEntries(doc, sourceItem) {
+    var entries = [];
+    var s = getVisibleBounds(sourceItem) || sourceItem.geometricBounds;
+    var width = s[2] - s[0], height = s[1] - s[3];
+    if (width <= 0 || height <= 0) return entries;
+    for (var t = 0; t < sourceItem.tags.length; t++) {
+        var tag = sourceItem.tags[t];
+        if (tag.name.indexOf("ILST_ZOOM_SRC_") !== 0) continue;
+        // A stale record must not prevent the remaining valid records loading.
+        try {
+            var key = tag.name.substring(14);
+            var marker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + key);
+            var zoom = findItemByTag(doc, "ILST_ZOOM_ITEM_" + key);
+            if (!marker || !zoom) continue;
+            var m = getVisibleBounds(marker) || marker.geometricBounds;
+            var z = getVisibleBounds(zoom) || zoom.geometricBounds;
+            var opts = {};
+            try { opts = JSON.parse(getTag(zoom, "ILST_ZOOM_ITEM_" + key)); } catch (e) {}
+            entries.push({
+                recordKey: key,
+                name: tag.value || ("放大图 " + (entries.length + 1)),
+                region: { x: (m[0] - s[0]) / width, y: (s[1] - m[1]) / height,
+                    width: (m[2] - m[0]) / width, height: (m[1] - m[3]) / height },
+                regionRotation: 0,
+                strokeColor: getColorHex(marker.strokeColor),
+                strokeWidth: marker.strokeWidth || 1.5,
+                strokeDash: getDashStyle(marker),
+                useRectangleColor: opts.useRectangleColor !== false,
+                addGuideLines: opts.addGuideLines === true,
+                placement: opts.placement || "right",
+                guideLineExtent: opts.guideLineExtent || "acrossImages",
+                originalZoomRegion: { x: (z[0] - s[0]) / width, y: (s[1] - z[1]) / height,
+                    width: (z[2] - z[0]) / width, height: (z[1] - z[3]) / height },
+                originalZoomRotation: 0,
+                preservesLayout: true
+            });
+        } catch (recordError) {}
+    }
+    return entries;
+}
+
+// Transform using the visible source extent. GroupItem.left/top describe the
+// uncropped artwork, which may be far outside its clipping mask.
+function positionZoomDuplicate(duplicate, sourceBounds, markerBounds, zoomBounds) {
+    var scale = (zoomBounds[2] - zoomBounds[0]) / (markerBounds[2] - markerBounds[0]);
+    var visible = getVisibleBounds(duplicate) || duplicate.geometricBounds;
+    var currentWidth = visible[2] - visible[0];
+    var resizeScale = (sourceBounds[2] - sourceBounds[0]) * scale / currentWidth;
+    duplicate.resize(resizeScale * 100, resizeScale * 100, true, true, true, true,
+        resizeScale * 100, Transformation.TOPLEFT);
+    visible = getVisibleBounds(duplicate) || duplicate.geometricBounds;
+    var left = zoomBounds[0] - (markerBounds[0] - sourceBounds[0]) * scale;
+    var top = zoomBounds[1] + (sourceBounds[1] - markerBounds[1]) * scale;
+    duplicate.translate(left - visible[0], top - visible[1]);
+}
+
+function getZoomEndpoints(regionCorners, zoomCorners, placement) {
+    switch (placement) {
+        case "left":
+            return [regionCorners[0], zoomCorners[1], regionCorners[3], zoomCorners[2]];
+        case "top":
+            return [regionCorners[0], zoomCorners[3], regionCorners[1], zoomCorners[2]];
+        case "bottom":
+            return [regionCorners[3], zoomCorners[0], regionCorners[2], zoomCorners[1]];
+        case "right":
+        default:
+            return [regionCorners[1], zoomCorners[0], regionCorners[2], zoomCorners[3]];
+    }
+}
+
+function getZoomGuidePlacement(sourceBounds, zoomBounds, fallback) {
+    var dx = (zoomBounds[0] + zoomBounds[2] - sourceBounds[0] - sourceBounds[2]) / 2;
+    // Convert Illustrator's upward Y axis to the preview's downward Y axis.
+    var dy = (sourceBounds[1] + sourceBounds[3] - zoomBounds[1] - zoomBounds[3]) / 2;
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return fallback || "right";
+    var horizontal = Math.abs(dx) / Math.max(0.01, sourceBounds[2] - sourceBounds[0]);
+    var vertical = Math.abs(dy) / Math.max(0.01, sourceBounds[1] - sourceBounds[3]);
+    if (horizontal >= vertical) {
+        if (dx >= 0) return "right";
+        return "left";
+    }
+    if (dy >= 0) return "bottom";
+    return "top";
+}
+
+function clipEdgeSegment(direction, distance, limits) {
+    if (Math.abs(direction) < 0.000001) {
+        return distance >= 0;
+    }
+    var ratio = distance / direction;
+    if (direction < 0) {
+        if (ratio > limits.last) return false;
+        limits.first = Math.max(limits.first, ratio);
+    } else {
+        if (ratio < limits.first) return false;
+        limits.last = Math.min(limits.last, ratio);
+    }
+    return true;
+}
+
+function tryClipLine(start, end, bounds) {
+    var bLeft = bounds[0];
+    var bTop = bounds[1];
+    var bRight = bounds[2];
+    var bBottom = bounds[3];
+    var dx = end[0] - start[0];
+    var dy = end[1] - start[1];
+    var limits = { first: 0, last: 1 };
+
+    if (bRight <= bLeft || bTop <= bBottom ||
+        !clipEdgeSegment(-dx, start[0] - bLeft, limits) ||
+        !clipEdgeSegment(dx, bRight - start[0], limits) ||
+        !clipEdgeSegment(-dy, start[1] - bBottom, limits) ||
+        !clipEdgeSegment(dy, bTop - start[1], limits) ||
+        (limits.last - limits.first) * Math.max(Math.abs(dx), Math.abs(dy)) < 0.0001) {
+        return null;
+    }
+
+    return {
+        start: [start[0] + limits.first * dx, start[1] + limits.first * dy],
+        end: [start[0] + limits.last * dx, start[1] + limits.last * dy]
+    };
+}
+
+// Always derive guide endpoints from the live clipping bounds, including when
+// an editor/tracker reload has lost the previous position of a moved zoom.
+function refreshZoomGuideLines(doc, key, source, marker, zoom, options, createMissing) {
+    if (!options.addGuideLines) return;
+    var s = getVisibleBounds(source) || source.geometricBounds;
+    var m = getVisibleBounds(marker) || marker.geometricBounds;
+    var z = getVisibleBounds(zoom) || zoom.geometricBounds;
+    var endpoints = getZoomEndpoints(
+        [[m[0], m[1]], [m[2], m[1]], [m[2], m[3]], [m[0], m[3]]],
+        [[z[0], z[1]], [z[2], z[1]], [z[2], z[3]], [z[0], z[3]]],
+        getZoomGuidePlacement(s, z, options.placement)
+    );
+    for (var g = 0; g < 2; g++) {
+        var points = [endpoints[g * 2], endpoints[g * 2 + 1]];
+        if (options.guideLineExtent === "insideSourceImage") {
+            var clipped = tryClipLine(points[0], points[1], s);
+            if (clipped) points = [clipped.start, clipped.end];
+        }
+        var tagName = "ILST_ZOOM_GUIDE" + (g + 1) + "_" + key;
+        var line = findItemByTag(doc, tagName);
+        if (!line) {
+            if (!createMissing) continue;
+            var layer = source.layer || doc.activeLayer;
+            line = layer.pathItems.add();
+            line.filled = false;
+            line.stroked = true;
+            line.strokeWidth = options.strokeWidth;
+            applyStrokeColor(line, options.strokeColor);
+            applyStrokeDash(line, options.strokeDash, options.strokeWidth);
+            addTag(line, tagName, String(g));
+        }
+        var unchanged = false;
+        try {
+            unchanged = line.pathPoints.length === 2;
+            for (var p = 0; unchanged && p < 2; p++) {
+                var anchor = line.pathPoints[p].anchor;
+                unchanged = Math.abs(anchor[0] - points[p][0]) < 0.0001 &&
+                    Math.abs(anchor[1] - points[p][1]) < 0.0001;
+            }
+        } catch (e) {}
+        if (!unchanged) line.setEntirePath(points);
+    }
+}
+
+// Plain linked images can be loaded by the CEP canvas directly. Transformed,
+// embedded and grouped artwork needs a rendered preview of its visible extent.
+function getZoomLinkedPreview(sourceItem) {
+    if (sourceItem.typename !== "PlacedItem" && sourceItem.typename !== "RasterItem") return null;
+    try {
+        if (sourceItem.typename === "RasterItem" && sourceItem.embedded) return null;
+        if (sourceItem.opacity !== 100) return null;
+        if (typeof BlendModes !== "undefined" && sourceItem.blendingMode !== BlendModes.NORMAL) return null;
+        var matrix = sourceItem.matrix;
+        if (!matrix || matrix.mValueA <= 0 || matrix.mValueD <= 0 ||
+            Math.abs(matrix.mValueB) > 0.000001 || Math.abs(matrix.mValueC) > 0.000001 ||
+            Math.abs(matrix.mValueA - matrix.mValueD) > 0.000001) return null;
+        var file = sourceItem.file;
+        if (!file || !file.exists) return null;
+        var match = file.name.match(/\.(png|jpe?g|bmp)$/i);
+        if (!match) return null;
+        var extension = match[1].toLowerCase();
+        if (extension === "jpg") extension = "jpeg";
+        return { path: file.fsName.replace(/\\/g, '/'), mimeType: "image/" + extension };
+    } catch (e) {
+        return null;
+    }
+}
+
+function hideZoomPreviewSiblings(current, parent, collection, changes) {
+    for (var i = 0; collection && i < collection.length; i++) {
+        var sibling = collection[i];
+        // pageItems can include nested descendants; hide only direct siblings.
+        if (sibling === current || sibling.parent !== parent) continue;
+        var isLayer = sibling.typename === "Layer";
+        var visibility = isLayer ? sibling.visible : !sibling.hidden;
+        if (!visibility) continue;
+        changes.push({ item: sibling, isLayer: isLayer, locked: sibling.locked });
+        if (sibling.locked) sibling.locked = false;
+        if (isLayer) sibling.visible = false;
+        else sibling.hidden = true;
+    }
+}
+
+// Capture synchronously in the original document. Do not redraw while hiding
+// unrelated artwork, and restore visibility, locks and selection before return.
+function captureZoomSourcePreview(doc, sourceItem, tempFile, capOpts) {
+    var changes = [];
+    var originalSelection = [];
+    var selection = doc.selection;
+    for (var i = 0; selection && i < selection.length; i++) {
+        originalSelection.push(selection[i]);
+    }
+    try {
+        var current = sourceItem;
+        while (current && current !== doc) {
+            var parent = current.parent;
+            if (!parent) throw new Error("Preview source has no document parent");
+            hideZoomPreviewSiblings(current, parent, parent.pageItems, changes);
+            hideZoomPreviewSiblings(current, parent, parent.layers, changes);
+            current = parent;
+        }
+        var previewBounds = getVisibleBounds(sourceItem) || sourceItem.geometricBounds;
+        doc.imageCapture(tempFile, previewBounds, capOpts);
+    } finally {
+        var restoreError = null;
+        for (var r = changes.length - 1; r >= 0; r--) {
+            var change = changes[r];
+            try {
+                if (change.isLayer) change.item.visible = true;
+                else change.item.hidden = false;
+                change.item.locked = change.locked;
+            } catch (error) {
+                restoreError = error;
+            }
+        }
+        doc.selection = originalSelection;
+        if (restoreError) throw restoreError;
+    }
+}
+
+function inspectZoomTarget() {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    var doc = app.activeDocument;
+    var sel = doc.selection;
+    if (!sel || sel.length === 0) return sciError("errors.zoomNoSelection");
+
+    var selection = getZoomSelection(sel);
+    if (selection.targets.length === 0) return sciError("errors.zoomInvalidSelection");
+    var sourceItem = selection.targets[0];
+    var manualRect = selection.manualRect;
+
+    clearZoomSessionTags(doc);
+    // Tags survive the separate CEP editor reloading the host script. Preserve
+    // selection order so that only the first image supplies the editor preview.
+    for (var targetIndex = 0; targetIndex < selection.targets.length; targetIndex++) {
+        addTag(selection.targets[targetIndex], "ILST_ZOOM_ACTIVE_TARGET", String(targetIndex + 1));
+    }
+    if (manualRect) {
+        addTag(manualRect, "ILST_ZOOM_ACTIVE_MANUAL", "1");
+    }
+
+    var sBounds = getVisibleBounds(sourceItem) || sourceItem.geometricBounds;
+    var sLeft = sBounds[0];
+    var sTop = sBounds[1];
+    var sRight = sBounds[2];
+    var sBottom = sBounds[3];
+    var sWidth = sRight - sLeft;
+    var sHeight = sTop - sBottom;
+    if (sWidth <= 0 || sHeight <= 0) return sciError("errors.zoomInvalidSelection");
+
+    var tempFile = new File(Folder.temp.fsName + "/sci_zoom_preview_" + (new Date().getTime()) + ".png");
+    var capOpts = new ImageCaptureOptions();
+    capOpts.antiAliasing = true;
+    // Screen preview only: bound the long edge instead of rasterizing large
+    // scientific images at a fixed DPI. Final zooms still duplicate the source.
+    capOpts.resolution = Math.max(1, Math.min(150, 1600 * 72 / Math.max(sWidth, sHeight)));
+    capOpts.transparency = true;
+    var linkedPreview = getZoomLinkedPreview(sourceItem);
+    if (!linkedPreview) {
+        try {
+            captureZoomSourcePreview(doc, sourceItem, tempFile, capOpts);
+        } catch (captureError) {
+            return sciError("errors.zoomCaptureFailed");
+        }
+    }
+
+    var previewPath = linkedPreview ? linkedPreview.path : tempFile.fsName.replace(/\\/g, '/');
+
+    var existingEntries = readZoomEntries(doc, sourceItem);
+
+    var manualRectInfo = null;
+    if (manualRect) {
+        var mrBounds = getVisibleBounds(manualRect) || manualRect.geometricBounds;
+        manualRectInfo = {
+            region: {
+                x: (mrBounds[0] - sLeft) / sWidth,
+                y: (sTop - mrBounds[1]) / sHeight,
+                width: (mrBounds[2] - mrBounds[0]) / sWidth,
+                height: (mrBounds[1] - mrBounds[3]) / sHeight
+            },
+            strokeColor: getColorHex(manualRect.strokeColor),
+            strokeWidth: manualRect.strokeWidth || 1.5,
+            strokeDash: getDashStyle(manualRect)
+        };
+    }
+
+    var result = {
+        sourceWidth: pointsToMm(sWidth),
+        sourceHeight: pointsToMm(sHeight),
+        previewPath: previewPath,
+        previewMimeType: linkedPreview ? linkedPreview.mimeType : "image/png",
+        previewIsTemporary: !linkedPreview,
+        existingEntries: existingEntries,
+        manualRect: manualRectInfo
+    };
+
+    return JSON.stringify(result);
+}
+
+function applyZoomImages(payloadJson) {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    var doc = app.activeDocument;
+    var targets = getActiveZoomTargets(doc);
+    var manualRect = findItemByTag(doc, "ILST_ZOOM_ACTIVE_MANUAL");
+    if (targets.length === 0) {
+        var selection = getZoomSelection(doc.selection);
+        targets = selection.targets;
+        manualRect = selection.manualRect;
+    }
+    if (targets.length === 0) return sciError("errors.zoomNoSelection");
+    var payload = {};
+    try { payload = JSON.parse(payloadJson); } catch (e) {
+        return sciError("errors.invalidDataFormat");
+    }
+    var entries = payload.entries || [];
+    var additions = [];
+    for (var i = 0; i < entries.length; i++) {
+        if (!entries[i].recordKey) additions.push(entries[i]);
+    }
+    for (var t = 0; t < targets.length; t++) {
+        var bounds = getVisibleBounds(targets[t]) || targets[t].geometricBounds;
+        if (bounds[2] <= bounds[0] || bounds[1] <= bounds[3]) return sciError("errors.zoomInvalidSelection");
+    }
+
+    // Duplication can retain direct selection on children of a clipping group.
+    doc.selection = null;
+    var createdZoomGroups = [];
+    try {
+        for (var targetIndex = 0; targetIndex < targets.length; targetIndex++) {
+            // Existing records belong to the first image. Other images retain
+            // their own records and receive only newly drawn regions.
+            var targetEntries = targetIndex === 0 ? entries : additions;
+            if (targetEntries.length === 0 && targetIndex !== 0) continue;
+            applyZoomToTarget(doc, targets[targetIndex], targetIndex === 0 ? manualRect : null,
+                targetEntries, targetIndex === 0 ? (payload.deletedKeys || []) : [], createdZoomGroups);
+        }
+        clearZoomSessionTags(doc);
+        doc.selection = null;
+        for (var s = 0; s < createdZoomGroups.length; s++) createdZoomGroups[s].selected = true;
+    } finally {
+        // Replaced groups invalidate cached host references. Rebuild tracking
+        // before it can mistake an edited zoom for a deletion and remove tags.
+        _zoomTrackedGroups = [];
+        _zoomTrackedDocName = null;
+    }
+    return "Success";
+}
+
+function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, createdZoomGroups) {
+    var targetLayer = sourceItem.layer || doc.activeLayer;
+    if (targetLayer) {
+        try { targetLayer.locked = false; } catch (e) {}
+        try { targetLayer.visible = true; } catch (e) {}
+    }
+
+    var sBounds = getVisibleBounds(sourceItem) || sourceItem.geometricBounds;
+    var sLeft = sBounds[0];
+    var sTop = sBounds[1];
+    var sRight = sBounds[2];
+    var sBottom = sBounds[3];
+    var sWidth = sRight - sLeft;
+    var sHeight = sTop - sBottom;
+    // Delete only records owned by this source.
+    for (var d = 0; d < deletedKeys.length; d++) {
+        var dKey = deletedKeys[d];
+        var oldZoom = findItemByTag(doc, "ILST_ZOOM_ITEM_" + dKey);
+        if (oldZoom) {
+            try { oldZoom.remove(); } catch (e) {}
+        }
+        var g1 = findItemByTag(doc, "ILST_ZOOM_GUIDE1_" + dKey);
+        if (g1) { try { g1.remove(); } catch (e) {} }
+        var g2 = findItemByTag(doc, "ILST_ZOOM_GUIDE2_" + dKey);
+        if (g2) { try { g2.remove(); } catch (e) {} }
+
+        var oldMarker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + dKey);
+        if (oldMarker) {
+            try { oldMarker.remove(); } catch (e) {}
+        }
+        deleteTag(sourceItem, "ILST_ZOOM_SRC_" + dKey);
+    }
+
+    var gap = 14.1732; // 5 mm in points
+    var occupiedBounds = [];
+
+    var preservedBounds = {};
+    var existingEntries = readZoomEntries(doc, sourceItem);
+    var usedNames = {};
+    for (var e = 0; e < existingEntries.length; e++) {
+        var saved = existingEntries[e];
+        usedNames[saved.name] = true;
+        var edited = null;
+        for (var n = 0; n < entries.length; n++) {
+            if (entries[n].recordKey === saved.recordKey) { edited = entries[n]; break; }
+        }
+        if (edited && edited.preservesLayout === false) continue;
+        var old = saved.originalZoomRegion;
+        var eb = [sLeft + old.x * sWidth, sTop - old.y * sHeight,
+            sLeft + (old.x + old.width) * sWidth, sTop - (old.y + old.height) * sHeight];
+        if (edited && edited.region.width > 0 && edited.region.height > 0) {
+            if (edited.placement === "left" || edited.placement === "right") {
+                eb[2] = eb[0] + (eb[1] - eb[3]) * edited.region.width * sWidth / (edited.region.height * sHeight);
+            } else {
+                eb[3] = eb[1] - (eb[2] - eb[0]) * edited.region.height * sHeight / (edited.region.width * sWidth);
+            }
+            preservedBounds[saved.recordKey] = eb;
+        }
+        occupiedBounds.push(eb);
+    }
+
+    for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        var reg = entry.region;
+        if (!reg || reg.width <= 0 || reg.height <= 0) continue;
+
+        var mLeft = sLeft + reg.x * sWidth;
+        var mTop = sTop - reg.y * sHeight;
+        var mWidth = reg.width * sWidth;
+        var mHeight = reg.height * sHeight;
+        var mRight = mLeft + mWidth;
+        var mBottom = mTop - mHeight;
+
+        var isNew = !entry.recordKey;
+        var key = entry.recordKey || createZoomRecordKey(doc);
+        var name = entry.name || ("放大图 " + (i + 1));
+        if (isNew) {
+            var nameIndex = 1;
+            while (usedNames[name]) name = "放大图 " + (nameIndex++);
+        }
+        usedNames[name] = true;
+
+        var marker = null;
+        if (!isNew) {
+            marker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + key);
+        }
+        if (!marker) {
+            if (manualRect && i === 0) {
+                marker = manualRect;
+                manualRect.filled = false;
+                manualRect.stroked = true;
+            } else {
+                marker = targetLayer.pathItems.rectangle(mTop, mLeft, mWidth, mHeight);
+                marker.filled = false;
+                marker.stroked = true;
+            }
+        } else {
+            marker.left = mLeft;
+            marker.top = mTop;
+            marker.width = mWidth;
+            marker.height = mHeight;
+        }
+
+        marker.strokeWidth = entry.strokeWidth;
+        applyStrokeColor(marker, entry.strokeColor);
+        applyStrokeDash(marker, entry.strokeDash, entry.strokeWidth);
+
+        var placement = entry.placement || "right";
+        var zWidth = 0, zHeight = 0, zLeft = 0, zTop = 0;
+
+        var preserved = preservedBounds[key];
+        if (preserved) {
+            zLeft = preserved[0]; zTop = preserved[1];
+            zWidth = preserved[2] - preserved[0]; zHeight = preserved[1] - preserved[3];
+        } else if (placement === "left" || placement === "right") {
+            var scale = sHeight / mHeight;
+            zWidth = mWidth * scale;
+            zHeight = sHeight;
+            zTop = sTop;
+            if (placement === "right") {
+                zLeft = sRight + gap;
+                for (var occ = 0; occ < occupiedBounds.length; occ++) {
+                    if (zTop > occupiedBounds[occ][3] && zTop - zHeight < occupiedBounds[occ][1] &&
+                        zLeft < occupiedBounds[occ][2] + gap && zLeft + zWidth > occupiedBounds[occ][0]) {
+                        zLeft = occupiedBounds[occ][2] + gap;
+                    }
+                }
+            } else {
+                zLeft = sLeft - gap - zWidth;
+                for (var occ = 0; occ < occupiedBounds.length; occ++) {
+                    if (zTop > occupiedBounds[occ][3] && zTop - zHeight < occupiedBounds[occ][1] &&
+                        zLeft < occupiedBounds[occ][2] && zLeft + zWidth > occupiedBounds[occ][0] - gap) {
+                        zLeft = occupiedBounds[occ][0] - gap - zWidth;
+                    }
+                }
+            }
+        } else {
+            var scale = sWidth / mWidth;
+            zWidth = sWidth;
+            zHeight = mHeight * scale;
+            zLeft = sLeft;
+            if (placement === "bottom") {
+                zTop = sBottom - gap;
+                for (var occ = 0; occ < occupiedBounds.length; occ++) {
+                    if (zLeft < occupiedBounds[occ][2] && zLeft + zWidth > occupiedBounds[occ][0] &&
+                        zTop > occupiedBounds[occ][3] - gap && zTop - zHeight < occupiedBounds[occ][1]) {
+                        zTop = occupiedBounds[occ][3] - gap;
+                    }
+                }
+            } else {
+                zTop = sTop + gap + zHeight;
+                for (var occ = 0; occ < occupiedBounds.length; occ++) {
+                    if (zLeft < occupiedBounds[occ][2] && zLeft + zWidth > occupiedBounds[occ][0] &&
+                        zTop > occupiedBounds[occ][3] && zTop - zHeight < occupiedBounds[occ][1] + gap) {
+                        zTop = occupiedBounds[occ][1] + gap + zHeight;
+                    }
+                }
+            }
+        }
+
+        var zBounds = [zLeft, zTop, zLeft + zWidth, zTop - zHeight];
+        if (!preserved) occupiedBounds.push(zBounds);
+
+        var existingZoomGroup = findItemByTag(doc, "ILST_ZOOM_ITEM_" + key);
+        if (existingZoomGroup) {
+            try { existingZoomGroup.remove(); } catch (e) {}
+        }
+
+        var dup = sourceItem.duplicate();
+        clearCopiedZoomTags(dup);
+        positionZoomDuplicate(dup, sBounds, [mLeft, mTop, mRight, mBottom], zBounds);
+
+        var clipRect = targetLayer.pathItems.rectangle(zTop, zLeft, zWidth, zHeight);
+        clipRect.filled = false;
+        clipRect.stroked = false;
+        clipRect.clipping = true;
+
+        var zoomGroup = targetLayer.groupItems.add();
+        dup.moveToBeginning(zoomGroup);
+        clipRect.moveToBeginning(zoomGroup);
+
+        var borderRect = zoomGroup.pathItems.rectangle(zTop, zLeft, zWidth, zHeight);
+        borderRect.filled = false;
+        borderRect.stroked = true;
+        borderRect.strokeWidth = entry.strokeWidth;
+        var bColor = entry.useRectangleColor ? entry.strokeColor : (entry.strokeColor);
+        applyStrokeColor(borderRect, bColor);
+        applyStrokeDash(borderRect, entry.strokeDash, entry.strokeWidth);
+        borderRect.moveToBeginning(zoomGroup);
+        // Illustrator expects the clipping path above the group's artwork,
+        // including the separate visible border.
+        clipRect.moveToBeginning(zoomGroup);
+        zoomGroup.clipped = true;
+
+        var oldG1 = findItemByTag(doc, "ILST_ZOOM_GUIDE1_" + key);
+        if (oldG1) { try { oldG1.remove(); } catch (e) {} }
+        var oldG2 = findItemByTag(doc, "ILST_ZOOM_GUIDE2_" + key);
+        if (oldG2) { try { oldG2.remove(); } catch (e) {} }
+
+        refreshZoomGuideLines(doc, key, sourceItem, marker, zoomGroup, entry, true);
+
+        addTag(sourceItem, "ILST_ZOOM_SRC_" + key, name);
+        addTag(marker, "ILST_ZOOM_MARKER_" + key, "MARKER");
+        addTag(zoomGroup, "ILST_ZOOM_ITEM_" + key, JSON.stringify({
+            // Each CEP window can own a separate tracker cache. A new revision
+            // tells every window to discard references to replaced artwork.
+            revision: createZoomRecordKey(doc),
+            name: name,
+            placement: placement,
+            addGuideLines: entry.addGuideLines,
+            guideLineExtent: entry.guideLineExtent,
+            useRectangleColor: entry.useRectangleColor,
+            strokeColor: entry.strokeColor,
+            strokeWidth: entry.strokeWidth,
+            strokeDash: entry.strokeDash
+        }));
+        createdZoomGroups.push(zoomGroup);
+    }
+
+}
+
+function cancelZoomTarget() {
+    if (app.documents.length === 0) return "OK";
+    var doc = app.activeDocument;
+    clearZoomSessionTags(doc);
+    return "OK";
+}
+
+var _zoomTrackedGroups = [];
+var _zoomTrackedDocName = null;
+
+function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
+    var p = getVisibleBounds(picture) || picture.geometricBounds;
+    var m = getVisibleBounds(marker) || marker.geometricBounds;
+    var z = getVisibleBounds(zoom) || zoom.geometricBounds;
+    var opts = {};
+    try { opts = JSON.parse(recordValue) || {}; } catch (e) {}
+    return {
+        key: key,
+        picture: picture,
+        marker: marker,
+        zoom: zoom,
+        recordValue: recordValue,
+        placement: opts.placement || "right",
+        addGuideLines: opts.addGuideLines === true,
+        guideLineExtent: opts.guideLineExtent || "acrossImages",
+        strokeColor: opts.strokeColor || "#ff0000",
+        strokeWidth: opts.strokeWidth || 1.5,
+        strokeDash: opts.strokeDash || "dash",
+        lastPBounds: [p[0], p[1], p[2], p[3]],
+        lastMBounds: [m[0], m[1], m[2], m[3]],
+        lastZBounds: [z[0], z[1], z[2], z[3]],
+        relRegion: {
+            x: (m[0] - p[0]) / (p[2] - p[0]),
+            y: (p[1] - m[1]) / (p[1] - p[3]),
+            width: (m[2] - m[0]) / (p[2] - p[0]),
+            height: (m[1] - m[3]) / (p[1] - p[3])
+        }
+    };
+}
+
+function readCurrentZoomRecords(doc) {
+    var records = {};
+    // Build one index per poll instead of looking up each cached zoom through
+    // its old native reference. Some host references remain readable after a
+    // replacement even though they no longer belong to the document.
+    for (var i = 0; i < doc.pageItems.length; i++) {
+        var item = doc.pageItems[i];
+        if (item.typename !== "GroupItem") continue;
+        for (var t = 0; t < item.tags.length; t++) {
+            var tag = item.tags[t];
+            if (tag.name.indexOf("ILST_ZOOM_ITEM_") === 0) {
+                records[tag.name.substring(15)] = { zoom: item, value: tag.value };
+            }
+        }
+    }
+    return records;
+}
+
+function syncZoomTracker() {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    var doc = app.activeDocument;
+    // The modeless editor owns updates until confirm/cancel clears its tags.
+    // Background polling must not rewrite the artwork behind its preview.
+    if (findItemByTag(doc, "ILST_ZOOM_ACTIVE_TARGET")) return "OK";
+    var docName = "";
+    try { docName = doc.name; } catch (e) { return "OK"; }
+    var currentRecords = readCurrentZoomRecords(doc);
+
+    if (_zoomTrackedDocName !== docName || _zoomTrackedGroups.length === 0) {
+        _zoomTrackedDocName = docName;
+        _zoomTrackedGroups = [];
+        try {
+            for (var p = 0; p < doc.pageItems.length; p++) {
+                var it = doc.pageItems[p];
+                for (var t = 0; t < it.tags.length; t++) {
+                    var tg = it.tags[t];
+                    if (tg.name.indexOf("ILST_ZOOM_ITEM_") === 0) {
+                        var key = tg.name.substring(15);
+                        var marker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + key);
+                        var picture = findItemByTag(doc, "ILST_ZOOM_SRC_" + key);
+                        if (marker && picture) {
+                            var tracked = readZoomTrackingRecord(key, picture, marker, it, tg.value);
+                            _zoomTrackedGroups.push(tracked);
+                            refreshZoomGuideLines(doc, key, picture, marker, it, tracked, false);
+                        }
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    if (_zoomTrackedGroups.length === 0) return "OK";
+
+    var remaining = [];
+    for (var i = 0; i < _zoomTrackedGroups.length; i++) {
+        var group = _zoomTrackedGroups[i];
+        var currentRecord = currentRecords[group.key];
+        if (currentRecord && currentRecord.value !== group.recordValue) {
+            // Another CEP window may have replaced the zoom with the same key.
+            // Check the document before treating an old reference as deletion.
+            var currentMarker = findItemByTag(doc, "ILST_ZOOM_MARKER_" + group.key);
+            var currentPicture = findItemByTag(doc, "ILST_ZOOM_SRC_" + group.key);
+            if (!currentMarker || !currentPicture) continue;
+            group = readZoomTrackingRecord(group.key, currentPicture, currentMarker, currentRecord.zoom, currentRecord.value);
+            remaining.push(group);
+            try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false); } catch (e) {}
+            continue;
+        }
+        // Keep cached positions for movement detection, but use the live object.
+        if (currentRecord) group.zoom = currentRecord.zoom;
+
+        if (!currentRecord) {
+            var g1 = findItemByTag(doc, "ILST_ZOOM_GUIDE1_" + group.key);
+            if (g1) { try { g1.remove(); } catch (e) {} }
+            var g2 = findItemByTag(doc, "ILST_ZOOM_GUIDE2_" + group.key);
+            if (g2) { try { g2.remove(); } catch (e) {} }
+
+            var markerShared = false;
+            for (var j = 0; j < _zoomTrackedGroups.length; j++) {
+                if (j !== i && _zoomTrackedGroups[j].marker === group.marker) {
+                    markerShared = true;
+                    break;
+                }
+            }
+            if (!markerShared) {
+                try { group.marker.remove(); } catch (e) {}
+            }
+            try { deleteTag(group.picture, "ILST_ZOOM_SRC_" + group.key); } catch (e) {}
+            continue;
+        }
+
+        var markerLive = true;
+        try { var t2 = group.marker.typename; } catch (e) { markerLive = false; }
+        var picLive = true;
+        try { var t3 = group.picture.typename; } catch (e) { picLive = false; }
+        if (!markerLive || !picLive) continue;
+
+        remaining.push(group);
+
+        var pBounds = getVisibleBounds(group.picture) || group.picture.geometricBounds;
+        var mBounds = getVisibleBounds(group.marker) || group.marker.geometricBounds;
+        var zBounds = getVisibleBounds(group.zoom) || group.zoom.geometricBounds;
+
+        var pChanged = (Math.abs(pBounds[0] - group.lastPBounds[0]) > 0.01 ||
+                        Math.abs(pBounds[1] - group.lastPBounds[1]) > 0.01 ||
+                        Math.abs(pBounds[2] - group.lastPBounds[2]) > 0.01 ||
+                        Math.abs(pBounds[3] - group.lastPBounds[3]) > 0.01);
+
+        var mChanged = (Math.abs(mBounds[0] - group.lastMBounds[0]) > 0.01 ||
+                        Math.abs(mBounds[1] - group.lastMBounds[1]) > 0.01 ||
+                        Math.abs(mBounds[2] - group.lastMBounds[2]) > 0.01 ||
+                        Math.abs(mBounds[3] - group.lastMBounds[3]) > 0.01);
+
+        var zChanged = (Math.abs(zBounds[0] - group.lastZBounds[0]) > 0.01 ||
+                        Math.abs(zBounds[1] - group.lastZBounds[1]) > 0.01 ||
+                        Math.abs(zBounds[2] - group.lastZBounds[2]) > 0.01 ||
+                        Math.abs(zBounds[3] - group.lastZBounds[3]) > 0.01);
+
+        if (pChanged) {
+            var pw = pBounds[2] - pBounds[0];
+            var ph = pBounds[1] - pBounds[3];
+            var newML = pBounds[0] + group.relRegion.x * pw;
+            var newMT = pBounds[1] - group.relRegion.y * ph;
+            var newMW = group.relRegion.width * pw;
+            var newMH = group.relRegion.height * ph;
+            group.marker.left = newML;
+            group.marker.top = newMT;
+            group.marker.width = newMW;
+            group.marker.height = newMH;
+            mBounds = [newML, newMT, newML + newMW, newMT - newMH];
+            group.lastPBounds = [pBounds[0], pBounds[1], pBounds[2], pBounds[3]];
+            group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
+            mChanged = true;
+        }
+
+        if (mChanged) {
+            var hasOverlap = (mBounds[2] > pBounds[0] && mBounds[0] < pBounds[2] &&
+                              mBounds[1] > pBounds[3] && mBounds[3] < pBounds[1]);
+            if (hasOverlap) {
+                var mW = mBounds[2] - mBounds[0];
+                var mH = mBounds[1] - mBounds[3];
+                if (mW > 0 && mH > 0) {
+                    var mAspect = mW / mH;
+                    var curZW = zBounds[2] - zBounds[0];
+                    var curZH = zBounds[1] - zBounds[3];
+                    var newZW = curZW, newZH = curZH;
+                    if (group.placement === "left" || group.placement === "right") {
+                        newZW = curZH * mAspect;
+                    } else {
+                        newZH = curZW / mAspect;
+                    }
+                    var newZBounds = [zBounds[0], zBounds[1], zBounds[0] + newZW, zBounds[1] - newZH];
+
+                    try {
+                        var dup = null, clipRect = null, borderRect = null;
+                        for (var itemIdx = 0; itemIdx < group.zoom.pageItems.length; itemIdx++) {
+                            var child = group.zoom.pageItems[itemIdx];
+                            if (child.clipping) clipRect = child;
+                            else if (child.typename === "PathItem" && !child.clipping) borderRect = child;
+                            else dup = child;
+                        }
+                        if (dup && clipRect) {
+                            positionZoomDuplicate(dup, pBounds, mBounds, newZBounds);
+                            clipRect.left = zBounds[0];
+                            clipRect.top = zBounds[1];
+                            clipRect.width = newZW;
+                            clipRect.height = newZH;
+                            if (borderRect) {
+                                borderRect.left = zBounds[0];
+                                borderRect.top = zBounds[1];
+                                borderRect.width = newZW;
+                                borderRect.height = newZH;
+                            }
+                            zBounds = newZBounds;
+                            group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
+                        }
+                    } catch (e) {}
+
+                    group.relRegion = {
+                        x: (mBounds[0] - pBounds[0]) / (pBounds[2] - pBounds[0]),
+                        y: (pBounds[1] - mBounds[1]) / (pBounds[1] - pBounds[3]),
+                        width: mW / (pBounds[2] - pBounds[0]),
+                        height: mH / (pBounds[1] - pBounds[3])
+                    };
+                }
+            }
+            group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
+        }
+
+        if (mChanged || zChanged || pChanged) {
+            try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false); } catch (e) {}
+            group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
+        }
+    }
+    _zoomTrackedGroups = remaining;
+    return "OK";
+}

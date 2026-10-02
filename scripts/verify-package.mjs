@@ -15,7 +15,6 @@ assert.ok(
   zxp.length > 0 && zip.length > 0,
   'Both release files must be nonempty'
 );
-
 assert.deepEqual(zip, zxp, 'ZIP must be a byte-for-byte copy of the signed ZXP');
 
 const extension = unzipSync(zxp);

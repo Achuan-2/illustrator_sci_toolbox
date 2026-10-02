@@ -77,6 +77,10 @@ export interface HostArguments {
   distributeObjects: [DistributionMode];
   copySpacing: [Direction];
   pasteSpacing: [Direction, number, boolean];
+  inspectZoomTarget: [];
+  applyZoomImages: [string];
+  cancelZoomTarget: [];
+  syncZoomTracker: [];
 }
 
 export type HostOperation = keyof HostArguments;

@@ -14,6 +14,14 @@ export interface Settings {
   labelsOrder: Order;
   labelsReverseOrder: boolean;
   autoUpdateIndex: boolean;
+  zoomLineWidth: number;
+  zoomLineColor: string;
+  zoomLineStyle: string;
+  zoomUseRectangleColor: boolean;
+  zoomAddGuideLines: boolean;
+  zoomPlacement: string;
+  zoomGuideLineExtent: string;
+  zoomKeepSquare: boolean;
 }
 
 export const storageKey = 'illustrator_sci_plugin_settings';
@@ -28,7 +36,15 @@ export const defaults: Settings = {
   fontColor: '#000000',
   labelsOrder: 'grid',
   labelsReverseOrder: false,
-  autoUpdateIndex: true
+  autoUpdateIndex: true,
+  zoomLineWidth: 1.5,
+  zoomLineColor: '#ff0000',
+  zoomLineStyle: 'dash',
+  zoomUseRectangleColor: true,
+  zoomAddGuideLines: false,
+  zoomPlacement: 'right',
+  zoomGuideLineExtent: 'acrossImages',
+  zoomKeepSquare: true
 };
 
 export function normalizeSettings(value: unknown): Settings {
@@ -53,6 +69,21 @@ export function normalizeSettings(value: unknown): Settings {
   if (!/^#[0-9a-f]{6}$/i.test(result.fontColor))
     result.fontColor = defaults.fontColor;
   if (!result.fontFamily) result.fontFamily = defaults.fontFamily;
+  if (result.zoomLineWidth <= 0) result.zoomLineWidth = defaults.zoomLineWidth;
+  if (!/^#[0-9a-f]{6}$/i.test(result.zoomLineColor))
+    result.zoomLineColor = defaults.zoomLineColor;
+  if (
+    !['dash', 'solid', 'dot', 'dashdot', 'dashdotdot', 'original'].includes(
+      result.zoomLineStyle
+    )
+  )
+    result.zoomLineStyle = defaults.zoomLineStyle;
+  if (!['right', 'left', 'top', 'bottom'].includes(result.zoomPlacement))
+    result.zoomPlacement = defaults.zoomPlacement;
+  if (
+    !['insideSourceImage', 'acrossImages'].includes(result.zoomGuideLineExtent)
+  )
+    result.zoomGuideLineExtent = defaults.zoomGuideLineExtent;
   return result;
 }
 

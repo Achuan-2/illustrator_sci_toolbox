@@ -36,6 +36,20 @@ const config: CEP_Config = {
       mainPath: './main/index.html',
       panelDisplayName: 'SCI Toolbox',
       autoVisible: true
+    },
+    {
+      name: 'zoom',
+      id: 'com.example.achuanPlugin.zoom',
+      mainPath: './main/index.html',
+      panelDisplayName: '制作放大图',
+      autoVisible: true,
+      type: 'Modeless',
+      width: 1150,
+      height: 800,
+      minWidth: 800,
+      minHeight: 600,
+      maxWidth: 2560,
+      maxHeight: 1600
     }
   ],
   build: { sourceMap: true, jsxBin: 'off' },

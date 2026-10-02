@@ -303,6 +303,9 @@ export function offsetWheel(
   liveOffsets();
 }
 
+// Timer ticks must not build up a host queue while preview capture is running.
+let zoomSyncPending: Promise<string | void> | undefined;
+
 export const actions = {
   copyPosition: () => run(copyPosition),
   pastePosition: () => run(pastePosition),
@@ -336,5 +339,72 @@ export const actions = {
   copySpacing: (direction: Direction) => run(() => copySpacing(direction)),
   pasteSpacing: (direction: Direction, anchor: boolean) =>
     run(() => pasteSpacing(direction, anchor)),
-  addBorder: () => run(addBorder)
+  addBorder: () => run(addBorder),
+  inspectZoom: async () => {
+    const resultStr = await bridge.call('inspectZoomTarget');
+    let data: any;
+    try {
+      data = JSON.parse(resultStr);
+    } catch (err) {
+      fail('errors.zoomCaptureFailed');
+    }
+    let previewDataUrl = data.previewDataUrl || '';
+    if (!previewDataUrl && data.previewPath) {
+      try {
+        const win =
+          typeof window !== 'undefined'
+            ? (window as unknown as { require?: (mod: string) => any })
+            : undefined;
+        if (win && typeof win.require === 'function') {
+          const fs = win.require('fs');
+          if (fs && fs.existsSync(data.previewPath)) {
+            const buf = fs.readFileSync(data.previewPath);
+            previewDataUrl = `data:${data.previewMimeType || 'image/png'};base64,${buf.toString('base64')}`;
+            // Direct previews reference the user's linked file; only generated
+            // temporary PNGs belong to the plugin and can be removed.
+            if (data.previewIsTemporary !== false) {
+              try {
+                fs.unlinkSync(data.previewPath);
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+      if (!previewDataUrl) {
+        previewDataUrl = `file:///${data.previewPath.replace(/\\/g, '/')}`;
+      }
+    }
+    if (!previewDataUrl) fail('errors.zoomCaptureFailed');
+    return {
+      sourceWidth: data.sourceWidth || 100,
+      sourceHeight: data.sourceHeight || 100,
+      previewDataUrl,
+      existingEntries: data.existingEntries || [],
+      manualRect: data.manualRect || null
+    };
+  },
+  applyZoom: async (payload: {
+    entries: any[];
+    deletedKeys: string[];
+  }): Promise<void> => {
+    await bridge.call('applyZoomImages', JSON.stringify(payload));
+  },
+  cancelZoomTarget: async (): Promise<void> => {
+    await bridge.call('cancelZoomTarget').catch(() => {
+      // Quiet background cleanup
+    });
+  },
+  syncZoom: () => {
+    if (!zoomSyncPending) {
+      zoomSyncPending = bridge
+        .call('syncZoomTracker')
+        .catch(() => {
+          // Quiet background sync
+        })
+        .finally(() => {
+          zoomSyncPending = undefined;
+        });
+    }
+    return zoomSyncPending;
+  }
 };
