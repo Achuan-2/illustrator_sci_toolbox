@@ -24,6 +24,11 @@ test('host file watching accepts Vite paths and Windows drive-letter casing', ()
 });
 
 test('complete host output is ES3 and works without native JSON or a document', () => {
+  assert.equal(
+    hostSource.charCodeAt(0),
+    0xfeff,
+    'Host output must declare UTF-8 for $.evalFile'
+  );
   parse(hostSource, { ecmaVersion: 3 });
   const context = vm.createContext({
     $: {},

@@ -28,7 +28,9 @@ export function buildExtendScript(outDir: string): void {
   const dispatcher = ts.transpileModule(entry, {
     compilerOptions: { target: ts.ScriptTarget.ES5, module: ts.ModuleKind.None }
   }).outputText;
-  const output = `${json}\n(function () {\n${legacy}\n${dispatcher}\n}());\n`;
+  // $.evalFile does not reliably detect UTF-8 without a BOM. Chinese text in
+  // the algorithms otherwise loads with the system encoding and can fail.
+  const output = `\uFEFF${json}\n(function () {\n${legacy}\n${dispatcher}\n}());\n`;
   const hostDir = path.join(outDir, 'jsx');
   fs.mkdirSync(hostDir, { recursive: true });
   fs.writeFileSync(path.join(hostDir, 'index.js'), output);

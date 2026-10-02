@@ -5,6 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { cep, runAction, type CepOptions } from 'vite-cep-plugin';
 import cepConfig from './cep.config';
 import { buildExtendScript, hostSources, isHostSource } from './vite.es.config';
+import { panelEntryRedirect } from './scripts/panel-entry';
 
 const outDir = path.resolve('dist/cep');
 const isPackage = process.env.ZXP_PACKAGE === 'true';
@@ -65,7 +66,7 @@ export default defineConfig(({ command }) => {
     // the installed panel into a dev-server redirect or register an extension.
     plugins: isCheck
       ? [svelte()]
-      : [svelte(), illustratorScripts(), cep(options)],
+      : [svelte(), panelEntryRedirect(), illustratorScripts(), cep(options)],
     server: { host: '127.0.0.1', port: cepConfig.port, strictPort: true },
     build: {
       outDir,

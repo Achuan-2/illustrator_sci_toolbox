@@ -16,7 +16,7 @@ pnpm dev
 
 首次构建会按 Bolt 的默认行为，将 `dist/cep` 链接到当前用户的 Adobe CEP 扩展目录，扩展 ID 仍是 `com.example.achuanPlugin.panel`。启用对应 CEP 版本的 PlayerDebugMode，重启 Illustrator，在“窗口 → 扩展功能 → SCI Toolbox”打开面板。已有同 ID 的手动安装目录可能阻止创建链接，需要先将该安装目录移到备份位置，再运行 `pnpm symlink`。不要把整个源码仓库复制到扩展目录。
 
-`pnpm dev` 使用固定端口 3000，面板会跳转到本地开发服务；浏览器也可以打开 `http://localhost:3000/main/index.html` 预览界面。浏览器预览不提供 Illustrator 文档操作，点击功能会显示相应提示。
+`pnpm dev` 使用固定端口 3000，面板会跳转到本地开发服务；浏览器也可以打开 `http://127.0.0.1:3000/`，根地址会跳转到 `/main/index.html` 预览界面。浏览器预览不提供 Illustrator 文档操作，点击功能会显示相应提示。
 
 Svelte 和 CSS 修改通过 Vite HMR 更新。`src/jsx` 中的宿主入口、算法或 JSON2 修改会重新生成 `dist/cep/jsx/index.js`，触发面板整页刷新，并在下一次操作前重新加载宿主代码。整页刷新会重置复制的数据、标注编辑会话等临时状态，已经写入 Illustrator 文档的内容不受影响，也不会因刷新自动执行文档操作。
 
@@ -39,7 +39,7 @@ Svelte 和 CSS 修改通过 Vite HMR 更新。`src/jsx` 中的宿主入口、算
 | `vite.es.config.ts` | JSON2、算法与入口的 ES3 构建 |
 | `cep.config.ts` | 扩展 ID、最低宿主版本、面板和签名配置 |
 
-宿主算法集中在私有作用域中，通过 `$['com.example.achuanPlugin'].call()` 调用。前端参数统一序列化，宿主错误返回 `{ ok: false, error, args }`，翻译在前端完成。`ScriptPath` 不再指向前端脚本；桥接层等待宿主初始化成功后再执行操作。
+宿主算法集中在私有作用域中，通过 `$['com.example.achuanPlugin'].call()` 调用。前端参数统一序列化，宿主错误返回 `{ ok: false, error, args }`，翻译在前端完成。`ScriptPath` 不再指向前端脚本；桥接层等待宿主初始化成功后再执行操作。构建的 `jsx/index.js` 必须保留 UTF-8 BOM，确保 `$.evalFile()` 正确读取包含中文的脚本；缺少 BOM 时可能报“类型错误：无法转换”，导致所有宿主操作初始化失败。
 
 ## 验证
 
