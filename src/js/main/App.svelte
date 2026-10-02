@@ -18,9 +18,9 @@
   const panels = [
     { id: 'relative', component: RelativePanel },
     { id: 'distribute', component: SpacingPanel },
+    { id: 'arrange', component: ArrangePanel },
     { id: 'swap', component: SwapPanel },
     { id: 'size', component: SizePanel },
-    { id: 'arrange', component: ArrangePanel },
     { id: 'labels', component: LabelsPanel },
     { id: 'border', component: BorderPanel },
     { id: 'selection', component: SelectionPanel },

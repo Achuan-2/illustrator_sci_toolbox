@@ -35,9 +35,14 @@
     'distribute.right':
       'M6 2h1v20H6z M13 2h1v20h-1z M20 2h1v20h-1z M3 5h3v14H3z M10 8h3v8h-3z M17 5h3v14h-3z',
     'spacing.horizontal':
-      'M2 5h4v14H2z M10 8h4v8h-4z M18 3h4v18h-4z M7 11h2v2H7z M15 11h2v2h-2z',
+      'M1 3h3v13H1z M7 3h7v13H7z M17 3h6v13h-6z',
     'spacing.vertical':
-      'M5 2h14v4H5z M8 10h8v4H8z M3 18h18v4H3z M11 7h2v2h-2z M11 15h2v2h-2z'
+      'M3 1h13v3H3z M3 7h13v7H3z M3 17h13v6H3z'
+  };
+  // Dimension marks emphasize equal edge gaps along the varying size axis.
+  const gapMarks: Record<string, string> = {
+    horizontal: 'M4 18v4M7 18v4M4 20h3M14 18v4M17 18v4M14 20h3',
+    vertical: 'M18 4h4M18 7h4M20 4v3M18 14h4M18 17h4M20 14v3'
   };
 </script>
 
@@ -50,4 +55,12 @@
   focusable="false"
 >
   <path d={paths[`${kind}.${mode}`]} />
+  {#if kind === 'spacing'}
+    <path
+      d={gapMarks[mode]}
+      fill="none"
+      stroke="var(--primary, #4ea1ff)"
+      stroke-width="1"
+    />
+  {/if}
 </svg>
