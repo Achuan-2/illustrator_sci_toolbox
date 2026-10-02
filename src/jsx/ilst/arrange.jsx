@@ -1558,11 +1558,90 @@ function swapSelectedPositions(corner) {
     return "Success";
 }
 
+// A shared anchor definition keeps alignment and distribution consistent.
+function getArrangementAnchor(info, mode) {
+    if (mode === "horizontalCenter") return (info.left + info.right) / 2;
+    if (mode === "verticalCenter") return (info.top + info.bottom) / 2;
+    return info[mode];
+}
+
+function isArrangementMode(mode) {
+    return mode === "left" || mode === "horizontalCenter" || mode === "right" ||
+        mode === "top" || mode === "verticalCenter" || mode === "bottom";
+}
+
+/** Align against a snapshot of the selection bounds, without resizing items. */
+function alignObjects(mode) {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    var selection = app.activeDocument.selection;
+    if (!selection || selection.length < 2) return sciError("errors.selectTwoOrMore");
+    if (mode !== "center" && !isArrangementMode(mode)) {
+        return sciError("errors.invalidArrangementMode");
+    }
+
+    var entries = [];
+    var bounds = { left: Infinity, top: -Infinity, right: -Infinity, bottom: Infinity };
+    for (var i = 0; i < selection.length; i++) {
+        var info = getVisibleInfo(selection[i]);
+        entries.push({ item: selection[i], info: info });
+        bounds.left = Math.min(bounds.left, info.left);
+        bounds.top = Math.max(bounds.top, info.top);
+        bounds.right = Math.max(bounds.right, info.right);
+        bounds.bottom = Math.min(bounds.bottom, info.bottom);
+    }
+
+    var horizontal = mode === "left" || mode === "horizontalCenter" || mode === "right";
+    for (var j = 0; j < entries.length; j++) {
+        var entry = entries[j];
+        var dx = 0, dy = 0;
+        if (mode === "center") {
+            dx = getArrangementAnchor(bounds, "horizontalCenter") - getArrangementAnchor(entry.info, "horizontalCenter");
+            dy = getArrangementAnchor(bounds, "verticalCenter") - getArrangementAnchor(entry.info, "verticalCenter");
+        } else {
+            var delta = getArrangementAnchor(bounds, mode) - getArrangementAnchor(entry.info, mode);
+            if (horizontal) dx = delta;
+            else dy = delta;
+        }
+        entry.item.translate(dx, dy);
+    }
+    return "Success";
+}
+
+/** Distribute the requested edges/centers rather than the gaps between items. */
+function distributeObjects(mode) {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    var selection = app.activeDocument.selection;
+    if (!selection || selection.length < 2) return sciError("errors.selectThreeOrMore");
+    if (!isArrangementMode(mode)) return sciError("errors.invalidArrangementMode");
+    // Both end objects stay fixed; with two objects there is nothing to move.
+    if (selection.length === 2) return "Success";
+
+    var horizontal = mode === "left" || mode === "horizontalCenter" || mode === "right";
+    var entries = [];
+    for (var i = 0; i < selection.length; i++) {
+        entries.push({
+            item: selection[i],
+            anchor: getArrangementAnchor(getVisibleInfo(selection[i]), mode),
+            index: i
+        });
+    }
+    // Top-to-bottom decreases Y in Illustrator. Tie-break explicitly for ES3 sorts.
+    entries.sort(function (a, b) {
+        var difference = horizontal ? a.anchor - b.anchor : b.anchor - a.anchor;
+        return difference || a.index - b.index;
+    });
+    var start = entries[0].anchor;
+    var step = (entries[entries.length - 1].anchor - start) / (entries.length - 1);
+    for (var j = 1; j < entries.length - 1; j++) {
+        var delta = start + j * step - entries[j].anchor;
+        entries[j].item.translate(horizontal ? delta : 0, horizontal ? 0 : delta);
+    }
+    return "Success";
+}
+
 /**
- * Distribute spacing evenly between multiple selected objects.
+ * Distribute gaps between visible edges, keeping both end items fixed.
  * direction: "horizontal" | "vertical"
- * Keeps the first and last item positions fixed, adjusts middle items so
- * gaps between adjacent visible edges are equal.
  */
 function distributeSpacing(direction) {
     if (app.documents.length === 0) return sciError("errors.noDocument");

@@ -1,6 +1,15 @@
 export type Corner = 'TL' | 'TR' | 'BL' | 'BR';
 export type Order = 'grid' | 'stacking' | 'horizontal' | 'vertical';
 export type Direction = 'horizontal' | 'vertical';
+export type AlignmentMode =
+  | 'left'
+  | 'horizontalCenter'
+  | 'right'
+  | 'center'
+  | 'top'
+  | 'verticalCenter'
+  | 'bottom';
+export type DistributionMode = Exclude<AlignmentMode, 'center'>;
 export type SizeMode = 'original' | 'auto' | 'custom';
 
 /** Argument order matches the existing Illustrator algorithms. */
@@ -63,6 +72,8 @@ export interface HostArguments {
   filterSelection: ['textOnly' | 'excludeText'];
   swapSelectedPositions: [Corner];
   distributeSpacing: [Direction];
+  alignObjects: [AlignmentMode];
+  distributeObjects: [DistributionMode];
   copySpacing: [Direction];
   pasteSpacing: [Direction, number, boolean];
 }

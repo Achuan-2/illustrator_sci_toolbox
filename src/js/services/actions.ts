@@ -3,7 +3,12 @@ import { settings } from '../stores/settings';
 import { workspace } from '../stores/workspace';
 import { t } from '../i18n';
 import { bridge, HostError } from './bridge';
-import type { Corner, Direction } from '../../shared/host';
+import type {
+  AlignmentMode,
+  Corner,
+  Direction,
+  DistributionMode
+} from '../../shared/host';
 
 const number = (value: unknown, fallback = 0): number =>
   Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -319,6 +324,14 @@ export const actions = {
   distribute: (direction: Direction) =>
     run(async () => {
       await bridge.call('distributeSpacing', direction);
+    }),
+  alignObjects: (mode: AlignmentMode) =>
+    run(async () => {
+      await bridge.call('alignObjects', mode);
+    }),
+  distributeObjects: (mode: DistributionMode) =>
+    run(async () => {
+      await bridge.call('distributeObjects', mode);
     }),
   copySpacing: (direction: Direction) => run(() => copySpacing(direction)),
   pasteSpacing: (direction: Direction, anchor: boolean) =>

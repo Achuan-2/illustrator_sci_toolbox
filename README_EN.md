@@ -63,6 +63,11 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
   <img alt="PixPin_2025-08-06_17-59-37" src="https://github.com/user-attachments/assets/3baad6da-798d-449b-9023-69c8698db78e" width="70%"/>
 
 ​
+- Align & Distribute
+
+  - Icon buttons align the selection to its overall left, horizontal center, right, top, vertical center or bottom bounds, with a combined center button. Select at least two objects.
+  - Distribute left/center/right or top/center/bottom anchors evenly with both end objects fixed. Select at least three objects. Equal-gap distribution and spacing copy/paste remain available.
+
 - Swap Positions of Two Shapes
 
   Uses

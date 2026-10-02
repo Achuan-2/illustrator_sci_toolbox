@@ -2,22 +2,75 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
+  import ArrangementIcon from './ArrangementIcon.svelte';
+  import type { AlignmentMode, DistributionMode } from '../../shared/host';
+
+  const alignmentRows: AlignmentMode[][] = [
+    ['left', 'horizontalCenter', 'right', 'center'],
+    ['top', 'verticalCenter', 'bottom']
+  ];
+  const distributionRows: DistributionMode[][] = [
+    ['left', 'horizontalCenter', 'right'],
+    ['top', 'verticalCenter', 'bottom']
+  ];
 </script>
 
 <div class="panel active" id="panel-distribute">
+  <h3>{$t('alignment.title')}</h3>
+  <p class="arrangement-hint">{$t('alignment.hint')}</p>
+  {#each alignmentRows as row}
+    <div class="toolbar">
+      {#each row as mode}
+        <button
+          class="btn arrangement-icon-button"
+          id={`align-${mode}-button`}
+          title={$t(`alignment.${mode}`)}
+          aria-label={$t(`alignment.${mode}`)}
+          onclick={() => actions.alignObjects(mode)}
+          ><ArrangementIcon kind="align" {mode} /></button
+        >
+      {/each}
+    </div>
+  {/each}
+
+  <h3>{$t('distribution.title')}</h3>
+  <p class="arrangement-hint">{$t('distribution.hint')}</p>
+  {#each distributionRows as row}
+    <div class="toolbar">
+      {#each row as mode}
+        <button
+          class="btn arrangement-icon-button"
+          id={`distribute-${mode}-button`}
+          title={$t(`distribution.${mode}`)}
+          aria-label={$t(`distribution.${mode}`)}
+          onclick={() => actions.distributeObjects(mode)}
+          ><ArrangementIcon kind="distribute" {mode} /></button
+        >
+      {/each}
+    </div>
+  {/each}
+
   <h3>{$t('spacing.even')}</h3>
   <div class="toolbar">
     <button
-      class="btn"
+      class="btn spacing-button"
       id="distribute-horizontal-button"
+      title={$t('spacing.horizontalHint')}
+      aria-label={$t('spacing.horizontalHint')}
       onclick={() => actions.distribute('horizontal')}
-      >{$t('spacing.horizontal')}</button
+      ><ArrangementIcon kind="spacing" mode="horizontal" />{$t(
+        'spacing.horizontal'
+      )}</button
     >
     <button
-      class="btn"
+      class="btn spacing-button"
       id="distribute-vertical-button"
+      title={$t('spacing.verticalHint')}
+      aria-label={$t('spacing.verticalHint')}
       onclick={() => actions.distribute('vertical')}
-      >{$t('spacing.vertical')}</button
+      ><ArrangementIcon kind="spacing" mode="vertical" />{$t(
+        'spacing.vertical'
+      )}</button
     >
   </div>
   <h3>{$t('spacing.paste')}</h3>
@@ -88,3 +141,35 @@
     >
   </div>
 </div>
+
+<style>
+  .arrangement-hint {
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0 0 8px;
+  }
+
+  .arrangement-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 36px;
+    padding: 5px;
+  }
+
+  .spacing-button {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .spacing-button :global(svg) {
+    margin-right: 6px;
+  }
+
+  .arrangement-icon-button:focus-visible,
+  .spacing-button:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+</style>

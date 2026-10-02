@@ -13,6 +13,53 @@ const bundle = fs.readFileSync(
 );
 const storageKey = 'illustrator_sci_plugin_settings';
 
+test('arrangement icon buttons dispatch every alignment and distribution mode with translated labels', async () => {
+  const panel = await createPanel();
+  try {
+    const alignment = ['left', 'horizontalCenter', 'right', 'center', 'top', 'verticalCenter', 'bottom'];
+    const distribution = ['left', 'horizontalCenter', 'right', 'top', 'verticalCenter', 'bottom'];
+    assert.deepEqual(
+      [...panel.window.document.querySelectorAll('#panel-distribute .arrangement-icon-button[id^="distribute-"]')]
+        .map((button) => button.id),
+      distribution.map((mode) => `distribute-${mode}-button`)
+    );
+    for (const [prefix, operation, modes] of [
+      ['align', 'alignObjects', alignment],
+      ['distribute', 'distributeObjects', distribution]
+    ] as const) {
+      for (const mode of modes) {
+        const button = panel.element(`${prefix}-${mode}-button`);
+        assert.ok(button.querySelector('svg path')?.getAttribute('d'));
+        assert.ok(button.getAttribute('title'));
+        assert.equal(button.getAttribute('title'), button.getAttribute('aria-label'));
+        await panel.click(button.id);
+        assert.deepEqual(panel.requests.at(-1), { operation, args: [mode] });
+      }
+    }
+    assert.equal(panel.element('align-center-button').getAttribute('title'), 'Horizontal and Vertical Align Center');
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.element('align-center-button').getAttribute('title'), '水平与垂直居中对齐');
+    const tab = [...panel.window.document.querySelectorAll('.tab')].find(
+      (button) => button.textContent === '排列分布'
+    );
+    assert.ok(tab);
+    (tab as unknown as HTMLButtonElement).click();
+    await panel.flush();
+    assert.equal(panel.element('panel-title').textContent, '排列分布');
+    for (const direction of ['horizontal', 'vertical']) {
+      assert.ok(panel.element(`distribute-${direction}-button`).querySelector('svg'));
+      await panel.click(`distribute-${direction}-button`);
+      assert.deepEqual(panel.requests.at(-1), { operation: 'distributeSpacing', args: [direction] });
+    }
+    await panel.click('copy-spacing-horizontal-button');
+    await panel.click('move-right-horizontal-button');
+    assert.deepEqual(panel.requests.at(-1), { operation: 'pasteSpacing', args: ['horizontal', 1.234, false] });
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 async function createPanel(saved?: string, legacy = false) {
   const window = new Window({ url: 'http://localhost:3000/main/index.html' });
   // happy-dom 20 implements :checked only for INPUT. Svelte also uses it for

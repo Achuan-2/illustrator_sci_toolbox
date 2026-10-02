@@ -15,6 +15,8 @@ declare function filterTextFrames(...args: unknown[]): string;
 declare function filterSelection(...args: unknown[]): string;
 declare function swapSelectedPositions(...args: unknown[]): string;
 declare function distributeSpacing(...args: unknown[]): string;
+declare function alignObjects(...args: unknown[]): string;
+declare function distributeObjects(...args: unknown[]): string;
 declare function copySpacing(...args: unknown[]): string;
 declare function pasteSpacing(...args: unknown[]): string;
 
@@ -32,6 +34,8 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   filterSelection: filterSelection,
   swapSelectedPositions: swapSelectedPositions,
   distributeSpacing: distributeSpacing,
+  alignObjects: alignObjects,
+  distributeObjects: distributeObjects,
   copySpacing: copySpacing,
   pasteSpacing: pasteSpacing
 };
