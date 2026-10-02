@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import type { Corner, Order, SizeMode } from '../../shared/host';
 
 export interface Workspace {
@@ -93,5 +93,6 @@ export function labelPreview(template: string, start: number): string {
 }
 
 export function exitLabelEditing(): void {
+  if (!get(workspace).labelEditing) return;
   workspace.update((value) => ({ ...value, labelEditing: false }));
 }

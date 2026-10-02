@@ -219,6 +219,17 @@ input[type='checkbox'] {
   margin-top: 8px;
 }
 
+/* Keep a function and its explanation together when a toolbar wraps. */
+.help-action,
+.help-heading {
+  display: inline-flex;
+  align-items: center;
+}
+.help-action > .help-hint,
+.help-heading > .help-hint {
+  margin-left: 6px;
+}
+
 /* Swap panel: two-column layout (left col: TL,BL ; right col: TR,BR) */
 .swap-grid {
   display: flex;

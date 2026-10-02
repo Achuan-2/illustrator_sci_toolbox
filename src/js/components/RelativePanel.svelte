@@ -2,6 +2,7 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
+  import HelpHint from './HelpHint.svelte';
 </script>
 
 <div class="panel active" id="panel-relative">
@@ -45,36 +46,35 @@
     <div class="input-group">
       <label for="relative-order">{$t('common.order')}</label>
       <select id="relative-order" bind:value={$workspace.relativeOrder}>
-        <option value="grid" title={$t('order.gridHint')}
-          >{$t('order.grid')}</option
-        >
-        <option value="stacking" title={$t('order.stackingHint')}
-          >{$t('order.stacking')}</option
-        >
-        <option value="horizontal" title={$t('order.horizontalHint')}
-          >{$t('order.horizontal')}</option
-        >
-        <option value="vertical" title={$t('order.verticalHint')}
-          >{$t('order.vertical')}</option
-        >
+        <option value="grid">{$t('order.grid')}</option>
+        <option value="stacking">{$t('order.stacking')}</option>
+        <option value="horizontal">{$t('order.horizontal')}</option>
+        <option value="vertical">{$t('order.vertical')}</option>
       </select>
+      <HelpHint
+        id="relative-order-help"
+        text={$t(`order.${$workspace.relativeOrder}Hint`)}
+      />
     </div>
     <div class="input-group">
       <label for="reverse-move-checkbox">{$t('relative.reverse')}</label>
       <input
         type="checkbox"
         id="reverse-move-checkbox"
-        title={$t('relative.reverseHint')}
         bind:checked={$workspace.reverseMove}
       />
+      <HelpHint id="reverse-move-help" text={$t('relative.reverseHint')} />
     </div>
     <div class="input-group">
       <label for="allow-mismatch-paste">{$t('relative.forcePaste')}</label>
       <input
         type="checkbox"
         id="allow-mismatch-paste"
-        title={$t('relative.forcePasteHint')}
         bind:checked={$workspace.allowMismatchPaste}
+      />
+      <HelpHint
+        id="allow-mismatch-paste-help"
+        text={$t('relative.forcePasteHint')}
       />
     </div>
     <div class="input-group">
@@ -82,9 +82,9 @@
       <input
         type="checkbox"
         id="use-artboard-ref"
-        title={$t('relative.artboardHint')}
         bind:checked={$workspace.useArtboardRef}
       />
+      <HelpHint id="use-artboard-ref-help" text={$t('relative.artboardHint')} />
     </div>
   </div>
   <div class="toolbar">

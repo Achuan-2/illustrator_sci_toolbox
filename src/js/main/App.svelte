@@ -43,7 +43,12 @@
   }
   function endOffsetEditing(event: Event) {
     const target = event.target as HTMLElement;
+    if (target.closest('.help-hint, .help-popup')) return;
     if (!target.matches('input, select, button')) return;
+    // Checkbox activation changes the DOM before click, but bind:checked saves
+    // it on change. Wait for that binding before updating the shared workspace.
+    if (event.type === 'click' && target.matches('input[type="checkbox"]')) return;
+    if (event.type === 'change' && !target.matches('input[type="checkbox"]')) return;
     if (target.id !== 'label-offset-x' && target.id !== 'label-offset-y')
       exitLabelEditing();
   }
@@ -72,6 +77,7 @@
   onhashchange={readHash}
   onfocusin={endOffsetEditing}
   onclick={endOffsetEditing}
+  onchange={endOffsetEditing}
 />
 <svelte:document
   onkeydown={(event) => {

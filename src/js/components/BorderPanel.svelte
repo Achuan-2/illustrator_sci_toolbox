@@ -2,6 +2,7 @@
   import { workspace } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions } from '../services/actions';
+  import HelpHint from './HelpHint.svelte';
 </script>
 
 <div class="panel active" id="panel-border">
@@ -31,9 +32,9 @@
         id="border-dash"
         min="0"
         step="0.1"
-        title={$t('border.dashHint')}
         bind:value={$workspace.borderDash}
       />
+      <HelpHint id="border-dash-help" text={$t('border.dashHint')} />
     </div>
     <div class="input-group">
       <label for="auto-group-border">{$t('border.autoGroup')}</label>

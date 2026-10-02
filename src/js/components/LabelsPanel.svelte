@@ -3,6 +3,7 @@
   import { workspace, labelPreview } from '../stores/workspace';
   import { t } from '../i18n';
   import { actions, offsetInput, offsetWheel } from '../services/actions';
+  import HelpHint from './HelpHint.svelte';
 </script>
 
 <div class="panel active" id="panel-labels">
@@ -25,21 +26,13 @@
     </div>
     <div class="input-group">
       <label for="font-bold">{$t('labels.fontBold')}</label>
-      <input
-        type="checkbox"
-        id="font-bold"
-        title={$t('labels.fontBoldHint')}
-        bind:checked={$settings.fontBold}
-      />
+      <input type="checkbox" id="font-bold" bind:checked={$settings.fontBold} />
+      <HelpHint id="font-bold-help" text={$t('labels.fontBoldHint')} />
     </div>
     <div class="input-group">
       <label for="font-color">{$t('labels.fontColor')}</label>
-      <input
-        type="color"
-        id="font-color"
-        title={$t('labels.fontColorHint')}
-        bind:value={$settings.fontColor}
-      />
+      <input type="color" id="font-color" bind:value={$settings.fontColor} />
+      <HelpHint id="font-color-help" text={$t('labels.fontColorHint')} />
     </div>
     <div class="input-group">
       <label for="label-offset-x">{$t('labels.offsetX')}</label>
@@ -48,10 +41,12 @@
         id="label-offset-x"
         value={$settings.labelOffsetX}
         class:editing-mode={$workspace.labelEditing}
-        title={$workspace.labelEditing ? $t('labels.editingHint') : ''}
         oninput={(event) => offsetInput(event, 'labelOffsetX')}
         onwheel={(event) => offsetWheel(event, 'labelOffsetX')}
       />
+      {#if $workspace.labelEditing}
+        <HelpHint id="label-offset-x-help" text={$t('labels.editingHint')} />
+      {/if}
     </div>
     <div class="input-group">
       <label for="label-offset-y">{$t('labels.offsetY')}</label>
@@ -60,10 +55,12 @@
         id="label-offset-y"
         value={$settings.labelOffsetY}
         class:editing-mode={$workspace.labelEditing}
-        title={$workspace.labelEditing ? $t('labels.editingHint') : ''}
         oninput={(event) => offsetInput(event, 'labelOffsetY')}
         onwheel={(event) => offsetWheel(event, 'labelOffsetY')}
       />
+      {#if $workspace.labelEditing}
+        <HelpHint id="label-offset-y-help" text={$t('labels.editingHint')} />
+      {/if}
     </div>
     <div class="input-group">
       <label for="label-template">{$t('labels.template')}</label>
@@ -89,16 +86,17 @@
       <button
         class="btn"
         id="undo-label-index"
-        title={$t('labels.undoIndexHint')}
+        aria-label={$t('labels.undoIndexHint')}
         style="flex: 0 0 auto; padding: 6px 10px;"
         onclick={actions.undoLabelIndex}>↶</button
       >
+      <HelpHint id="undo-label-index-help" text={$t('labels.undoIndexHint')} />
       <input
         type="checkbox"
         id="auto-update-index"
-        title={$t('labels.autoIndexHint')}
         bind:checked={$settings.autoUpdateIndex}
       />
+      <HelpHint id="auto-update-index-help" text={$t('labels.autoIndexHint')} />
     </div>
     <div class="input-group">
       <span>{$t('labels.preview')}</span>
@@ -115,50 +113,53 @@
     <div class="input-group">
       <label for="labels-order">{$t('common.order')}</label>
       <select id="labels-order" bind:value={$settings.labelsOrder}>
-        <option value="grid" title={$t('order.gridHint')}
-          >{$t('order.grid')}</option
-        >
-        <option value="stacking" title={$t('order.stackingHint')}
-          >{$t('order.stacking')}</option
-        >
-        <option value="horizontal" title={$t('order.horizontalHint')}
-          >{$t('order.horizontal')}</option
-        >
-        <option value="vertical" title={$t('order.verticalHint')}
-          >{$t('order.vertical')}</option
-        >
+        <option value="grid">{$t('order.grid')}</option>
+        <option value="stacking">{$t('order.stacking')}</option>
+        <option value="horizontal">{$t('order.horizontal')}</option>
+        <option value="vertical">{$t('order.vertical')}</option>
       </select>
+      <HelpHint
+        id="labels-order-help"
+        text={$t(`order.${$settings.labelsOrder}Hint`)}
+      />
     </div>
     <div class="input-group">
       <label for="labels-reverse-order">{$t('common.reverseOrder')}</label>
       <input
         type="checkbox"
         id="labels-reverse-order"
-        title={$t('common.reverseOrderHint')}
         bind:checked={$settings.labelsReverseOrder}
+      />
+      <HelpHint
+        id="labels-reverse-order-help"
+        text={$t('common.reverseOrderHint')}
       />
     </div>
   </div>
   <div class="toolbar">
-    <button
-      class="btn"
-      id="filter-text-button"
-      title={$t('selection.textOnlyHint')}
-      onclick={actions.filterText}>{$t('labels.selectText')}</button
-    >
+    <span class="help-action">
+      <button class="btn" id="filter-text-button" onclick={actions.filterText}
+        >{$t('labels.selectText')}</button
+      >
+      <HelpHint id="filter-text-help" text={$t('selection.textOnlyHint')} />
+    </span>
   </div>
   <div class="toolbar">
-    <button
-      class="btn btn-primary"
-      id="add-label-button"
-      title={$t('labels.addHint')}
-      onclick={actions.addLabels}>{$t('labels.add')}</button
-    >
-    <button
-      class="btn"
-      id="update-label-button"
-      title={$t('labels.updateHint')}
-      onclick={actions.updateLabels}>{$t('labels.update')}</button
-    >
+    <span class="help-action">
+      <button
+        class="btn btn-primary"
+        id="add-label-button"
+        onclick={actions.addLabels}>{$t('labels.add')}</button
+      >
+      <HelpHint id="add-label-help" text={$t('labels.addHint')} />
+    </span>
+    <span class="help-action">
+      <button
+        class="btn"
+        id="update-label-button"
+        onclick={actions.updateLabels}>{$t('labels.update')}</button
+      >
+      <HelpHint id="update-label-help" text={$t('labels.updateHint')} />
+    </span>
   </div>
 </div>

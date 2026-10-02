@@ -3,6 +3,7 @@
   import { t } from '../i18n';
   import { actions } from '../services/actions';
   import ArrangementIcon from './ArrangementIcon.svelte';
+  import HelpHint from './HelpHint.svelte';
   import type { AlignmentMode, DistributionMode } from '../../shared/host';
 
   const alignmentRows: AlignmentMode[][] = [
@@ -16,8 +17,12 @@
 </script>
 
 <div class="panel active" id="panel-distribute">
-  <h3>{$t('alignment.title')}</h3>
-  <p class="arrangement-hint">{$t('alignment.hint')}</p>
+  <h3 class="help-heading">
+    {$t('alignment.title')}<HelpHint
+      id="alignment-help"
+      text={$t('alignment.hint')}
+    />
+  </h3>
   {#each alignmentRows as row}
     <div class="toolbar">
       {#each row as mode}
@@ -33,8 +38,12 @@
     </div>
   {/each}
 
-  <h3>{$t('distribution.title')}</h3>
-  <p class="arrangement-hint">{$t('distribution.hint')}</p>
+  <h3 class="help-heading">
+    {$t('distribution.title')}<HelpHint
+      id="distribution-help"
+      text={$t('distribution.hint')}
+    />
+  </h3>
   {#each distributionRows as row}
     <div class="toolbar">
       {#each row as mode}
@@ -52,26 +61,36 @@
 
   <h3>{$t('spacing.even')}</h3>
   <div class="toolbar">
-    <button
-      class="btn spacing-button"
-      id="distribute-horizontal-button"
-      title={$t('spacing.horizontalHint')}
-      aria-label={$t('spacing.horizontalHint')}
-      onclick={() => actions.distribute('horizontal')}
-      ><ArrangementIcon kind="spacing" mode="horizontal" />{$t(
-        'spacing.horizontal'
-      )}</button
-    >
-    <button
-      class="btn spacing-button"
-      id="distribute-vertical-button"
-      title={$t('spacing.verticalHint')}
-      aria-label={$t('spacing.verticalHint')}
-      onclick={() => actions.distribute('vertical')}
-      ><ArrangementIcon kind="spacing" mode="vertical" />{$t(
-        'spacing.vertical'
-      )}</button
-    >
+    <span class="help-action">
+      <button
+        class="btn spacing-button"
+        id="distribute-horizontal-button"
+        aria-label={$t('spacing.horizontalHint')}
+        onclick={() => actions.distribute('horizontal')}
+        ><ArrangementIcon kind="spacing" mode="horizontal" />{$t(
+          'spacing.horizontal'
+        )}</button
+      >
+      <HelpHint
+        id="distribute-horizontal-help"
+        text={$t('spacing.horizontalHint')}
+      />
+    </span>
+    <span class="help-action">
+      <button
+        class="btn spacing-button"
+        id="distribute-vertical-button"
+        aria-label={$t('spacing.verticalHint')}
+        onclick={() => actions.distribute('vertical')}
+        ><ArrangementIcon kind="spacing" mode="vertical" />{$t(
+          'spacing.vertical'
+        )}</button
+      >
+      <HelpHint
+        id="distribute-vertical-help"
+        text={$t('spacing.verticalHint')}
+      />
+    </span>
   </div>
   <h3>{$t('spacing.paste')}</h3>
 
@@ -143,10 +162,14 @@
 </div>
 
 <style>
-  .arrangement-hint {
-    color: var(--muted);
-    line-height: 1.5;
-    margin: 0 0 8px;
+  h3 {
+    display: flex;
+    align-items: center;
+    margin: 16px 0 8px;
+  }
+
+  h3:first-child {
+    margin-top: 0;
   }
 
   .arrangement-icon-button {

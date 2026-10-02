@@ -85,6 +85,97 @@ test('swap panel shows nine icon buttons in anchor order and dispatches each anc
   }
 });
 
+test('explanation icons support hover, pinned clicks, single-popup dismissal and dynamic translations', async () => {
+  const panel = await createPanel();
+  try {
+    const control = panel.element('reverse-move-checkbox') as unknown as HTMLInputElement;
+    const checked = control.checked;
+    const icon = panel.element('reverse-move-help');
+    const content = 'reverse-move-help-content';
+    const hostCalls = () => panel.requests.filter((request) => request.operation !== 'syncZoomTracker');
+    const requests = hostCalls().length;
+    const pause = (ms = 220) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    icon.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await pause();
+    assert.equal(panel.window.document.getElementById(content), null, 'Quick hovering does not open help');
+    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
+    await pause(650);
+    assert.equal(panel.window.document.getElementById(content), null, 'Leaving cancels delayed help');
+    icon.dispatchEvent(new panel.window.MouseEvent('mouseenter'));
+    await pause(650);
+    assert.equal(panel.element(content).getAttribute('role'), 'tooltip');
+    assert.equal(panel.element(content).parentElement, panel.window.document.body);
+    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
+    await pause();
+    assert.equal(panel.window.document.getElementById(content), null);
+
+    await panel.click(icon.id);
+    icon.dispatchEvent(new panel.window.MouseEvent('mouseleave'));
+    await pause();
+    assert.ok(panel.window.document.getElementById(content), 'Clicked explanation stays open after the pointer leaves');
+    await panel.click(icon.id);
+    assert.equal(panel.window.document.getElementById(content), null);
+
+    await panel.click(icon.id);
+    await panel.click('allow-mismatch-paste-help');
+    assert.equal(panel.window.document.getElementById(content), null);
+    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 1);
+    panel.window.document.body.click();
+    await panel.flush();
+    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 0);
+
+    await panel.click('relative-order-help');
+    await panel.input('relative-order', 'horizontal');
+    assert.equal(panel.element('relative-order-help-content').textContent, 'Sort strictly from left to right');
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.element('relative-order-help').getAttribute('aria-label'), '查看提示');
+    assert.equal(panel.element('relative-order-help-content').textContent, '严格从左到右排序');
+    panel.element('relative-order-help').dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.window.document.querySelectorAll('.help-popup').length, 0);
+    assert.equal(control.checked, checked);
+    assert.equal(hostCalls().length, requests, 'Viewing help must not call Illustrator operations');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('explanations fit narrow viewports and do not interrupt label live editing', async () => {
+  const panel = await createPanel();
+  try {
+    Object.defineProperty(panel.window, 'innerWidth', { value: 220, configurable: true });
+    Object.defineProperty(panel.window, 'innerHeight', { value: 180, configurable: true });
+    const icon = panel.element('auto-layout-help');
+    icon.getBoundingClientRect = () => ({ left: 185, top: 150, right: 207, bottom: 172, width: 22, height: 22 } as ReturnType<typeof icon.getBoundingClientRect>);
+    await panel.click(icon.id);
+    const popup = panel.element('auto-layout-help-content');
+    popup.getBoundingClientRect = () => ({ left: 0, top: 0, right: 204, bottom: 80, width: 204, height: 80 } as ReturnType<typeof popup.getBoundingClientRect>);
+    panel.window.dispatchEvent(new panel.window.Event('resize'));
+    await panel.flush();
+    const left = parseFloat(popup.style.left), top = parseFloat(popup.style.top);
+    assert.ok(left >= 8 && left + 204 <= 212);
+    assert.ok(top >= 8 && top + 80 <= 172);
+
+    await panel.click('add-label-button');
+    const offset = panel.element('label-offset-x');
+    assert.equal(offset.classList.contains('editing-mode'), true);
+    panel.element('label-offset-x-help').focus();
+    await panel.click('label-offset-x-help');
+    assert.equal(offset.classList.contains('editing-mode'), true);
+    assert.ok(panel.window.document.getElementById('label-offset-x-help-content'));
+    panel.element('label-offset-x-help').dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await panel.flush();
+    assert.equal(offset.classList.contains('editing-mode'), true);
+    await panel.input('label-offset-x', '3');
+    assert.equal(panel.requests.at(-1)?.operation, 'updateLabelOffsets');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 async function createPanel(saved?: string, legacy = false) {
   const window = new Window({ url: 'http://localhost:3000/main/index.html' });
   // happy-dom 20 implements :checked only for INPUT. Svelte also uses it for
@@ -172,6 +263,58 @@ async function createPanel(saved?: string, legacy = false) {
   };
   return { window, requests, alerts, element, input, click, flush };
 }
+
+test('checkbox activation survives the browser checkpoint between click and change', async () => {
+  const panel = await createPanel();
+  try {
+    const controls = [...panel.window.document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    assert.ok(controls.length >= 14, 'Cover workspace and persisted settings controls');
+    for (const control of controls) {
+      const initial = control.checked;
+      for (const expected of [!initial, initial]) {
+        control.focus();
+        await panel.flush();
+        // happy-dom's .click() runs activation, click and change synchronously.
+        // Native user activation allows queued rendering after click listeners,
+        // before the subsequent input/change events. Model that checkpoint.
+        control.checked = expected;
+        panel.window.HTMLElement.prototype.dispatchEvent.call(
+          control,
+          new panel.window.MouseEvent('click', { bubbles: true, cancelable: true })
+        );
+        await panel.flush();
+        assert.equal(control.checked, expected, `${control.id}: click must preserve the activated value`);
+        control.dispatchEvent(new panel.window.Event('input', { bubbles: true }));
+        control.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
+        await panel.flush();
+        assert.equal(control.checked, expected, `${control.id}: binding must save the activated value`);
+        await panel.input('language', 'zh_CN');
+        await panel.input('language', 'en');
+        assert.equal(control.checked, expected, `${control.id}: a later render must retain the saved value`);
+      }
+    }
+    await panel.click('add-label-button');
+    assert.equal(panel.element('label-offset-x').classList.contains('editing-mode'), true);
+    const reverse = panel.element('reverse-move-checkbox') as unknown as HTMLInputElement;
+    reverse.checked = true;
+    panel.window.HTMLElement.prototype.dispatchEvent.call(
+      reverse,
+      new panel.window.MouseEvent('click', { bubbles: true, cancelable: true })
+    );
+    await panel.flush();
+    assert.equal(reverse.checked, true, 'Active label editing must also preserve checkbox activation');
+    reverse.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.element('label-offset-x').classList.contains('editing-mode'), false);
+    await panel.click('add-label-button');
+    await panel.click('font-bold');
+    assert.equal(panel.element('label-offset-x').classList.contains('editing-mode'), false);
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).fontBold, true);
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
 
 test('installed panel starts and calls the host without newer Chromium APIs', async () => {
   // Chromium 57 supports ES2017; later syntax must be transpiled in the package.
@@ -283,8 +426,9 @@ test('production controls preserve dynamic placeholders, arrange visibility and 
     assert.equal(panel.requests.at(-1)?.operation, 'updateLabelOffsets');
     assert.equal(panel.requests.at(-1)?.args[0], 0);
     await panel.input('language', 'en');
+    await panel.click('label-offset-x-help');
     assert.equal(
-      panel.element('label-offset-x').getAttribute('title'),
+      panel.element('label-offset-x-help-content').textContent,
       'Change the value to move labels in real time'
     );
     await panel.click('copy-size-button');
