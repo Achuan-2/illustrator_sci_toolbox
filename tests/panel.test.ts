@@ -271,11 +271,14 @@ test('color dropdown previews all seven colors and supports keyboard, Escape and
     await panel.click('pseudocolor-lut');
     const options = [...panel.window.document.querySelectorAll('#pseudocolor-lut-options [role="option"]')];
     assert.equal(options.length, 7);
+    assert.deepEqual(options.map((option) => option.getAttribute('data-color')), [
+      'green', 'red', 'blue', 'cyan', 'magenta', 'yellow', 'grays'
+    ]);
     for (const option of options) {
       assert.match(option.querySelector('.color-swatch')?.getAttribute('style') || '', /linear-gradient/);
       assert.ok(option.textContent?.trim());
     }
-    options[0].dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    options[1].dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     await panel.flush();
     assert.equal(panel.window.document.activeElement?.getAttribute('data-color'), 'green');
     panel.window.document.activeElement?.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

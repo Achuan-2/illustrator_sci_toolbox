@@ -6,6 +6,10 @@
     layerColorHex,
     type LayerColorId
   } from '../services/pseudocolorLayers';
+  const colorOptions: readonly LayerColorId[] = [
+    'green',
+    ...layerColorIds.filter((color) => color !== 'green')
+  ];
   interface Props {
     id: string;
     value: LayerColorId;
@@ -36,9 +40,9 @@
   }
   function toggle() {
     open = !open;
-    if (open) void focusOption(layerColorIds.indexOf(value));
+    if (open) void focusOption(colorOptions.indexOf(value));
   }
-  function keydown(event: KeyboardEvent, index = layerColorIds.indexOf(value)) {
+  function keydown(event: KeyboardEvent, index = colorOptions.indexOf(value)) {
     if (event.key === 'Escape') {
       event.preventDefault();
       close(true);
@@ -51,17 +55,17 @@
         event.key === 'Home'
           ? 0
           : event.key === 'End'
-            ? layerColorIds.length - 1
+            ? colorOptions.length - 1
             : wasOpen
               ? (index +
                   (event.key === 'ArrowDown' ? 1 : -1) +
-                  layerColorIds.length) %
-                layerColorIds.length
+                  colorOptions.length) %
+                colorOptions.length
               : index;
       void focusOption(next);
     } else if (open && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
-      choose(layerColorIds[index]);
+      choose(colorOptions[index]);
     }
   }
 </script>
@@ -109,7 +113,7 @@
       role="listbox"
       aria-labelledby={`${id}-label`}
     >
-      {#each layerColorIds as color, index}
+      {#each colorOptions as color, index}
         <button
           type="button"
           role="option"
