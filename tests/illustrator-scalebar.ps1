@@ -165,6 +165,7 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         var cmFov={width:0.1,height:0.05,unit:"cm",source:"manual"};
         assert(api.apply(JSON.stringify({token:info.token,documentKey:info.documentKey,fov:cmFov,
             options:options,saveOnly:false,autoSave:true}))==="OK","Autosave pinned image after selection changed");
+        app.redraw();
         assert(doc.selection[0]===autoOther,"Editing previous image must not reselect it");
         assert(barFor(source).textFrames[0].contents==="0.005cm","Scale label uses FOV unit with calibrated conversion");
         assertBar(source,50,"cm bar keeps physical calibration");
@@ -234,6 +235,24 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         near(mergedInfo.fov.width,1000,"Merged image inherits consistent channel FOV");
         merged.name="Renamed merged channels";
         merged=apply(merged,mergedInfo.fov,options);
+        app.redraw();
+        var afterAdd=JSON.parse(api.inspect("")), selectedItems=[];
+        for(var selectionIndex=0;selectionIndex<doc.selection.length;selectionIndex++) {
+            var selectedItem=doc.selection[selectionIndex];
+            selectedItems.push({type:selectedItem.typename,name:selectedItem.name,parent:selectedItem.parent.name});
+        }
+        assert(afterAdd.token===mergedInfo.token,"Adding a merged scale keeps its image editable without reselection: " + JSON.stringify({inspection:afterAdd,selection:selectedItems}));
+        options.lengthUm=75;
+        assert(api.apply(JSON.stringify({token:mergedInfo.token,fov:mergedInfo.fov,options:options,autoSave:true}))==="OK","Edit merged scale immediately after creation");
+        app.redraw();
+        var afterEdit=JSON.parse(api.inspect(""));
+        assert(afterEdit.token===mergedInfo.token,"Editing a merged scale preserves selection without reselection: " + JSON.stringify(afterEdit));
+        options.lengthUm=50;
+        assert(api.apply(JSON.stringify({token:mergedInfo.token,fov:mergedInfo.fov,options:options,autoSave:true}))==="OK","Continue editing merged scale");
+        app.redraw();
+        assert(JSON.parse(api.inspect("")).token===mergedInfo.token,"Repeated edits stay bound after redraw");
+        assert(api.inspect(mergedInfo.signature)==="null","Polling preserves the merged form after creation and repeated edits");
+        checks.push("merged scale creation and consecutive autosaves stay editable after Illustrator redraw without reselection");
         assertBar(merged,50,"Merged image accepts a calibrated editable scale");
         var mergedBar=barFor(merged);
         assert(merged.pageItems[0]===mergedBar,"Merged scale stays above channel overlays");

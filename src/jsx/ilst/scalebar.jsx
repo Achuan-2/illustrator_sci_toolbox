@@ -382,7 +382,7 @@ function applyScalebar(payloadJson) {
         if (payload.documentKey && payload.documentKey !== scaleDocumentKey(doc)) return sciError("errors.scaleTargetChanged");
         if (payload.autoSave) {
             // Save the inspected image even when the user has already selected
-            // another one. Background saves never alter Illustrator selection.
+            // another one. Background saves never steal another image's selection.
             for (var i = 0; i < doc.pageItems.length; i++) {
                 var candidate = doc.pageItems[i];
                 if ((candidate.uuid || getTag(candidate, "SCI_SCALE_TARGET")) === payload.token) { target = candidate; break; }
@@ -403,13 +403,11 @@ function applyScalebar(payloadJson) {
                 try { wasSelectedTarget = scaleSelectionTarget(doc) === target; } catch (selectionError) {}
             }
             var selected = scaleDrawBar(doc, target, payload.fov, currentOptions);
-            if (!payload.autoSave) {
-                doc.selection = null;
-                selected.selected = true;
-            } else if (wasSelectedTarget && !doc.selection.length) {
-                // Editing a selected scale label replaces that native item.
-                // Restore its own image selection, leaving other images alone.
-                selected.selected = true;
+            if (!payload.autoSave || wasSelectedTarget) {
+                // Replacing a selected bar can invalidate its group's selection
+                // only after Illustrator redraws. Set the complete selection now
+                // instead of trusting the old selection length or selected flag.
+                doc.selection = [selected];
             }
         }
         return "OK";
