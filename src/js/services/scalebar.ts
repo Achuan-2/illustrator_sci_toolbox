@@ -47,6 +47,16 @@ export function unitSymbol(unit: string): string {
 export function lengthInUnit(lengthUm: number, unit: string): number {
   return Number((lengthUm / unitFactor(unit)).toPrecision(12));
 }
+export function maxScalebarLengthUm(
+  fov: ImageFov | null,
+  orientation: ScalebarOptions['orientation']
+): number | undefined {
+  if (!fov) return undefined;
+  const dimension = orientation === 'vertical' ? fov.height : fov.width;
+  return Number.isFinite(dimension) && dimension > 0
+    ? dimension * unitFactor(fov.unit) * 0.9
+    : undefined;
+}
 export const defaultScalebar: ScalebarOptions = {
   orientation: 'horizontal',
   lengthUm: 50,

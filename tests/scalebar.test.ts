@@ -103,7 +103,7 @@ test('printing DPI, unsupported units, zero rationals and malformed TIFF are not
   }
 });
 
-test('explicit TIFF FOV parses scientific units and invalid lengths fail before drawing', () => {
+test('explicit TIFF FOV clamps lengths to 90% along the selected axis before drawing', () => {
   assert.deepEqual(
     plain(
       context.readScaleTiff(
@@ -123,14 +123,42 @@ test('explicit TIFF FOV parses scientific units and invalid lengths fail before 
   };
   const fov = { width: 0.05, height: 0.03, unit: 'cm' };
   assert.doesNotThrow(() => context.validateScaleOptions(options, fov));
-  assert.throws(
-    () => context.validateScaleOptions({ ...options, lengthUm: 301 }, fov),
-    /errors.scaleTooLong/
-  );
+  assert.equal(options.lengthUm, 270);
+  const horizontal = { ...options, orientation: 'horizontal', lengthUm: 501 };
+  context.validateScaleOptions(horizontal, fov);
+  assert.equal(horizontal.lengthUm, 450);
+  const shorter = { ...options, lengthUm: 20 };
+  context.validateScaleOptions(shorter, fov);
+  assert.equal(shorter.lengthUm, 20);
   assert.throws(
     () => context.validateScaleOptions({ ...options, thickness: NaN }, fov),
     /errors.scaleOptions/
   );
+});
+
+test('merged channel groups accept multiple rasters and require consistent calibration to infer FOV', () => {
+  const host = vm.createContext({
+    getTag: () => null,
+    getVisibleBounds: (item: any) => item.geometricBounds
+  });
+  vm.runInContext(source, host);
+  const group: any = { typename: 'GroupItem', name: 'SCI Merge Channels — Screen',
+    note: '', geometricBounds: [0, 100, 200, 0], pageItems: [] };
+  const image = (fov: object) => ({ typename: 'RasterItem', parent: group,
+    note: `[SCI_FOV]${JSON.stringify(fov)}[/SCI_FOV]`, geometricBounds: group.geometricBounds });
+  group.pageItems = [image({ width: 100, height: 50, unit: 'um' }),
+    image({ width: 0.1, height: 0.05, unit: 'mm' })];
+  const doc = { selection: [group] };
+  assert.equal(host.scaleSelectionTarget(doc), group);
+  assert.deepEqual(plain(host.scaleReadFov(group)), { width: 100, height: 50, unit: 'um' });
+  group.name = 'Renamed result'; group.note = 'SCI_MERGE_CHANNELS:1';
+  assert.equal(host.scaleSelectionTarget(doc), group);
+  group.pageItems[1].note = '[SCI_FOV]{"width":200,"height":50,"unit":"um"}[/SCI_FOV]';
+  assert.equal(host.scaleReadFov(group), null);
+  group.note += '\n[SCI_FOV]{"width":300,"height":150,"unit":"um"}[/SCI_FOV]';
+  assert.equal(host.scaleReadFov(group).width, 300, 'Manual merged FOV overrides conflicting channels');
+  group.note = '';
+  assert.throws(() => host.scaleSelectionTarget(doc), /errors.scaleSelection/);
 });
 
 test('FOV note round-trips while preserving unrelated text and tags', () => {

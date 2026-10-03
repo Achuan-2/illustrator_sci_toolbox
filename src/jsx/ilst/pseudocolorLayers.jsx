@@ -266,6 +266,7 @@ function applyPseudocolorLayers(payload) {
             results.push(merged);
             merged.move(first.item.layer, ElementPlacement.PLACEATBEGINNING);
             merged.name = "SCI Merge Channels — Screen"; merged.isIsolated = true;
+            merged.note = "SCI_MERGE_CHANNELS:1";
             for (var m = 0; m < indices.length; m++) {
                 var index = indices[m];
                 var channel = makePseudocolorLayerGroup(merged, session.targets[index], channels[index].lut, right+10, first.bounds[1]);

@@ -31,9 +31,10 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
     }
     function makeApi() {
         return eval("(function(){" + read("/src/jsx/lib/json2.js") + read("/src/jsx/ilst/arrange.jsx") +
-            read("/src/jsx/ilst/scalebar.jsx") + ";return {inspect:inspectScalebar,apply:applyScalebar,fov:scaleReadFov," +
+            read("/src/jsx/ilst/scalebar.jsx") + read("/src/jsx/ilst/pseudocolorLayers.jsx") + ";return {inspect:inspectScalebar,apply:applyScalebar,fov:scaleReadFov," +
+            "merge:applyPseudocolorLayers," +
             "opts:scaleReadOptions,tag:getTag,bounds:getVisibleBounds,picture:scaleWrapperPicture," +
-            "zoom:applyZoomImages,zoomInspect:inspectZoomTarget,entries:readZoomEntries,sync:syncZoomTracker," +
+            "zoom:applyZoomImages,zoomInspect:inspectZoomTarget,cancelZoom:cancelZoomTarget,entries:readZoomEntries,sync:syncZoomTracker," +
             "find:findItemByTag,setBounds:setZoomRectangleBounds,tiff:readScaleTiff,factor:scaleUnitFactor,clear:scaleClearDuplicate};})()");
     }
     function assert(condition, message) { if (!condition) throw new Error(message); }
@@ -138,9 +139,10 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         other.remove();
         info=inspect(source); var count=doc.pageItems.length;
         options.lengthUm=1001;
-        assert(api.apply(JSON.stringify({token:info.token,fov:fov,options:options})).indexOf("errors.scaleTooLong")>=0,"Reject scale larger than FOV");
-        assert(doc.pageItems.length===count,"Invalid length preserves artwork"); options.lengthUm=50;
-        checks.push("selection changes and invalid lengths cannot overwrite artwork");
+        assert(api.apply(JSON.stringify({token:info.token,fov:fov,options:options}))==="OK","Clamp scale larger than FOV");
+        near(api.opts(source).lengthUm,900,"Persist length capped at 90% of FOV");
+        assertBar(source,900,"Draw capped scale"); options.lengthUm=50;
+        checks.push("selection changes are rejected and oversized lengths are capped at 90%");
         options.showText=false; apply(wrapper,fov,options);
         assert(barFor(source).textFrames.length===0,"Optional text hidden");
         options.showText=true; apply(wrapper,fov,options);
@@ -192,6 +194,11 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         near(api.fov(zoom).width,500,"Zoom physical FOV"); assertBar(zoom,50,"Zoom inherits represented length");
         near(api.fov(zoom).height,0,"Zoom preserves unknown perpendicular FOV");
         var initialBounds=api.bounds(zoom);
+        saved[0].scaleLengthUm=1000; doc.selection=null; wrapper.selected=true;
+        assert(api.zoom(JSON.stringify({entries:saved,deletedKeys:[]})) === "Success","Create zoom with an oversized requested scale");
+        zoom=api.find(doc,"ILST_ZOOM_ITEM_"+key);
+        near(api.opts(zoom).lengthUm,450,"Zoom scale clamps to 90% of crop FOV");
+        assertBar(zoom,450,"Zoom capped scale is calibrated");
         saved[0].scaleLengthUm=100; doc.selection=null; wrapper.selected=true;
         assert(api.zoom(JSON.stringify({entries:saved,deletedKeys:[]})) === "Success","Edit zoom represented length");
         zoom=api.find(doc,"ILST_ZOOM_ITEM_"+key); assertBar(zoom,100,"Custom zoom represented length");
@@ -209,9 +216,35 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         var previewInfo=JSON.parse(api.zoomInspect()); preview=new File(previewInfo.previewPath);
         assert(previewInfo.sourceScalebar.lengthUm===50,"Zoom editor receives source scale length");
         assert(previewInfo.existingEntries[0].scaleLengthUm===100,"Zoom editor receives custom scale length");
+        near(previewInfo.sourceFov.width,1000,"Zoom editor receives physical source FOV");
         checks.push("zoom editor reads source and existing zoom scale settings");
+        api.cancelZoom();
+        // Crop tracking must also clamp an existing bar when its FOV shrinks.
+        api.setBounds(marker,[mb[0],mb[1],mb[0]+20,mb[3]]); api.sync();
+        near(api.fov(zoom).width,50,"Small crop FOV");
+        near(api.opts(zoom).lengthUm,45,"Tracking caps existing scale to reduced crop FOV");
+        assertBar(zoom,45,"Tracked small-crop scale is calibrated");
         apply(wrapper,fov,options);
         api.sync();
+        var channelCopy=source.duplicate(doc.activeLayer);
+        channelCopy.translate(0,-250);
+        doc.selection=null; source.selected=true; channelCopy.selected=true;
+        assert(api.merge(JSON.stringify({mode:"merge",keepOriginal:true})) === "2","Merge calibrated channels");
+        var merged=doc.selection[0], mergedInfo=inspect(merged);
+        near(mergedInfo.fov.width,1000,"Merged image inherits consistent channel FOV");
+        merged.name="Renamed merged channels";
+        merged=apply(merged,mergedInfo.fov,options);
+        assertBar(merged,50,"Merged image accepts a calibrated editable scale");
+        var mergedBar=barFor(merged);
+        assert(merged.pageItems[0]===mergedBar,"Merged scale stays above channel overlays");
+        var mergedBounds=api.bounds(merged);
+        for(var repeat=0;repeat<3;repeat++) {
+            options.lengthUm=2000; merged=apply(merged,mergedInfo.fov,options);
+            near(api.opts(merged).lengthUm,900,"Merged scale also respects the FOV cap");
+            for(var axis=0;axis<4;axis++) near(api.bounds(merged)[axis],mergedBounds[axis],"Scale updates preserve merged picture bounds");
+        }
+        merged.remove(); channelCopy.remove(); options.lengthUm=50;
+        checks.push("merged channels inherit calibration, survive renaming and support capped editable foreground scales");
         var saveOptions=new IllustratorSaveOptions(); saveOptions.pdfCompatible=false;
         doc.saveAs(new File(aiPath),saveOptions); doc.close(SaveOptions.DONOTSAVECHANGES);
         doc=null; doc=app.open(new File(aiPath)); api=makeApi();

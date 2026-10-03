@@ -9,6 +9,7 @@
     unitFactor,
     unitSymbol,
     lengthInUnit,
+    maxScalebarLengthUm,
     normalizeScalebarStyle,
     type ImageFov,
     type ScalebarOptions,
@@ -33,6 +34,17 @@
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingSave: ReturnType<typeof snapshot> | undefined;
   let editingRevision = 0;
+  let maxLength = $derived.by(() => {
+    const maximum = maxScalebarLengthUm(fov, options.orientation);
+    return maximum === undefined
+      ? undefined
+      : lengthInUnit(maximum, options.unit || fov.unit);
+  });
+
+  function clampLength() {
+    if (maxLength !== undefined && displayLength > maxLength)
+      displayLength = maxLength;
+  }
 
   function report(cause: unknown) {
     error =
@@ -59,6 +71,7 @@
       options = { ...(result.options || $settings.scalebarStyle) };
       options.unit = fovUnit(options.unit || fov.unit);
       displayLength = lengthInUnit(options.lengthUm, options.unit);
+      clampLength();
       hasScalebar = Boolean(result.options);
       message = result.errorKey
         ? $t(result.errorKey)
@@ -73,6 +86,7 @@
   }
 
   function snapshot(create = false) {
+    clampLength();
     return {
       token,
       documentKey,
@@ -262,6 +276,7 @@
             id="scale-length"
             type="number"
             min="0"
+            max={maxLength}
             step="any"
             bind:value={displayLength}
           />

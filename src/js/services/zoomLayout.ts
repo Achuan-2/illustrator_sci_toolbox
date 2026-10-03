@@ -44,6 +44,7 @@ export interface ZoomEntry {
   preservesLayout?: boolean;
   scaleLengthUm?: number | null;
   scaleUnit?: string;
+  scaleOrientation?: 'horizontal' | 'vertical';
 }
 
 export const GAP_POINTS = (0.5 * 72) / 2.54; // ~14.17 points (0.5 cm)

@@ -783,6 +783,30 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
   } finally { await panel.window.happyDOM.close(); }
 });
 
+test('scalebar form clamps saved styles, typed lengths and smaller FOVs to 90% with converted units', async () => {
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    (window as any).__scaleSelection = { token: 'small', signature: 'small', documentKey: 'test.ai',
+      fov: { width: 10, height: 5, unit: 'um' }, options: null };
+  });
+  try {
+    assert.equal((panel.element('scale-length') as any).value, '9');
+    assert.equal(panel.element('scale-length').getAttribute('max'), '9');
+    await panel.input('scale-length', '100');
+    assert.equal((panel.element('scale-length') as any).value, '9');
+    await panel.input('scale-orientation', 'vertical');
+    assert.equal((panel.element('scale-length') as any).value, '4.5');
+    await panel.input('scale-unit', 'nm');
+    assert.equal(panel.element('scale-length').getAttribute('max'), '4500');
+    await panel.input('fov-height', '2');
+    assert.equal((panel.element('scale-length') as any).value, '1800');
+    await panel.click('apply-scalebar-button');
+    const payload = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(payload.options.lengthUm, 1.8);
+    assert.equal(payload.options.unit, 'nm');
+    assert.equal(panel.window.document.querySelector('[role="alert"]'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
 test('width-only FOV saves and creates a bar, and styles persist across panel reloads without copying calibration', async () => {
   const selectNewImage = (window: Window) => {
     (window as any).__scaleSelection = {
@@ -1275,7 +1299,8 @@ test('standalone zoom window restores source units and edits represented length 
   const updates: { type: string; enabled: boolean }[] = [];
   const session = {
     data: {
-      sourceScalebar: { lengthUm: 50, unit: 'cm' },
+      sourceScalebar: { lengthUm: 50, unit: 'cm', orientation: 'vertical' },
+      sourceFov: { width: 1000, height: 800, unit: 'um' },
       sourceWidth: 500,
       sourceHeight: 400,
       previewDataUrl:
@@ -1332,6 +1357,9 @@ test('standalone zoom window restores source units and edits represented length 
     assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
     assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
     assert.equal((panel.element('zoom-scale-length') as any).value, '0.0075');
+    assert.equal(panel.element('zoom-scale-length').getAttribute('max'), '0.0216');
+    await panel.input('zoom-scale-length', '1');
+    assert.equal((panel.element('zoom-scale-length') as any).value, '0.0216');
     await panel.input('zoom-scale-length', '0.01');
 
     await panel.click('zoom-auto-update');

@@ -9,7 +9,12 @@
   } from '../stores/zoomModal';
   import { actions } from '../services/actions';
   import { tooltip } from '../services/tooltip';
-  import { unitFactor, unitSymbol, lengthInUnit } from '../services/scalebar';
+  import {
+    unitFactor,
+    unitSymbol,
+    lengthInUnit,
+    maxScalebarLengthUm
+  } from '../services/scalebar';
 
   let { standalone = false } = $props<{ standalone?: boolean }>();
   let isStandalone = $derived(standalone || isZoomWindow());
@@ -54,6 +59,39 @@
   let activeIndex = $state(0);
 
   let activeEntry = $derived(entries[activeIndex] ?? null);
+
+  function maxZoomScaleLength(entry: ZoomEntry) {
+    const fov = $zoomModalState.sourceFov;
+    return maxScalebarLengthUm(
+      fov ? {
+        ...fov,
+        width: fov.width * entry.region.width,
+        height: fov.height * entry.region.height
+      } : null,
+      $zoomModalState.sourceScalebar?.orientation || entry.scaleOrientation || 'horizontal'
+    );
+  }
+
+  let maxZoomDisplayLength = $derived.by(() => {
+    if (!activeEntry) return undefined;
+    const maximum = maxZoomScaleLength(activeEntry);
+    return maximum === undefined
+      ? undefined
+      : lengthInUnit(maximum, activeEntry.scaleUnit || 'um');
+  });
+
+  // Crop edits can shrink the physical FOV after a length has been entered.
+  $effect(() => {
+    for (const entry of entries) {
+      const maximum = maxZoomScaleLength(entry);
+      if (
+        maximum !== undefined &&
+        entry.scaleLengthUm != null &&
+        entry.scaleLengthUm > maximum
+      )
+        entry.scaleLengthUm = maximum;
+    }
+  });
 
   let canConfirm = $derived(
     entries.length > 0 &&
@@ -1093,8 +1131,9 @@
                 <div class="settings-row control-group">
                   <label for="zoom-scale-length">{$t('scale.zoomLength', { unit: unitSymbol(activeEntry.scaleUnit || 'um') })}</label>
                   <input id="zoom-scale-length" type="number" min="0" step="any"
+                    max={maxZoomDisplayLength}
                     bind:value={() => lengthInUnit(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
-                      (value) => { activeEntry.scaleLengthUm = Number(value) * unitFactor(activeEntry.scaleUnit || 'um'); }} />
+                      (value) => { activeEntry.scaleLengthUm = Math.min(Number(value) * unitFactor(activeEntry.scaleUnit || 'um'), maxZoomScaleLength(activeEntry) ?? Infinity); }} />
                   <select aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
                     <option value="nm">nm</option><option value="um">μm</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">inch</option>
                   </select>

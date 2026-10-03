@@ -161,23 +161,39 @@ function scaleFindRaster(item, result) {
     }
 }
 
+function scaleIsMergedImage(item) {
+    // Recognize older results by name too; new groups retain a persistent note.
+    return item.typename === "GroupItem" &&
+        (/^SCI_MERGE_CHANNELS:1(?:\n|$)/.test(item.note || "") || item.name === "SCI Merge Channels — Screen");
+}
+
 function scaleReadFov(item) {
     var stored = scaleReadStoredFov(item);
     if (stored) return stored;
     var rasters = [];
     scaleFindRaster(item, rasters);
-    if (rasters.length !== 1) return null;
-    var image = rasters[0], fov = scaleReadStoredFov(image);
-    if (!fov) {
-        try { fov = readScaleTiff(image.file); } catch (fileError) {}
+    if (!rasters.length || (rasters.length !== 1 && !scaleIsMergedImage(item))) return null;
+    var result = null;
+    for (var i = 0; i < rasters.length; i++) {
+        var image = rasters[i], fov = scaleReadStoredFov(image);
+        if (!fov) {
+            try { fov = readScaleTiff(image.file); } catch (fileError) {}
+        }
+        if (!fov) return null;
+        if (image !== item) {
+            var full = image.geometricBounds, view = getVisibleBounds(item) || item.geometricBounds;
+            fov = { width: fov.width * (view[2] - view[0]) / (full[2] - full[0]),
+                height: fov.height * (view[1] - view[3]) / (full[1] - full[3]), unit: fov.unit, source: fov.source };
+        }
+        if (!validScaleFov(fov)) return null;
+        if (result) {
+            var factor = scaleUnitFactor(fov.unit) / scaleUnitFactor(result.unit);
+            // Conflicting channel calibrations need an explicit manual FOV.
+            if (Math.abs(result.width - fov.width * factor) > Math.max(1, result.width) * 0.000001 ||
+                Math.abs(result.height - fov.height * factor) > Math.max(1, result.height) * 0.000001) return null;
+        } else result = fov;
     }
-    if (!fov) return null;
-    if (image !== item) {
-        var full = image.geometricBounds, view = getVisibleBounds(item) || item.geometricBounds;
-        fov = { width: fov.width * (view[2] - view[0]) / (full[2] - full[0]),
-            height: fov.height * (view[1] - view[3]) / (full[1] - full[3]), unit: fov.unit, source: fov.source };
-    }
-    return validScaleFov(fov) ? fov : null;
+    return result;
 }
 
 function scaleReadOptions(item) {
@@ -212,7 +228,7 @@ function scaleSelectionTarget(doc) {
     item = scaleWrapperPicture(item);
     var rasters = [];
     scaleFindRaster(item, rasters);
-    if (rasters.length !== 1) throw new Error("errors.scaleSelection");
+    if (rasters.length !== 1 && !(rasters.length > 1 && scaleIsMergedImage(item))) throw new Error("errors.scaleSelection");
     return item;
 }
 
@@ -248,7 +264,8 @@ function validateScaleOptions(options, fov) {
         (options.unit && !scaleUnitFactor(options.unit))) throw new Error("errors.scaleOptions");
     if (!validScaleFov(fov, options.orientation)) throw new Error("errors.scaleFov");
     var dimension = options.orientation === "vertical" ? fov.height : fov.width;
-    if (options.lengthUm > dimension * scaleUnitFactor(fov.unit)) throw new Error("errors.scaleTooLong");
+    // Clamp before every draw, including inherited bars and crop tracking.
+    options.lengthUm = Math.min(options.lengthUm, dimension * scaleUnitFactor(fov.unit) * 0.9);
 }
 
 function scaleColor(hex) {
@@ -338,6 +355,7 @@ function scaleDrawBar(doc, target, fov, options) {
         addTag(target, "SCI_SCALE_ID", key);
         addTag(target, "SCI_SCALE_OPTIONS", JSON.stringify(options));
         scaleWriteFov(target, fov);
+        if (options.autoGroup && target.typename === "GroupItem" && !target.clipped) bar.moveToBeginning(target);
         if (options.autoGroup && target.clipped) {
             // Keep the clipping path topmost and the annotation above pixels.
             bar.moveToBeginning(target);

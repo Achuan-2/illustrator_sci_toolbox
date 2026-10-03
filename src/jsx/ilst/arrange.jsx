@@ -50,6 +50,7 @@ function getFontFullName(fontFamily, bold) {
 function getVisibleBounds(o) {
     var bounds, clippedItem, sandboxItem, sandboxLayer;
     var curItem;
+    if (getTag(o, "SCI_SCALE_BAR")) return undefined;
     if (getTag(o, "SCI_SCALE_WRAPPER")) {
         var scalePicture = scaleWrapperPicture(o);
         if (scalePicture !== o) return getVisibleBounds(scalePicture);
@@ -2320,6 +2321,7 @@ function readZoomEntries(doc, sourceItem) {
                 originalZoomRotation: 0,
                 scaleLengthUm: scaleReadOptions(zoom) ? scaleReadOptions(zoom).lengthUm : null,
                 scaleUnit: scaleReadOptions(zoom) ? scaleReadOptions(zoom).unit : null,
+                scaleOrientation: scaleReadOptions(zoom) ? scaleReadOptions(zoom).orientation : null,
                 preservesLayout: true
             });
         } catch (recordError) {}
@@ -2609,6 +2611,7 @@ function inspectZoomTarget() {
         previewIsTemporary: !linkedPreview,
         existingEntries: existingEntries,
         sourceScalebar: scaleReadOptions(sourceItem),
+        sourceFov: scaleReadFov(sourceItem),
         manualRect: manualRectInfo
     };
 
