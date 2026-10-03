@@ -90,6 +90,8 @@ test('scalebar preferences reject invalid storage and retain valid style fields'
   assert.equal(style.bold, true);
   assert.equal('unit' in style, false);
   assert.deepEqual(readSettings({ getItem: () => JSON.stringify({ scalebarStyle: style }) }).scalebarStyle, style);
+  const hiddenStyle = { ...style, lengthUm: 0 };
+  assert.deepEqual(readSettings({ getItem: () => JSON.stringify({ scalebarStyle: hiddenStyle }) }).scalebarStyle, hiddenStyle);
 });
 
 test('language, zero offsets and false values survive persistence and reopening', () => {

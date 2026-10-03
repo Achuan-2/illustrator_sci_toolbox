@@ -130,6 +130,14 @@ test('explicit TIFF FOV clamps lengths to 90% along the selected axis before dra
   const shorter = { ...options, lengthUm: 20 };
   context.validateScaleOptions(shorter, fov);
   assert.equal(shorter.lengthUm, 20);
+  const hidden = { ...options, lengthUm: 0 };
+  context.validateScaleOptions(hidden, fov);
+  assert.equal(hidden.lengthUm, 0);
+  for (const lengthUm of [-1, NaN, null, undefined])
+    assert.throws(
+      () => context.validateScaleOptions({ ...options, lengthUm }, fov),
+      /errors.scaleOptions/
+    );
   assert.throws(
     () => context.validateScaleOptions({ ...options, thickness: NaN }, fov),
     /errors.scaleOptions/

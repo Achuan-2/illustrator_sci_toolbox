@@ -28,7 +28,7 @@ var pseudocolorRootNote = "SCI_PSEUDOCOLOR_ROOT:1";
 function pseudocolorDirectChildren(group) {
     var children = [];
     for (var i = 0; i < group.pageItems.length; i++) {
-        if (group.pageItems[i].parent === group) children.push(group.pageItems[i]);
+        if (group.pageItems[i].parent === group && !getTag(group.pageItems[i], "SCI_SCALE_BAR")) children.push(group.pageItems[i]);
     }
     return children;
 }
@@ -36,12 +36,12 @@ function pseudocolorDirectChildren(group) {
 function pseudocolorLayerParts(item) {
     if (item.typename !== "GroupItem") return null;
     var children = pseudocolorDirectChildren(item), channel = item;
-    if (item.note === pseudocolorRootNote || item.name.indexOf("SCI Pseudocolor ") === 0) {
+    if (/^SCI_PSEUDOCOLOR_ROOT:1(?:\n|$)/.test(item.note || "") || item.name.indexOf("SCI Pseudocolor ") === 0) {
         if (children.length !== 1 || children[0].typename !== "GroupItem") return null;
         channel = children[0]; children = pseudocolorDirectChildren(channel);
     }
     var note = channel.note || "", match = /^LUT (red|green|blue|cyan|magenta|yellow|grays) — /.exec(channel.name);
-    var lut = note.indexOf(pseudocolorChannelPrefix) === 0 ? note.substring(pseudocolorChannelPrefix.length) : match && match[1];
+    var lut = note.indexOf(pseudocolorChannelPrefix) === 0 ? note.substring(pseudocolorChannelPrefix.length).split("\n")[0] : match && match[1];
     if (!lut || !pseudocolorLayerRGB(lut)) return null;
     var source = null, tint = null, backdrop = null;
     for (var i = 0; i < children.length; i++) {
@@ -81,6 +81,12 @@ function pseudocolorSameBounds(a, b) {
 }
 
 function readPseudocolorLayerEntry(item, doc) {
+    var wrapper = null;
+    if (getTag(item, "SCI_SCALE_WRAPPER")) {
+        wrapper = item;
+        item = scaleWrapperPicture(item);
+        if (pseudocolorDirectChildren(wrapper).length !== 1) throw new Error(sciError("errors.layerImage"));
+    } else if (getTag(item.parent, "SCI_SCALE_WRAPPER")) wrapper = item.parent;
     var parts = pseudocolorLayerParts(item);
     // Direct-selecting the source copy should update its existing result too.
     if (!parts && (item.typename === "PlacedItem" || item.typename === "RasterItem")) {
@@ -93,7 +99,8 @@ function readPseudocolorLayerEntry(item, doc) {
     }
     var source = parts ? parts.source : item;
     if ((!parts && source.typename !== "PlacedItem" && source.typename !== "RasterItem") ||
-        !pseudocolorEditable(item, doc) || !pseudocolorEditable(source, doc))
+        !pseudocolorEditable(item, doc) || !pseudocolorEditable(source, doc) ||
+        (wrapper && (!pseudocolorEditable(wrapper, doc) || wrapper.opacity !== 100 || wrapper.blendingMode !== BlendModes.NORMAL)))
         throw new Error(sciError("errors.layerImage"));
     var matrix = source.matrix;
     if (item.opacity !== 100 || source.opacity !== 100 ||
@@ -105,11 +112,36 @@ function readPseudocolorLayerEntry(item, doc) {
     if (b[2] <= b[0] || b[1] <= b[3]) throw new Error(sciError("errors.layerImage"));
     if (parts && (!pseudocolorEditable(parts.tint, doc) || parts.tint.opacity !== 100 ||
         parts.channel.opacity !== 100 ||
-        !pseudocolorSameBounds(b, item.geometricBounds) || !pseudocolorSameBounds(b, parts.tint.geometricBounds) ||
+        !pseudocolorSameBounds(b, getVisibleBounds(item) || item.geometricBounds) || !pseudocolorSameBounds(b, parts.tint.geometricBounds) ||
         (parts.backdrop && (!pseudocolorEditable(parts.backdrop, doc) || !pseudocolorSameBounds(b, parts.backdrop.geometricBounds)))))
         throw new Error(sciError("errors.layerImage"));
-    return {item:item,parent:item.parent,source:source,sourceParent:source.parent,
+    var picture = item;
+    if (wrapper) item = wrapper;
+    return {item:item,picture:picture,parent:item.parent,source:source,sourceParent:source.parent,
+        fov:scaleReadFov(picture),scalebar:scaleReadOptions(picture),
         parts:parts,lut:parts ? parts.lut : null,name:source.name || "Image",bounds:[b[0],b[1],b[2],b[3]]};
+}
+
+function pseudocolorSharedScalebar(targets, indices) {
+    var first = targets[indices[0]], options = first.scalebar, fov = first.fov;
+    if (!options || !validScaleFov(fov, options.orientation)) return null;
+    // Grouping does not affect appearance. Length, units, style and physical
+    // calibration must agree before one editable scale can represent all channels.
+    var keys = ["orientation","lengthUm","thickness","color","showText","fontColor","fontSize","bold","position"];
+    for (var i = 1; i < indices.length; i++) {
+        var other = targets[indices[i]], otherOptions = other.scalebar, otherFov = other.fov;
+        if (!otherOptions || !validScaleFov(otherFov, otherOptions.orientation) ||
+            scaleUnitName(options.unit || fov.unit) !== scaleUnitName(otherOptions.unit || otherFov.unit)) return null;
+        for (var k = 0; k < keys.length; k++) {
+            if (options[keys[k]] !== otherOptions[keys[k]]) return null;
+        }
+        var factor = scaleUnitFactor(otherFov.unit) / scaleUnitFactor(fov.unit);
+        if (Math.abs(fov.width - otherFov.width * factor) > Math.max(1, fov.width) * 0.000001 ||
+            Math.abs(fov.height - otherFov.height * factor) > Math.max(1, fov.height) * 0.000001) return null;
+    }
+    var shared = {fov:JSON.parse(JSON.stringify(fov)),options:JSON.parse(JSON.stringify(options))};
+    shared.options.autoGroup = true;
+    return shared;
 }
 
 function readPseudocolorLayerTargets() {
@@ -150,13 +182,17 @@ function validatePseudocolorLayerSession(session) {
         var target = session.targets[i];
         try {
             var current = readPseudocolorLayerEntry(target.item, session.document);
-            if (current.parent !== target.parent || current.source !== target.source ||
+            if (current.parent !== target.parent || current.picture !== target.picture || current.source !== target.source ||
                 current.sourceParent !== target.sourceParent || current.lut !== target.lut ||
                 !!current.parts !== !!target.parts ||
                 (current.parts && (current.parts.channel !== target.parts.channel || current.parts.tint !== target.parts.tint)))
                 return sciError("errors.pseudocolorStale");
             if (!pseudocolorSameBounds(current.bounds, target.bounds))
                 return sciError("errors.pseudocolorStale");
+            // Scale edits do not invalidate channel geometry; use their latest
+            // calibration/style when the user confirms the merge.
+            target.fov = current.fov;
+            target.scalebar = current.scalebar;
         } catch (error) { return sciError("errors.pseudocolorStale"); }
     }
     return null;
@@ -176,6 +212,10 @@ function makePseudocolorLayerGroup(parent, entry, lut, left, top) {
     backdrop.note = "SCI_PSEUDOCOLOR_BACKGROUND:1";
     backdrop.stroked = false; backdrop.filled = true; backdrop.fillColor = black;
     var image = entry.source.duplicate(group, ElementPlacement.PLACEATBEGINNING);
+    // The copied pixels need their calibration, but scale IDs/options belong
+    // to the original picture. A merged result owns one separate annotation.
+    scaleClearDuplicate(image);
+    if (entry.fov) scaleWriteFov(image, entry.fov);
     image.name = entry.parts ? entry.source.name : "Source " + entry.name;
     image.translate(left - b[0], top - b[1]);
     image.blendingMode = BlendModes.NORMAL;
@@ -251,6 +291,11 @@ function applyPseudocolorLayers(payload) {
                 var left = entry.bounds[0];
                 if (request.keepOriginal !== false) left = entry.bounds[2] + 10;
                 makePseudocolorLayerGroup(root, entry, request.lut, left, entry.bounds[1]);
+                if (entry.scalebar && entry.fov) {
+                    var batchScale = JSON.parse(JSON.stringify(entry.scalebar));
+                    batchScale.autoGroup = true;
+                    scaleDrawBar(doc, root, entry.fov, batchScale);
+                }
             }
             // Stage new results first, then recolor existing groups in place.
             // Retain snapshots before setters so a failed mixed batch can roll back.
@@ -272,6 +317,8 @@ function applyPseudocolorLayers(payload) {
                 var channel = makePseudocolorLayerGroup(merged, session.targets[index], channels[index].lut, right+10, first.bounds[1]);
                 channel.blendingMode = m === 0 ? BlendModes.NORMAL : BlendModes.SCREEN;
             }
+            var sharedScale = pseudocolorSharedScalebar(session.targets, indices);
+            if (sharedScale) scaleDrawBar(doc, merged, sharedScale.fov, sharedScale.options);
         }
     } catch (error) {
         for (var v = updated.length - 1; v >= 0; v--) {

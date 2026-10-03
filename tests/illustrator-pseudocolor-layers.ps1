@@ -30,6 +30,7 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
     // Compile in a private scope without replacing the installed dispatcher.
     var api = new Function("JSON", read("/src/jsx/ilst/arrange.jsx") +
         read("/src/jsx/ilst/pseudocolorLayers.jsx") +
+        read("/src/jsx/ilst/scalebar.jsx") +
         ';return {applyLayers:applyPseudocolorLayers,' +
         'inspectLayers:inspectPseudocolorLayerTargets,' +
         'failSecondCopy:function(){var original=makePseudocolorLayerGroup,count=0;' +

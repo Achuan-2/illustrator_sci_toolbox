@@ -258,7 +258,7 @@ function inspectScalebar(previousSignature) {
 }
 
 function validateScaleOptions(options, fov) {
-    if (!options || !(options.lengthUm > 0) || !isFinite(options.lengthUm) || !(options.thickness > 0) || !isFinite(options.thickness) ||
+    if (!options || typeof options.lengthUm !== "number" || options.lengthUm < 0 || !isFinite(options.lengthUm) || !(options.thickness > 0) || !isFinite(options.thickness) ||
         !(options.fontSize > 0) || !isFinite(options.fontSize) || !/^(horizontal|vertical)$/.test(options.orientation) ||
         !/^(TL|TR|BL|BR)$/.test(options.position) || !/^#[0-9a-f]{6}$/i.test(options.color) || !/^#[0-9a-f]{6}$/i.test(options.fontColor) ||
         (options.unit && !scaleUnitFactor(options.unit))) throw new Error("errors.scaleOptions");
@@ -296,6 +296,14 @@ function scaleRemoveBars(doc, target) {
 function scaleDrawBar(doc, target, fov, options) {
     validateScaleOptions(options, fov);
     options.unit = scaleUnitName(options.unit || fov.unit);
+    if (options.lengthUm === 0) {
+        // Zero is a saved hidden state. Remove both the bar and its label while
+        // retaining calibration/style so a positive length restores the scale.
+        scaleRemoveBars(doc, target);
+        addTag(target, "SCI_SCALE_OPTIONS", JSON.stringify(options));
+        scaleWriteFov(target, fov);
+        return getTag(target.parent, "SCI_SCALE_WRAPPER") ? target.parent : target;
+    }
     var bounds = getVisibleBounds(target) || target.geometricBounds;
     var width = bounds[2] - bounds[0], height = bounds[1] - bounds[3];
     var vertical = options.orientation === "vertical";

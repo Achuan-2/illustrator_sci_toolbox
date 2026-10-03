@@ -64,7 +64,7 @@
   "layers.read": "读取所选通道",
   "layers.success": "已为 {count} 张图片创建或更新可编辑的伪彩图层组合。",
   "layers.mergeSuccess": "已将 {count} 个通道叠加为可编辑组合，全部原图已保留。",
-  "errors.layerImage": "请选择未旋转、不透明度为 100% 的单张图片或本插件的伪彩组合。普通图片需使用正常混合；原图、颜色层和背景应保持对齐。不支持其他组合或剪切蒙版。",
+  "errors.layerImage": "请选择未旋转、不透明度为 100% 的单张图片、带比例尺的图片或本插件的伪彩组合。普通图片需使用正常混合；原图、颜色层和背景应保持对齐。不支持其他组合或剪切蒙版。",
   "errors.layerOptions": "图层模式仅支持红、绿、蓝、青、品红、黄和灰色，请重新设置颜色或读取通道。",
   "errors.layerApply": "创建伪彩图层失败：{0}",
   "merge.title": "合并通道（Merge Channels）",
@@ -342,7 +342,7 @@
   "scale.autoSaved": "已自动保存。",
   "errors.scaleSelection": "请选择一张图片、包含一张图片的编组，或已有比例尺。",
   "errors.scaleFov": "请输入当前比例尺方向对应的 FOV 尺寸和单位。",
-  "errors.scaleOptions": "比例尺长度、厚度和字号必须大于 0，请检查参数。",
+  "errors.scaleOptions": "比例尺长度不能小于 0，厚度和字号必须大于 0，请检查参数。",
   "errors.scaleTooLong": "比例尺代表的长度超过图片或放大区域的 FOV，请减小比例尺长度。",
   "errors.scaleTargetChanged": "选中的图片已改变，请重新读取图片信息后再保存。",
   "errors.scaleTiff": "源 TIFF 中没有可读取的 FOV / ImageJ / OME 标定信息。"

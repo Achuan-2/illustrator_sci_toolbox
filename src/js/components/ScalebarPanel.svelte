@@ -150,7 +150,8 @@
     // An incomplete numeric input stays editable until a valid value is entered.
     if (
       !payload.saveOnly &&
-      (!(payload.options.lengthUm > 0) ||
+      (!Number.isFinite(payload.options.lengthUm) ||
+        payload.options.lengthUm < 0 ||
         !(payload.options.thickness > 0) ||
         !(payload.options.fontSize > 0))
     )

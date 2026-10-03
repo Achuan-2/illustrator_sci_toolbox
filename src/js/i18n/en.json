@@ -64,7 +64,7 @@
   "layers.read": "Read Selected Channels",
   "layers.success": "Created or updated editable pseudocolor groups for {count} image(s).",
   "layers.mergeSuccess": "Overlaid {count} channels in an editable group. All originals were kept.",
-  "errors.layerImage": "Select unrotated individual images or this plugin\\'s pseudocolor groups with 100% opacity. Plain images require Normal blending; sources, tint objects and backdrops must stay aligned. Other groups and clipping masks are unsupported.",
+  "errors.layerImage": "Select unrotated individual images, images with scalebars or this plugin\\'s pseudocolor groups with 100% opacity. Plain images require Normal blending; sources, tint objects and backdrops must stay aligned. Other groups and clipping masks are unsupported.",
   "errors.layerOptions": "Layer mode supports red, green, blue, cyan, magenta, yellow and gray only. Set the colors again or reread the channels.",
   "errors.layerApply": "Could not create pseudocolor layers: {0}",
   "merge.title": "Merge Channels",
@@ -342,7 +342,7 @@
   "scale.autoSaved": "Saved automatically.",
   "errors.scaleSelection": "Select one image, a group containing one image, or an existing scalebar.",
   "errors.scaleFov": "Enter a valid FOV dimension for the current bar orientation and a unit.",
-  "errors.scaleOptions": "Scalebar length, thickness and font size must be positive. Check the settings.",
+  "errors.scaleOptions": "Scalebar length must be nonnegative; thickness and font size must be positive. Check the settings.",
   "errors.scaleTooLong": "The scalebar exceeds the image or zoom region FOV. Use a shorter length.",
   "errors.scaleTargetChanged": "The selected image changed. Read its information again before saving.",
   "errors.scaleTiff": "No supported FOV, ImageJ or OME calibration was found in the source TIFF."

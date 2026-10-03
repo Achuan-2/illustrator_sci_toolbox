@@ -783,6 +783,26 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
   } finally { await panel.window.happyDOM.close(); }
 });
 
+test('zero scalebar length autosaves its hidden state and a positive value restores it without adding again', async () => {
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar');
+  try {
+    await panel.input('scale-length', '0');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const hidden = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(hidden.options.lengthUm, 0);
+    assert.equal(hidden.saveOnly, false);
+    assert.equal(hidden.autoSave, true);
+    assert.equal(panel.window.document.getElementById('apply-scalebar-button'), null);
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).scalebarStyle.lengthUm, 0);
+    await panel.input('scale-length', '0.005');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const restored = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(restored.options.lengthUm, 50);
+    assert.equal(restored.autoSave, true);
+    assert.equal(panel.window.document.querySelector('[role="alert"]'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
 test('scalebar form clamps saved styles, typed lengths and smaller FOVs to 90% with converted units', async () => {
   const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar', (window) => {
     (window as any).__scaleSelection = { token: 'small', signature: 'small', documentKey: 'test.ai',
@@ -1360,6 +1380,8 @@ test('standalone zoom window restores source units and edits represented length 
     assert.equal(panel.element('zoom-scale-length').getAttribute('max'), '0.0216');
     await panel.input('zoom-scale-length', '1');
     assert.equal((panel.element('zoom-scale-length') as any).value, '0.0216');
+    await panel.input('zoom-scale-length', '0');
+    assert.equal((panel.element('zoom-scale-length') as any).value, '0');
     await panel.input('zoom-scale-length', '0.01');
 
     await panel.click('zoom-auto-update');

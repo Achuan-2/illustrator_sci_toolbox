@@ -84,7 +84,11 @@ export function normalizeScalebarStyle(
   const result: ScalebarStyle = { ...fallback };
   for (const key of ['lengthUm', 'thickness', 'fontSize'] as const) {
     const item = saved[key];
-    if (typeof item === 'number' && Number.isFinite(item) && item > 0)
+    if (
+      typeof item === 'number' &&
+      Number.isFinite(item) &&
+      (key === 'lengthUm' ? item >= 0 : item > 0)
+    )
       result[key] = item;
   }
   for (const key of ['color', 'fontColor'] as const)
