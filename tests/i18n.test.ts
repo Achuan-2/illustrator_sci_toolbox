@@ -75,6 +75,23 @@ test('default English, legacy settings and malformed storage normalize safely', 
   );
 });
 
+test('scalebar preferences reject invalid storage and retain valid style fields', () => {
+  for (const saved of [null, [], 'bad', { lengthUm: -1, fontSize: 0, thickness: Infinity,
+    color: 'red', fontColor: null, orientation: 'diagonal', position: 'center', bold: 'true' }]) {
+    assert.deepEqual(normalizeSettings({ scalebarStyle: saved }).scalebarStyle, defaults.scalebarStyle);
+  }
+  const style = normalizeSettings({ scalebarStyle: { ...defaults.scalebarStyle, lengthUm: 100,
+    thickness: 4, fontSize: 15, showText: false, autoGroup: false, bold: true,
+    orientation: 'vertical', position: 'TL', color: '#00ff00', fontColor: '#ff0000', unit: 'cm' } }).scalebarStyle;
+  assert.equal(style.lengthUm, 100);
+  assert.equal(style.orientation, 'vertical');
+  assert.equal(style.showText, false);
+  assert.equal(style.autoGroup, false);
+  assert.equal(style.bold, true);
+  assert.equal('unit' in style, false);
+  assert.deepEqual(readSettings({ getItem: () => JSON.stringify({ scalebarStyle: style }) }).scalebarStyle, style);
+});
+
 test('language, zero offsets and false values survive persistence and reopening', () => {
   const stored = new Map<string, string>();
   const storage = {

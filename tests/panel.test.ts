@@ -731,6 +731,7 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
   try {
     assert.equal(panel.requests.filter((r) => r.operation === 'inspectScalebar').length, 1);
     assert.equal((panel.element('fov-width') as any).value, '0.2');
+    assert.equal(panel.window.document.getElementById('fov-height'), null);
     assert.equal((panel.element('fov-unit') as any).value, 'cm');
     assert.equal((panel.element('scale-length') as any).value, '0.0075');
     assert.equal((panel.element('scale-unit') as any).value, 'cm');
@@ -738,6 +739,7 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
     for (const id of ['inspect-scalebar-button', 'import-scale-tiff-button', 'save-fov-button', 'apply-scalebar-button'])
       assert.equal(panel.window.document.getElementById(id), null);
     await panel.input('scale-orientation', 'vertical');
+    assert.equal(panel.window.document.getElementById('fov-width'), null);
     assert.equal(panel.element('scale-length').previousElementSibling?.textContent, 'Height (cm):');
     await panel.input('scale-length', '0.01');
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -749,10 +751,10 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
     assert.equal(payload.options.orientation, 'vertical'); assert.equal(payload.options.lengthUm, 100);
     assert.equal(payload.options.unit, 'cm'); assert.equal(payload.autoSave, true);
     assert.equal(payload.options.bold, true); assert.equal(payload.options.fontColor, '#ff0000');
-    await panel.input('fov-width', '0.3');
+    await panel.input('fov-height', '0.3');
     await new Promise((resolve) => setTimeout(resolve, 300));
     const saved = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
-    assert.equal(saved.fov.width, 0.3); assert.equal(saved.saveOnly, false);
+    assert.equal(saved.fov.height, 0.3); assert.equal(saved.saveOnly, false);
     await panel.input('fov-unit', 'mm');
     assert.equal((panel.element('scale-unit') as any).value, 'mm');
     assert.equal((panel.element('scale-length') as any).value, '0.1');
@@ -761,9 +763,11 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
     (panel.window as any).__scaleSelection = { token: 'second-image', signature: 'second-image', documentKey: 'test.ai',
       fov: { width: 2, height: 1, unit: 'mm' }, options: null };
     await new Promise((resolve) => setTimeout(resolve, 400));
-    assert.equal((panel.element('fov-width') as any).value, '2');
+    assert.equal((panel.element('fov-height') as any).value, '1');
     assert.equal((panel.element('scale-unit') as any).value, 'mm');
-    assert.equal((panel.element('scale-length') as any).value, '0.05');
+    assert.equal((panel.element('scale-length') as any).value, '0.1');
+    assert.equal((panel.element('scale-font-size') as any).value, '12');
+    assert.equal((panel.element('scale-bold') as any).checked, true);
     assert.equal(panel.element('apply-scalebar-button').textContent, '添加比例尺');
     await panel.input('fov-height', '1.5');
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -774,6 +778,79 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
     assert.equal(JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string).autoSave, false);
     assert.deepEqual(panel.alerts, []);
   } finally { await panel.window.happyDOM.close(); }
+});
+
+test('width-only FOV saves and creates a bar, and styles persist across panel reloads without copying calibration', async () => {
+  const selectNewImage = (window: Window) => {
+    (window as any).__scaleSelection = {
+      token: 'width-only-image', signature: 'width-only-image', documentKey: 'test.ai',
+      fov: null, options: null
+    };
+  };
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar', selectNewImage);
+  let stored = '';
+  try {
+    assert.equal(panel.window.document.getElementById('fov-height'), null);
+    await panel.input('fov-width', '500');
+    await panel.input('scale-length', '100');
+    await panel.input('scale-thickness', '4');
+    await panel.input('scale-position', 'TL');
+    await panel.input('scale-color', '#00ff00');
+    await panel.input('scale-font-color', '#ff0000');
+    await panel.input('scale-font-size', '15');
+    await panel.click('scale-bold');
+    await panel.click('scale-auto-group');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const saved = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(saved.fov.width, 500);
+    assert.equal(saved.fov.height, 0);
+    assert.equal(saved.saveOnly, true);
+    await panel.click('apply-scalebar-button');
+    const added = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(added.saveOnly, false);
+    assert.equal(added.options.lengthUm, 100);
+    stored = panel.window.localStorage.getItem(storageKey)!;
+    const preferred = JSON.parse(stored).scalebarStyle;
+    assert.equal(preferred.thickness, 4);
+    assert.equal(preferred.position, 'TL');
+    assert.equal('unit' in preferred, false);
+    assert.equal('fov' in preferred, false);
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel(stored, true, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    selectNewImage(window);
+    (window as any).__scaleSelection.fov = { width: 2, height: 0, unit: 'mm' };
+  });
+  try {
+    assert.equal((reopened.element('fov-width') as any).value, '2');
+    assert.equal((reopened.element('scale-length') as any).value, '0.1');
+    assert.equal((reopened.element('scale-unit') as any).value, 'mm');
+    assert.equal((reopened.element('scale-thickness') as any).value, '4');
+    assert.equal((reopened.element('scale-position') as any).value, 'TL');
+    assert.equal((reopened.element('scale-color') as any).value, '#00ff00');
+    assert.equal((reopened.element('scale-font-color') as any).value, '#ff0000');
+    assert.equal((reopened.element('scale-font-size') as any).value, '15');
+    assert.equal((reopened.element('scale-bold') as any).checked, true);
+    assert.equal((reopened.element('scale-auto-group') as any).checked, false);
+    await reopened.input('scale-orientation', 'vertical');
+    assert.equal(reopened.window.document.getElementById('fov-width'), null);
+    assert.equal((reopened.element('fov-height') as any).value, '0');
+    const count = reopened.requests.filter((r) => r.operation === 'applyScalebar').length;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(reopened.requests.filter((r) => r.operation === 'applyScalebar').length, count);
+    await reopened.input('fov-height', '1');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(JSON.parse(reopened.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string).fov.height, 1);
+    (reopened.window as any).__scaleSelection = {
+      token: 'existing-image', signature: 'existing-image', documentKey: 'test.ai',
+      fov: { width: 500, height: 200, unit: 'um' },
+      options: { orientation: 'horizontal', lengthUm: 50, thickness: 2, color: '#ffffff',
+        showText: false, fontColor: '#ffffff', fontSize: 8, bold: false, position: 'BR', autoGroup: true }
+    };
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((reopened.element('scale-font-size') as any).value, '8');
+    assert.equal((reopened.element('scale-show-text') as any).checked, false);
+    assert.equal(JSON.parse(reopened.window.localStorage.getItem(storageKey)!).scalebarStyle.fontSize, 15);
+  } finally { await reopened.window.happyDOM.close(); }
 });
 
 test('zoom automatic update switch persists and gates background host polling', async () => {

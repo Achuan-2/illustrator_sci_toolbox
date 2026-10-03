@@ -341,7 +341,7 @@
   "scale.barUnit": "Scalebar unit:",
   "scale.autoSaved": "Saved automatically.",
   "errors.scaleSelection": "Select one image, a group containing one image, or an existing scalebar.",
-  "errors.scaleFov": "Enter a valid FOV width, height and unit.",
+  "errors.scaleFov": "Enter a valid FOV dimension for the current bar orientation and a unit.",
   "errors.scaleOptions": "Scalebar length, thickness and font size must be positive. Check the settings.",
   "errors.scaleTooLong": "The scalebar exceeds the image or zoom region FOV. Use a shorter length.",
   "errors.scaleTargetChanged": "The selected image changed. Read its information again before saving.",

@@ -103,8 +103,22 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
             assert(bb[0]>=sb[0]-0.05 && bb[2]<=sb[2]+0.05 && bb[1]<=sb[1]+0.05 && bb[3]>=sb[3]-0.05,"Annotation inside image");
             assert(((bb[0]+bb[2])/2 < (sb[0]+sb[2])/2) === (c%2 === 0),"Left/right corner");
             assert(((bb[1]+bb[3])/2 > (sb[1]+sb[3])/2) === (c<2),"Top/bottom corner");
+            var alignedBar=barFor(source), pathBounds=barPath(alignedBar).geometricBounds;
+            var textBounds=alignedBar.textFrames[0].geometricBounds;
+            if (o) near(textBounds[c<2 ? 1 : 3],pathBounds[c<2 ? 1 : 3],"Vertical text aligns with top/bottom bar edge");
+            else near(textBounds[c%2 === 0 ? 0 : 2],pathBounds[c%2 === 0 ? 0 : 2],"Horizontal text aligns with left/right bar edge");
         }
-        checks.push("horizontal/vertical bars at all four corners and editing without duplicates");
+        checks.push("horizontal/vertical bars at all four corners, aligned text edges and editing without duplicates");
+        options.orientation="horizontal";
+        apply(wrapper,{width:1000,height:0,unit:"um"},options);
+        assertBar(source,50,"Width-only FOV draws horizontal bar");
+        near(inspect(wrapper).fov.height,0,"Unknown height survives metadata reload");
+        info=inspect(wrapper); options.orientation="vertical";
+        assert(api.apply(JSON.stringify({token:info.token,fov:{width:1000,height:0,unit:"um"},options:options})).indexOf("errors.scaleFov")>=0,"Vertical bar requires known height");
+        apply(wrapper,{width:0,height:500,unit:"um"},options);
+        assertBar(source,50,"Height-only FOV draws vertical bar");
+        near(inspect(wrapper).fov.width,0,"Unknown width survives metadata reload");
+        checks.push("single-axis FOV creation, editing and stored metadata without guessing the other dimension");
         options.orientation="horizontal"; options.position="BR"; options.lengthUm=50;
         apply(wrapper,fov,options);
         api=makeApi(); info=inspect(barFor(source).textFrames[0]);
@@ -165,6 +179,9 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         assert(api.tag(wrapper,"SCI_SCALE_WRAPPER"),"Regrouping creates a wrapper");
         assertBar(source,50,"Regrouped scale");
         checks.push("grouping can be disabled and restored without duplicate bars");
+        // A source with only horizontal calibration must also support zoom
+        // creation, custom lengths and crop/size tracking without a height.
+        apply(wrapper,{width:1000,height:0,unit:"um"},options);
         var entry={recordKey:null,name:"scale zoom",region:{x:0.1,y:0.1,width:0.5,height:0.5},regionRotation:0,
             strokeColor:"#ff0000",strokeWidth:1.5,strokeDash:"solid",useRectangleColor:true,addGuideLines:true,
             placement:"right",guideLineExtent:"acrossImages",preservesLayout:false};
@@ -173,6 +190,7 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         var saved=api.entries(doc,source), key=saved[0].recordKey;
         var zoom=api.find(doc,"ILST_ZOOM_ITEM_"+key);
         near(api.fov(zoom).width,500,"Zoom physical FOV"); assertBar(zoom,50,"Zoom inherits represented length");
+        near(api.fov(zoom).height,0,"Zoom preserves unknown perpendicular FOV");
         var initialBounds=api.bounds(zoom);
         saved[0].scaleLengthUm=100; doc.selection=null; wrapper.selected=true;
         assert(api.zoom(JSON.stringify({entries:saved,deletedKeys:[]})) === "Success","Edit zoom represented length");
@@ -186,12 +204,14 @@ $taskScript = '(function(){ var repositoryRoot=' + (ConvertTo-Json $taskRoot -Co
         var marker=api.find(doc,"ILST_ZOOM_MARKER_"+key), mb=api.bounds(marker);
         api.setBounds(marker,[mb[0],mb[1],mb[0]+100,mb[3]]); api.sync();
         near(api.fov(zoom).width,250,"Crop edit updates zoom FOV"); assertBar(zoom,100,"Crop edit recalibrates scale");
-        checks.push("zoom inheritance, custom length, manual sizing, source movement and crop calibration");
+        checks.push("width-only FOV zoom inheritance, custom length, manual sizing, source movement and crop calibration");
         doc.selection=null; wrapper.selected=true;
         var previewInfo=JSON.parse(api.zoomInspect()); preview=new File(previewInfo.previewPath);
         assert(previewInfo.sourceScalebar.lengthUm===50,"Zoom editor receives source scale length");
         assert(previewInfo.existingEntries[0].scaleLengthUm===100,"Zoom editor receives custom scale length");
         checks.push("zoom editor reads source and existing zoom scale settings");
+        apply(wrapper,fov,options);
+        api.sync();
         var saveOptions=new IllustratorSaveOptions(); saveOptions.pdfCompatible=false;
         doc.saveAs(new File(aiPath),saveOptions); doc.close(SaveOptions.DONOTSAVECHANGES);
         doc=null; doc=app.open(new File(aiPath)); api=makeApi();

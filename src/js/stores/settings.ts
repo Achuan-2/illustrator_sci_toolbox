@@ -1,6 +1,10 @@
 import { writable } from 'svelte/store';
 import type { Order } from '../../shared/host';
 import { isLayerColor, type LayerColorId } from '../services/pseudocolorLayers';
+import {
+  normalizeScalebarStyle,
+  type ScalebarStyle
+} from '../services/scalebar';
 
 export type Language = 'en' | 'zh_CN';
 export interface Settings {
@@ -27,6 +31,7 @@ export interface Settings {
   pseudocolorLut: LayerColorId;
   pseudocolorKeepOriginal: boolean;
   pseudocolorDefaultsVersion: number;
+  scalebarStyle: ScalebarStyle;
 }
 
 export const storageKey = 'illustrator_sci_plugin_settings';
@@ -53,7 +58,8 @@ export const defaults: Settings = {
   zoomAutoUpdate: true,
   pseudocolorLut: 'red',
   pseudocolorKeepOriginal: false,
-  pseudocolorDefaultsVersion: 1
+  pseudocolorDefaultsVersion: 1,
+  scalebarStyle: normalizeScalebarStyle(null)
 };
 
 export function normalizeSettings(value: unknown): Settings {
@@ -67,6 +73,7 @@ export function normalizeSettings(value: unknown): Settings {
     if (typeof item === 'number' && !Number.isFinite(item)) continue;
     Object.assign(result, { [key]: item });
   }
+  result.scalebarStyle = normalizeScalebarStyle(saved.scalebarStyle);
   // Reset the old auto-saved Keep Originals default once. Subsequent explicit
   // choices retain this version and continue to persist across panel reloads.
   if (saved.pseudocolorDefaultsVersion !== defaults.pseudocolorDefaultsVersion)

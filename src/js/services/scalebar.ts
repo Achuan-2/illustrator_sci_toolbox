@@ -1,5 +1,6 @@
 export type FovUnit = 'nm' | 'um' | 'mm' | 'cm' | 'm' | 'inch';
 export interface ImageFov {
+  // Zero denotes an unknown dimension; each bar requires only its own axis.
   width: number;
   height: number;
   unit: string;
@@ -58,3 +59,32 @@ export const defaultScalebar: ScalebarOptions = {
   position: 'BR',
   autoGroup: true
 };
+
+// Image calibration and units belong to the image. Reusable styles retain the
+// physical length, while new images choose their own FOV unit for display.
+export type ScalebarStyle = Omit<ScalebarOptions, 'unit'>;
+export function normalizeScalebarStyle(
+  value: unknown,
+  fallback: ScalebarStyle = defaultScalebar
+): ScalebarStyle {
+  const saved =
+    value && typeof value === 'object'
+      ? (value as Record<string, unknown>)
+      : {};
+  const result: ScalebarStyle = { ...fallback };
+  for (const key of ['lengthUm', 'thickness', 'fontSize'] as const) {
+    const item = saved[key];
+    if (typeof item === 'number' && Number.isFinite(item) && item > 0)
+      result[key] = item;
+  }
+  for (const key of ['color', 'fontColor'] as const)
+    if (typeof saved[key] === 'string' && /^#[0-9a-f]{6}$/i.test(saved[key]))
+      result[key] = saved[key];
+  for (const key of ['showText', 'bold', 'autoGroup'] as const)
+    if (typeof saved[key] === 'boolean') result[key] = saved[key];
+  if (saved.orientation === 'horizontal' || saved.orientation === 'vertical')
+    result.orientation = saved.orientation;
+  if (['TL', 'TR', 'BL', 'BR'].includes(String(saved.position)))
+    result.position = saved.position as ScalebarStyle['position'];
+  return result;
+}

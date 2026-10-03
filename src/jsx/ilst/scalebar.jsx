@@ -19,8 +19,15 @@ function scaleLabel(options, fov) {
     return String(value) + (unit === "um" ? "μm" : unit);
 }
 
-function validScaleFov(fov) {
-    return fov && isFinite(fov.width) && isFinite(fov.height) && fov.width > 0 && fov.height > 0 && scaleUnitFactor(fov.unit) > 0;
+function validScaleFovDimension(value) {
+    return value === undefined || value === null || (isFinite(value) && value >= 0);
+}
+
+function validScaleFov(fov, orientation) {
+    if (!fov || !validScaleFovDimension(fov.width) || !validScaleFovDimension(fov.height) || !scaleUnitFactor(fov.unit)) return false;
+    if (orientation === "horizontal") return fov.width > 0;
+    if (orientation === "vertical") return fov.height > 0;
+    return fov.width > 0 || fov.height > 0;
 }
 
 function scaleXmlAttribute(text, name) {
@@ -115,7 +122,11 @@ function scaleReadStoredFov(item) {
     try {
         var match = /\[SCI_FOV\]([\s\S]*?)\[\/SCI_FOV\]/.exec(item.note || "");
         var fov = JSON.parse(match ? match[1] : getTag(item, "SCI_FOV"));
-        if (validScaleFov(fov)) return fov;
+        if (validScaleFov(fov)) {
+            if (!fov.width) fov.width = 0;
+            if (!fov.height) fov.height = 0;
+            return fov;
+        }
     } catch (error) {}
     return null;
 }
@@ -231,11 +242,11 @@ function inspectScalebar(previousSignature) {
 }
 
 function validateScaleOptions(options, fov) {
-    if (!validScaleFov(fov)) throw new Error("errors.scaleFov");
     if (!options || !(options.lengthUm > 0) || !isFinite(options.lengthUm) || !(options.thickness > 0) || !isFinite(options.thickness) ||
         !(options.fontSize > 0) || !isFinite(options.fontSize) || !/^(horizontal|vertical)$/.test(options.orientation) ||
         !/^(TL|TR|BL|BR)$/.test(options.position) || !/^#[0-9a-f]{6}$/i.test(options.color) || !/^#[0-9a-f]{6}$/i.test(options.fontColor) ||
         (options.unit && !scaleUnitFactor(options.unit))) throw new Error("errors.scaleOptions");
+    if (!validScaleFov(fov, options.orientation)) throw new Error("errors.scaleFov");
     var dimension = options.orientation === "vertical" ? fov.height : fov.width;
     if (options.lengthUm > dimension * scaleUnitFactor(fov.unit)) throw new Error("errors.scaleTooLong");
 }
@@ -271,6 +282,8 @@ function scaleDrawBar(doc, target, fov, options) {
     var bounds = getVisibleBounds(target) || target.geometricBounds;
     var width = bounds[2] - bounds[0], height = bounds[1] - bounds[3];
     var vertical = options.orientation === "vertical";
+    var right = options.position === "TR" || options.position === "BR";
+    var top = options.position === "TL" || options.position === "TR";
     var length = options.lengthUm / ((vertical ? fov.height : fov.width) * scaleUnitFactor(fov.unit)) * (vertical ? height : width);
     var barWidth = vertical ? options.thickness : length, barHeight = vertical ? length : options.thickness;
     var parent = target.parent, wrapper = null, oldWrapper = null;
@@ -299,13 +312,19 @@ function scaleDrawBar(doc, target, fov, options) {
             attributes.fillColor = scaleColor(options.fontColor);
             attributes.textFont = app.textFonts.getByName(getFontFullName("ArialMT", options.bold));
             var lb = label.geometricBounds, gap = Math.max(2, options.thickness);
-            var tx = vertical ? -gap - (lb[2] - lb[0]) : (barWidth - (lb[2] - lb[0])) / 2;
-            var ty = vertical ? -(barHeight - (lb[1] - lb[3])) / 2 : gap + (lb[1] - lb[3]);
+            // Align the corner-facing text edge with the same bar edge. Keep
+            // editable text at the requested font size, including long labels.
+            var tx, ty;
+            if (vertical) {
+                tx = -gap - (lb[2] - lb[0]);
+                ty = top ? 0 : -(barHeight - (lb[1] - lb[3]));
+            } else {
+                tx = right ? barWidth - (lb[2] - lb[0]) : 0;
+                ty = gap + (lb[1] - lb[3]);
+            }
             label.translate(tx - lb[0], ty - lb[1]);
         }
         var bb = bar.geometricBounds, margin = Math.min(width, height) * 0.04;
-        var right = options.position === "TR" || options.position === "BR";
-        var top = options.position === "TL" || options.position === "TR";
         var left = right ? bounds[2] - margin - (bb[2] - bb[0]) : bounds[0] + margin;
         var barTop = top ? bounds[1] - margin : bounds[3] + margin + (bb[1] - bb[3]);
         // Long labels/bars stay within the picture when there is little margin.
@@ -353,7 +372,9 @@ function applyScalebar(payloadJson) {
             if (!target) return sciError("errors.scaleTargetChanged");
         } else target = scaleSelectionTarget(doc);
         if ((target.uuid || getTag(target, "SCI_SCALE_TARGET")) !== payload.token) return sciError("errors.scaleTargetChanged");
-        if (!validScaleFov(payload.fov)) return sciError("errors.scaleFov");
+        if (!validScaleFov(payload.fov, payload.options && payload.options.orientation)) return sciError("errors.scaleFov");
+        if (!payload.fov.width) payload.fov.width = 0;
+        if (!payload.fov.height) payload.fov.height = 0;
         var currentOptions = payload.options;
         if (payload.saveOnly) currentOptions = scaleReadOptions(target);
         if (currentOptions) validateScaleOptions(currentOptions, payload.fov);

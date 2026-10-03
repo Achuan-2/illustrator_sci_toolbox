@@ -147,3 +147,51 @@ test('FOV note round-trips while preserving unrelated text and tags', () => {
   assert.equal(context.scaleReadStoredFov(item).width, 600);
   assert.equal(context.scaleReadStoredFov(item).height, 250);
 });
+
+test('single-axis FOV validates only the requested orientation and survives notes and crop calibration', () => {
+  const options = {
+    orientation: 'horizontal',
+    lengthUm: 50,
+    thickness: 2,
+    fontSize: 8,
+    color: '#ffffff',
+    fontColor: '#ffffff',
+    position: 'BR'
+  };
+  const horizontal = { width: 100, height: 0, unit: 'um' };
+  const vertical = { width: 0, height: 200, unit: 'um' };
+  assert.doesNotThrow(() => context.validateScaleOptions(options, horizontal));
+  assert.doesNotThrow(() =>
+    context.validateScaleOptions(
+      { ...options, orientation: 'vertical' },
+      vertical
+    )
+  );
+  assert.throws(
+    () =>
+      context.validateScaleOptions(
+        { ...options, orientation: 'vertical' },
+        horizontal
+      ),
+    /errors.scaleFov/
+  );
+  assert.throws(
+    () => context.validateScaleOptions(options, vertical),
+    /errors.scaleFov/
+  );
+  for (const fov of [
+    { ...horizontal, height: NaN },
+    { ...horizontal, height: -1 },
+    { width: 0, height: 0, unit: 'um' }
+  ])
+    assert.equal(context.validScaleFov(fov), false);
+  const item = { note: '' };
+  context.getTag = () => null;
+  context.addTag = () => undefined;
+  context.scaleWriteFov(item, { width: 100, unit: 'um' });
+  assert.deepEqual(plain(context.scaleReadStoredFov(item)), horizontal);
+  assert.deepEqual(
+    plain(context.scaleZoomFov(item, { width: 0.25, height: 0.5 })),
+    { width: 25, height: 0, unit: 'um', source: 'zoom' }
+  );
+});

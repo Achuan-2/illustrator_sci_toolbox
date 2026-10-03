@@ -2,12 +2,14 @@
   import { untrack } from 'svelte';
   import { t } from '../i18n';
   import { bridge, HostError } from '../services/bridge';
+  import { settings } from '../stores/settings';
   import {
     defaultScalebar,
     fovUnit,
     unitFactor,
     unitSymbol,
     lengthInUnit,
+    normalizeScalebarStyle,
     type ImageFov,
     type ScalebarOptions,
     type ScalebarInspection
@@ -54,7 +56,7 @@
         ? { ...result.fov }
         : { width: 0, height: 0, unit: 'um' };
       fov.unit = fovUnit(fov.unit);
-      options = { ...(result.options || defaultScalebar) };
+      options = { ...(result.options || $settings.scalebarStyle) };
       options.unit = fovUnit(options.unit || fov.unit);
       displayLength = lengthInUnit(options.lengthUm, options.unit);
       hasScalebar = Boolean(result.options);
@@ -105,6 +107,11 @@
   }
   function queueSave() {
     if (!token) return;
+    const style = normalizeScalebarStyle(
+      snapshot().options,
+      $settings.scalebarStyle
+    );
+    settings.update((value) => ({ ...value, scalebarStyle: style }));
     editingRevision += 1;
     if (saveTimer) clearTimeout(saveTimer);
     pendingSave = snapshot();
@@ -117,7 +124,14 @@
     saveTimer = undefined;
     const payload = pendingSave;
     pendingSave = undefined;
-    if (!payload || !(payload.fov.width > 0) || !(payload.fov.height > 0))
+    if (
+      !payload ||
+      !(
+        (payload.options.orientation === 'vertical'
+          ? payload.fov.height
+          : payload.fov.width) > 0
+      )
+    )
       return;
     // An incomplete numeric input stays editable until a valid value is entered.
     if (
@@ -192,24 +206,27 @@
     >
       <h3>{$t('scale.fov')}</h3>
       <div class="grid">
-        <div class="input-group">
-          <label for="fov-width">{$t('scale.fovWidth')}</label><input
-            id="fov-width"
-            type="number"
-            min="0"
-            step="any"
-            bind:value={fov.width}
-          />
-        </div>
-        <div class="input-group">
-          <label for="fov-height">{$t('scale.fovHeight')}</label><input
-            id="fov-height"
-            type="number"
-            min="0"
-            step="any"
-            bind:value={fov.height}
-          />
-        </div>
+        {#if options.orientation === 'horizontal'}
+          <div class="input-group">
+            <label for="fov-width">{$t('scale.fovWidth')}</label><input
+              id="fov-width"
+              type="number"
+              min="0"
+              step="any"
+              bind:value={fov.width}
+            />
+          </div>
+        {:else}
+          <div class="input-group">
+            <label for="fov-height">{$t('scale.fovHeight')}</label><input
+              id="fov-height"
+              type="number"
+              min="0"
+              step="any"
+              bind:value={fov.height}
+            />
+          </div>
+        {/if}
         <div class="input-group">
           <label for="fov-unit">{$t('scale.unit')}</label><select
             id="fov-unit"

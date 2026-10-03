@@ -341,7 +341,7 @@
   "scale.barUnit": "比例尺单位：",
   "scale.autoSaved": "已自动保存。",
   "errors.scaleSelection": "请选择一张图片、包含一张图片的编组，或已有比例尺。",
-  "errors.scaleFov": "请输入有效的 FOV 宽度、高度和单位。",
+  "errors.scaleFov": "请输入当前比例尺方向对应的 FOV 尺寸和单位。",
   "errors.scaleOptions": "比例尺长度、厚度和字号必须大于 0，请检查参数。",
   "errors.scaleTooLong": "比例尺代表的长度超过图片或放大区域的 FOV，请减小比例尺长度。",
   "errors.scaleTargetChanged": "选中的图片已改变，请重新读取图片信息后再保存。",
