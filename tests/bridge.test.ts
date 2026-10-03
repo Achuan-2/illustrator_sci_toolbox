@@ -55,6 +55,7 @@ test('complete host output is ES3 and works without native JSON or a document', 
     'inspectZoomTarget',
     'applyZoomImages',
     'syncZoomTracker',
+    'inspectPseudocolorLayerTargets',
     'applyPaletteFill'
   ]) {
     const result = JSON.parse(
@@ -71,6 +72,11 @@ test('complete host output is ES3 and works without native JSON or a document', 
     undefined,
     'Host algorithms must not pollute global scope'
   );
+  assert.deepEqual(JSON.parse(context.$[hostNamespace].call('applyPseudocolorLayers',
+    encodeURIComponent(JSON.stringify([JSON.stringify({ mode: 'batch', lut: 'red', keepOriginal: false })])))),
+    { ok: false, error: 'errors.noDocument', args: [] });
+  for (const removed of ['inspectPseudocolorTargets', 'capturePseudocolorTargets', 'applyPseudocolorImages', 'applyMergedChannels', 'cancelPseudocolorTargets'])
+    assert.equal(JSON.parse(context.$[hostNamespace].call(removed, '%5B%5D')).error, 'errors.details');
   const unknown = JSON.parse(
     context.$[hostNamespace].call('constructor', '%5B%5D')
   );

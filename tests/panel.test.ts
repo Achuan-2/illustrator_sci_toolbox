@@ -206,6 +206,113 @@ test('hover explanations fit narrow viewports and preserve label live editing', 
 });
 
 
+function configureLayerPanel(
+  window: Window,
+  targets = [{ name: 'first', width: 100, height: 100, lut: 'blue' },
+    { name: 'second', width: 100, height: 100, lut: 'magenta' }]
+) {
+  const cep = (window as any).__adobe_cep__, evaluate = cep.evalScript;
+  cep.evalScript = (script: string, callback: (result: string) => void) => evaluate(script, (result: string) => {
+    if (script.includes('"inspectPseudocolorLayerTargets"'))
+      callback(JSON.stringify({ ok: true, data: JSON.stringify({ sessionId: 'layers-session', targets }) }));
+    else if (script.includes('"applyPseudocolorLayers"')) callback(JSON.stringify({ ok: true, data: '2' }));
+    else callback(result);
+  });
+  (window as any).require = () => { throw new Error('Layer coloring must not access image files'); };
+}
+async function chooseLayerColor(panel: Awaited<ReturnType<typeof createPanel>>, id: string, color: string) {
+  await panel.click(id);
+  const option = panel.window.document.querySelector(`#${id}-options [data-color="${color}"]`);
+  assert.ok(option);
+  (option as unknown as HTMLButtonElement).click();
+  await panel.flush();
+}
+
+test('pseudocolor tab has two independent layer-only groups and preserves configured channel colors', async () => {
+  const panel = await createPanel('{"language":"zh_CN","pseudocolorMethod":"pixels","pseudocolorLut":"fire"}', true, undefined, configureLayerPanel);
+  try {
+    assert.equal(panel.element('pseudocolor-group').querySelector('legend')?.textContent, '伪彩');
+    assert.equal(panel.element('merge-channels-group').querySelector('legend')?.textContent, '合并通道（Merge Channels）');
+    for (const id of ['pseudocolor-method', 'pseudocolor-mode', 'pseudocolor-resolution', 'pseudocolor-invert', 'pseudocolor-read-button'])
+      assert.equal(panel.window.document.getElementById(id), null);
+    assert.equal((panel.element('pseudocolor-keep') as any).checked, false);
+    await chooseLayerColor(panel, 'pseudocolor-lut', 'blue');
+    await panel.click('pseudocolor-apply-button');
+    const applied = () => panel.requests.filter((request) => request.operation === 'applyPseudocolorLayers').at(-1)!;
+    assert.deepEqual(JSON.parse(applied().args[0] as string), { mode: 'batch', lut: 'blue', keepOriginal: false });
+    assert.match(panel.element('pseudocolor-group').querySelector('[role="status"]')?.textContent || '', /2 张图片.*可编辑/);
+    await panel.click('merge-apply-button');
+    assert.equal(JSON.parse(applied().args[0] as string).mode, 'merge');
+    await panel.click('merge-read-button');
+    assert.match(panel.element('merge-lut-0').textContent || '', /Blue/);
+    assert.match(panel.element('merge-lut-1').textContent || '', /Magenta/);
+    await chooseLayerColor(panel, 'merge-lut-1', 'cyan');
+    await panel.click('merge-enable-0');
+    assert.equal((panel.element('merge-apply-button') as any).disabled, true);
+    assert.equal((panel.element('pseudocolor-apply-button') as any).disabled, false);
+    assert.equal((panel.element('merge-lut-0') as any).disabled, true);
+    await panel.click('merge-enable-0');
+    await panel.click('merge-apply-button');
+    const request = JSON.parse(applied().args[0] as string);
+    assert.equal(request.sessionId, 'layers-session');
+    assert.equal(request.channels[0].lut, 'blue');
+    assert.equal(request.channels[1].lut, 'cyan');
+    assert.deepEqual(Object.keys(request.channels[0]).sort(), ['enabled', 'lut']);
+    assert.equal(panel.requests.some((request) => /capture|PseudocolorImages|MergedChannels/.test(request.operation)), false);
+    const saved = JSON.parse(panel.window.localStorage.getItem(storageKey)!);
+    assert.equal(saved.pseudocolorLut, 'blue');
+    assert.equal('pseudocolorMethod' in saved, false);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
+test('color dropdown previews all seven colors and supports keyboard, Escape and outside-click dismissal', async () => {
+  const panel = await createPanel(undefined, true);
+  try {
+    await panel.click('pseudocolor-lut');
+    const options = [...panel.window.document.querySelectorAll('#pseudocolor-lut-options [role="option"]')];
+    assert.equal(options.length, 7);
+    for (const option of options) {
+      assert.match(option.querySelector('.color-swatch')?.getAttribute('style') || '', /linear-gradient/);
+      assert.ok(option.textContent?.trim());
+    }
+    options[0].dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.window.document.activeElement?.getAttribute('data-color'), 'green');
+    panel.window.document.activeElement?.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.element('pseudocolor-lut').getAttribute('aria-expanded'), 'false');
+    assert.match(panel.element('pseudocolor-lut').textContent || '', /Green/);
+    assert.match(panel.element('pseudocolor-lut').querySelector('.color-swatch')?.getAttribute('style') || '', /00ff00/);
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).pseudocolorLut, 'green');
+    await panel.click('pseudocolor-lut');
+    panel.window.document.activeElement?.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.window.document.activeElement?.id, 'pseudocolor-lut');
+    assert.equal(panel.window.document.getElementById('pseudocolor-lut-options'), null);
+    await panel.click('pseudocolor-lut');
+    panel.window.document.body.dispatchEvent(new panel.window.Event('pointerdown', { bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.window.document.getElementById('pseudocolor-lut-options'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
+test('channel size errors only block merging and coloring invalidates previously read channels', async () => {
+  const panel = await createPanel(undefined, false, undefined, (window) => configureLayerPanel(window, [
+    {name:'first', width:100, height:100, lut:'red'}, {name:'second', width:200, height:100, lut:'green'}
+  ]));
+  try {
+    await panel.click('merge-read-button');
+    assert.equal((panel.element('merge-apply-button') as any).disabled, true);
+    assert.match(panel.element('merge-channels-group').querySelector('.error')?.textContent || '', /same width and height/);
+    assert.equal((panel.element('pseudocolor-apply-button') as any).disabled, false);
+    await panel.click('pseudocolor-apply-button');
+    assert.equal(panel.window.document.getElementById('merge-lut-0'), null);
+    assert.equal(panel.element('merge-channels-group').querySelector('.error'), null);
+    assert.equal((panel.element('merge-apply-button') as any).disabled, false);
+    assert.ok(panel.requests.some((request) => request.operation === 'cancelPseudocolorLayerTargets'));
+  } finally { await panel.window.happyDOM.close(); }
+});
+
 test('palette tab puts groups first, copies color values and reopens named custom palettes', async () => {
   const copied: string[] = [];
   const panel = await createPanel(undefined, true, undefined, (window) => {

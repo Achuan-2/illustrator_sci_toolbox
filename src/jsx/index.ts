@@ -24,6 +24,9 @@ declare function applyZoomImages(...args: unknown[]): string;
 declare function cancelZoomTarget(...args: unknown[]): string;
 declare function syncZoomTracker(...args: unknown[]): string;
 declare function applyPaletteFill(...args: unknown[]): string;
+declare function inspectPseudocolorLayerTargets(...args: unknown[]): string;
+declare function cancelPseudocolorLayerTargets(...args: unknown[]): string;
+declare function applyPseudocolorLayers(...args: unknown[]): string;
 
 var methods: Record<string, (...args: unknown[]) => string> = {
   arrangeImages: arrangeImages,
@@ -47,7 +50,10 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   applyZoomImages: applyZoomImages,
   cancelZoomTarget: cancelZoomTarget,
   syncZoomTracker: syncZoomTracker,
-  applyPaletteFill: applyPaletteFill
+  applyPaletteFill: applyPaletteFill,
+  inspectPseudocolorLayerTargets: inspectPseudocolorLayerTargets,
+  cancelPseudocolorLayerTargets: cancelPseudocolorLayerTargets,
+  applyPseudocolorLayers: applyPseudocolorLayers
 };
 
 $['com.example.achuanPlugin'] = {

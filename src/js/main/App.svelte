@@ -24,6 +24,7 @@
   import SizePanel from '../components/SizePanel.svelte';
   import BorderPanel from '../components/BorderPanel.svelte';
   import ZoomPanel from '../components/ZoomPanel.svelte';
+  import PseudocolorPanel from '../components/PseudocolorPanel.svelte';
   import PalettePanel from '../components/PalettePanel.svelte';
   import ZoomModal from '../components/ZoomModal.svelte';
   import SelectionPanel from '../components/SelectionPanel.svelte';
@@ -42,6 +43,7 @@
     { id: 'labels', component: LabelsPanel },
     { id: 'border', component: BorderPanel },
     { id: 'zoom', component: ZoomPanel },
+    { id: 'pseudocolor', component: PseudocolorPanel },
     { id: 'palettes', component: PalettePanel },
     { id: 'selection', component: SelectionPanel },
     { id: 'settings', component: SettingsPanel },

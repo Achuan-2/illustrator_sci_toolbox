@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { Order } from '../../shared/host';
+import { isLayerColor, type LayerColorId } from '../services/pseudocolorLayers';
 
 export type Language = 'en' | 'zh_CN';
 export interface Settings {
@@ -23,6 +24,9 @@ export interface Settings {
   zoomGuideLineExtent: string;
   zoomKeepSquare: boolean;
   zoomAutoUpdate: boolean;
+  pseudocolorLut: LayerColorId;
+  pseudocolorKeepOriginal: boolean;
+  pseudocolorDefaultsVersion: number;
 }
 
 export const storageKey = 'illustrator_sci_plugin_settings';
@@ -46,7 +50,10 @@ export const defaults: Settings = {
   zoomPlacement: 'right',
   zoomGuideLineExtent: 'acrossImages',
   zoomKeepSquare: true,
-  zoomAutoUpdate: true
+  zoomAutoUpdate: true,
+  pseudocolorLut: 'red',
+  pseudocolorKeepOriginal: false,
+  pseudocolorDefaultsVersion: 1
 };
 
 export function normalizeSettings(value: unknown): Settings {
@@ -60,6 +67,11 @@ export function normalizeSettings(value: unknown): Settings {
     if (typeof item === 'number' && !Number.isFinite(item)) continue;
     Object.assign(result, { [key]: item });
   }
+  // Reset the old auto-saved Keep Originals default once. Subsequent explicit
+  // choices retain this version and continue to persist across panel reloads.
+  if (saved.pseudocolorDefaultsVersion !== defaults.pseudocolorDefaultsVersion)
+    result.pseudocolorKeepOriginal = defaults.pseudocolorKeepOriginal;
+  result.pseudocolorDefaultsVersion = defaults.pseudocolorDefaultsVersion;
   result.language = result.language === 'zh_CN' ? 'zh_CN' : 'en';
   if (
     !['grid', 'stacking', 'horizontal', 'vertical'].includes(result.labelsOrder)
@@ -72,6 +84,8 @@ export function normalizeSettings(value: unknown): Settings {
     result.fontColor = defaults.fontColor;
   if (!result.fontFamily) result.fontFamily = defaults.fontFamily;
   if (result.zoomLineWidth <= 0) result.zoomLineWidth = defaults.zoomLineWidth;
+  if (!isLayerColor(result.pseudocolorLut))
+    result.pseudocolorLut = defaults.pseudocolorLut;
   if (!/^#[0-9a-f]{6}$/i.test(result.zoomLineColor))
     result.zoomLineColor = defaults.zoomLineColor;
   if (

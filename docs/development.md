@@ -1,6 +1,12 @@
 # 开发与发布
 
+伪彩仅使用原生图层上色。`PseudocolorPanel.svelte` 同时显示伪彩和合并通道两个分组，各自复用固定操作类型的 `PseudocolorLayersPanel.svelte`，共享忙碌状态；伪彩应用成功后清理旧通道设置，避免使用失效引用。`PseudocolorColorSelect.svelte` 提供带渐变色块的下拉框，支持方向键、Enter、Escape 和点击外部关闭。`pseudocolorLayers.ts` 定义七种单色、通道默认值和尺寸校验。旧像素处理设置会被忽略，旧复杂色表恢复为红色。默认替换原图，手动保留选项仍可持久化。
+
+宿主 `pseudocolorLayers.jsx` 在隔离混合的组合中依次创建黑色背景、正常混合的原图副本和使用 Darken 的染色矩形，避免抗锯齿边缘露出彩色底层。透明区域为黑色，彩色图片保留原 RGB 分量。已有伪彩组合再次应用时直接更新染色层，保持对象、位置和尺寸；通过对象 note 标记及旧版结构兼容识别结果，重命名后仍可操作。
+
 色卡模块使用独立的 `illustrator_sci_plugin_palettes` 本地存储记录，避免将用户色卡混入插件设置或宿主文档。`paletteCatalog.ts` 保存默认分组和初始色值，`paletteLibrary.ts` 负责内容校验、HEX 规范化与复制格式，`PalettePanel.svelte` 提供色卡编辑，`PaletteGroupManager.svelte` 提供分组管理弹窗及键盘焦点约束。`palettes` 保存用户新增色卡及默认色卡的修改，按稳定 ID 合并显示，来源链接从目录读取；`deletedPaletteIds` 记录默认色卡删除状态，防止修改被删除后恢复初始色卡。删除分组依据合并后的实际所属关系处理移入和移出的色卡。`deletedGroupIds` 记录已删除的预置分组，`groupNames` 保存预置分组的自定义显示名称，所有字段保持旧版 version 1 记录兼容。旧版个人分组的色卡迁移到可用分组，只有恢复孤立数据且无可用分组时才生成恢复分组。无法读取存储时保留原记录，保存失败时保留当前面板中的修改并提示。复制优先使用 Clipboard API，CEP 旧版或权限拒绝时使用 `execCommand('copy')`，完成后恢复焦点及文本选择。自动化检查涵盖剪贴板接口模拟、编辑、删除确认和重新读取，不代表实机剪贴板验收。
+
+合并支持 2–7 个同尺寸灰度图片或已有伪彩组合，混合选择也可使用。已有伪彩图沿用当前单色设置，其余图片使用默认色；读取通道后可单独改色或排除通道。合并使用组合内的原图副本，按左上角对齐，上层通道使用 Screen 混合，并保留全部输入对象。读取仅读取名称、边界和引用，不生成预览文件；应用前验证文档、父对象、原图、颜色层、边界和混合属性。创建失败移除本次生成的组合，修改失败恢复旧颜色及元数据。`tests/illustrator-pseudocolor-layers.ps1` 在临时文档中验证七色渲染、边缘、原位改色、旧版结果、通道合并、会话校验和回滚；`tests/panel.test.ts` 验证分组、色块预览、键盘操作和旧设置迁移。
 
 项目基于 [Bolt CEP](https://github.com/hyperbrew/bolt-cep) 的 `vite-cep-plugin`、Svelte 5、TypeScript 和 Vite。开发环境使用 Node.js 22 或以上、项目指定的 pnpm；安装包的宿主范围为 Illustrator CC 2018（22.0）及以上、CEP 8 及以上，前端按 Chromium 57 编译。这个范围是兼容目标，实际兼容性仍需要记录宿主验收结果。
 

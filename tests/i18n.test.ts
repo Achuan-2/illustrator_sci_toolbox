@@ -39,6 +39,7 @@ test('translation keys, placeholders and all static component/host references ma
       .join('\n') +
     fs.readFileSync('src/jsx/ilst/arrange.jsx', 'utf8') +
     fs.readFileSync('src/jsx/ilst/paletteFill.jsx', 'utf8') +
+    fs.readFileSync('src/jsx/ilst/pseudocolorLayers.jsx', 'utf8') +
     fs.readFileSync('src/js/services/actions.ts', 'utf8');
   const references = [
     ...sources.matchAll(/(?:\$t|fail|sciError)\(['"]([^'"]+)['"]/g)
@@ -59,6 +60,15 @@ test('default English, legacy settings and malformed storage normalize safely', 
     assert.equal(readSettings({ getItem: () => saved }).language, 'en');
   }
   assert.equal(normalizeSettings({ fontSize: 12 }).fontSize, 12);
+  assert.equal(normalizeSettings({}).pseudocolorKeepOriginal, false);
+  const migrated = normalizeSettings({ pseudocolorKeepOriginal: true, pseudocolorLut: 'blue', pseudocolorResolution: 150 });
+  assert.equal(migrated.pseudocolorKeepOriginal, false);
+  assert.equal(migrated.pseudocolorLut, 'blue');
+  assert.equal('pseudocolorResolution' in migrated, false);
+  const oldPixelSettings = normalizeSettings({ pseudocolorMethod: 'pixels', pseudocolorLut: 'fire', pseudocolorInverted: true });
+  assert.equal(oldPixelSettings.pseudocolorLut, 'red');
+  assert.equal('pseudocolorMethod' in oldPixelSettings, false);
+  assert.equal('pseudocolorInverted' in oldPixelSettings, false);
   assert.equal(
     normalizeSettings({ fontSize: null }).fontSize,
     defaults.fontSize
@@ -90,6 +100,11 @@ test('language, zero offsets and false values survive persistence and reopening'
   assert.equal(reopened.labelOffsetY, 0);
   assert.equal(reopened.autoUpdateIndex, false);
   assert.equal(reopened.zoomAutoUpdate, false);
+  assert.equal(reopened.pseudocolorKeepOriginal, false);
+  const saveNewChoice = persistSettings(storage);
+  settings.update((value) => ({ ...value, pseudocolorKeepOriginal: true }));
+  saveNewChoice();
+  assert.equal(readSettings(storage).pseudocolorKeepOriginal, true, 'Explicit Keep Originals choice must survive reloads after migration');
   const saved = stored.get(storageKey);
   settings.set(defaults);
   assert.equal(
