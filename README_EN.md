@@ -20,6 +20,8 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## 2 Feature Introduction
 
+- Color Palettes: four groups at the top (Journal Palettes, Categorical, Sequential, and Diverging) contain 23 built-in scientific palettes. Left-click a color to apply a fill to selected shapes; right-click to copy its HEX or RGB value. Use the settings icon beside the groups to open a dialog for adding, renaming, and deleting any group. Create named palettes with one or more colors; all palettes, including defaults, can be edited, moved, and deleted directly. Palette edits and deletions, group names and deletions, the current group, and the copy format are remembered locally. See [palette sources and behavior](docs/palettes.md).
+
 - Copy and Paste Relative Position:
 
   Usage Tips

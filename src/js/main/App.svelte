@@ -24,6 +24,7 @@
   import SizePanel from '../components/SizePanel.svelte';
   import BorderPanel from '../components/BorderPanel.svelte';
   import ZoomPanel from '../components/ZoomPanel.svelte';
+  import PalettePanel from '../components/PalettePanel.svelte';
   import ZoomModal from '../components/ZoomModal.svelte';
   import SelectionPanel from '../components/SelectionPanel.svelte';
   import SettingsPanel from '../components/SettingsPanel.svelte';
@@ -41,6 +42,7 @@
     { id: 'labels', component: LabelsPanel },
     { id: 'border', component: BorderPanel },
     { id: 'zoom', component: ZoomPanel },
+    { id: 'palettes', component: PalettePanel },
     { id: 'selection', component: SelectionPanel },
     { id: 'settings', component: SettingsPanel },
     { id: 'about', component: AboutPanel }
@@ -199,6 +201,7 @@
   onchange={endOffsetEditing}
 />
 <svelte:document
+  oncontextmenu={(event) => event.preventDefault()}
   onkeydown={(event) => {
     if (!standaloneZoom && event.key === 'Escape') exitLabelEditing();
   }}

@@ -5,6 +5,7 @@ import test from 'node:test';
 import { Window } from 'happy-dom';
 import { parse } from 'acorn';
 import { hostNamespace } from '../src/shared/host.ts';
+import { paletteStorageKey } from '../src/js/services/paletteLibrary.ts';
 
 const assets = fs.readdirSync('dist/cep/assets');
 const bundle = fs.readFileSync(
@@ -204,6 +205,303 @@ test('hover explanations fit narrow viewports and preserve label live editing', 
   }
 });
 
+
+test('palette tab puts groups first, copies color values and reopens named custom palettes', async () => {
+  const copied: string[] = [];
+  const panel = await createPanel(undefined, true, undefined, (window) => {
+    Object.defineProperty(window.navigator, 'clipboard', { value: undefined, configurable: true });
+    (window.document as any).execCommand = (command: string) => {
+      assert.equal(command, 'copy');
+      copied.push((window.document.activeElement as any).value);
+      return true;
+    };
+  });
+  let saved = '';
+  try {
+    await panel.input('language', 'zh_CN');
+    const tab = [...panel.window.document.querySelectorAll('.tab')].find((button) => button.textContent === '色卡');
+    assert.ok(tab);
+    (tab as any).click();
+    await panel.flush();
+    assert.equal(panel.element('panel-palettes').firstElementChild?.classList.contains('palette-header'), true);
+    assert.deepEqual([...panel.window.document.querySelectorAll('.palette-groups button')].map((button) => button.textContent), ['期刊配色','分类配色','连续配色','发散配色']);
+    assert.equal(panel.window.document.querySelectorAll('#panel-palettes .palette-card').length, 5);
+    const first = panel.window.document.querySelector('#panel-palettes .color-swatch') as any;
+    first.click();
+    await panel.flush();
+    assert.deepEqual(panel.requests.at(-1), { operation: 'applyPaletteFill', args: ['#E64B35'] });
+    assert.deepEqual(copied, [], 'Left click applies a fill without copying');
+    assert.match(panel.window.document.querySelector('#panel-palettes [role="status"]')?.textContent || '', /已应用填充色 #E64B35/);
+    const requestCount = panel.requests.length;
+    const rightClick = new panel.window.MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true });
+    first.dispatchEvent(rightClick);
+    await panel.flush();
+    assert.equal(rightClick.defaultPrevented, true);
+    assert.deepEqual(copied, ['#E64B35']);
+    await panel.input('palette-copy-format', 'rgb');
+    first.dispatchEvent(new panel.window.MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }));
+    await panel.flush();
+    assert.equal(copied.at(-1), 'rgb(230, 75, 53)');
+    assert.equal(panel.requests.length, requestCount, 'Right click never calls the fill operation');
+    assert.match(panel.element('palette-copy-toast').textContent || '', /已复制 rgb\(230, 75, 53\)/);
+    assert.doesNotMatch(panel.window.document.querySelector('#panel-palettes .apply-status')?.textContent || '', /已复制/);
+    await new Promise((resolve) => setTimeout(resolve, 3100));
+    await panel.flush();
+    assert.equal(panel.window.document.getElementById('palette-copy-toast'), null, 'Copy toast closes after three seconds');
+
+    await panel.click('palette-manage-groups');
+    await panel.click('palette-add-group');
+    await panel.input('palette-group-name', '我的实验');
+    await panel.click('palette-save-group');
+    await panel.click('palette-close-manager');
+    assert.equal(panel.window.document.querySelector('.palette-groups button[aria-pressed="true"]')?.textContent, '我的实验');
+    await panel.click('palette-add-card');
+    await panel.input('palette-card-name', '对照与处理');
+    await panel.input('palette-color-hex-0', '#47a');
+    await panel.click('palette-add-color');
+    await panel.input('palette-color-hex-1', 'EE6677');
+    await panel.click('palette-save-card');
+    const card = panel.window.document.querySelector('#panel-palettes .palette-card')!;
+    assert.equal(card.querySelector('h3')?.textContent, '对照与处理');
+    assert.deepEqual([...card.querySelectorAll('.color-swatch')].map((button) => button.getAttribute('data-color')), ['#4477AA', '#EE6677']);
+    (card.querySelector('[data-action="edit"]') as any).click();
+    await panel.flush();
+    await panel.input('palette-card-name', '实验主配色');
+    await panel.click('palette-save-card');
+    await manageGroup(panel, 'rename', JSON.parse(panel.window.localStorage.getItem(paletteStorageKey)!).groups[0].id);
+    await panel.input('palette-group-name', '论文配色');
+    await panel.click('palette-save-group');
+    await panel.click('palette-close-manager');
+    saved = panel.window.localStorage.getItem(paletteStorageKey)!;
+    const stored = JSON.parse(saved);
+    assert.equal(stored.groups[0].name, '论文配色');
+    assert.equal(stored.palettes[0].name, '实验主配色');
+    assert.equal(stored.copyFormat, 'rgb');
+    assert.deepEqual(panel.alerts, []);
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel('{"language":"zh_CN"}', false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    assert.equal(reopened.window.document.querySelector('.palette-groups button[aria-pressed="true"]')?.textContent, '论文配色');
+    assert.equal(reopened.window.document.querySelector('#panel-palettes h3')?.textContent, '实验主配色');
+    assert.equal((reopened.element('palette-copy-format') as any).value, 'rgb');
+    await manageGroup(reopened, 'delete', JSON.parse(saved).groups[0].id);
+    assert.equal(reopened.window.document.querySelectorAll('#panel-palettes .palette-card').length, 1, 'Deletion waits for an explicit user click');
+    await reopened.click('palette-confirm-delete');
+    assert.equal(reopened.window.document.querySelectorAll('.palette-groups button').length, 4);
+    assert.equal(JSON.parse(reopened.window.localStorage.getItem(paletteStorageKey)!).palettes.length, 0);
+  } finally { await reopened.window.happyDOM.close(); }
+});
+
+test('failed palette fill shows a localized error while right-click copying remains independent', async () => {
+  const panel = await createPanel('{"language":"zh_CN"}', false, undefined, (window) => {
+    Object.defineProperty(window.navigator, 'clipboard', { value: undefined, configurable: true });
+    (window.document as any).execCommand = () => true;
+  });
+  try {
+    const adapter = (panel.window as any).__adobe_cep__;
+    const evaluate = adapter.evalScript;
+    let fills = 0;
+    adapter.evalScript = (script: string, callback: (value: string) => void) => {
+      if (script.includes('"applyPaletteFill"')) {
+        fills++;
+        callback(JSON.stringify({ ok: false, error: 'errors.paletteFillSelection', args: [] }));
+      } else evaluate(script, callback);
+    };
+    const color = panel.window.document.querySelector('#panel-palettes .color-swatch') as any;
+    color.click();
+    await panel.flush();
+    assert.match(panel.window.document.querySelector('#panel-palettes .error')?.textContent || '', /请选择需要应用填充色的形状/);
+    assert.doesNotMatch(panel.window.document.querySelector('#panel-palettes [role="status"]')?.textContent || '', /已应用/);
+    color.dispatchEvent(new panel.window.MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }));
+    await panel.flush();
+    assert.match(panel.element('palette-copy-toast').textContent || '', /已复制 #E64B35/);
+    assert.equal(fills, 1);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
+test('default palettes can be edited, moved and deleted directly with persistent changes', async () => {
+  const panel = await createPanel();
+  let saved = '';
+  try {
+    const original = panel.window.document.querySelector('[data-palette-id="builtin-npg"]')!;
+    assert.equal(panel.window.document.querySelector('[data-action="duplicate"]'), null);
+    assert.ok(original.querySelector('[data-action="delete"]'));
+    (original.querySelector('[data-action="edit"]') as any).click();
+    await panel.flush();
+    assert.equal((panel.element('palette-card-group') as any).value, 'journals');
+    await panel.input('palette-card-name', 'My Nature Colors');
+    await panel.input('palette-color-hex-0', 'oops');
+    await panel.click('palette-save-card');
+    assert.ok(panel.window.document.getElementById('palette-card-editor'));
+    assert.match(panel.window.document.querySelector('#panel-palettes .error')?.textContent || '', /valid HEX/);
+    await panel.input('palette-color-hex-0', '#FFFFFF');
+    await panel.input('palette-card-group', 'categorical');
+    await panel.click('palette-save-card');
+    assert.ok([...panel.window.document.querySelectorAll('#panel-palettes h3')].some((heading) => heading.textContent === 'My Nature Colors'));
+    assert.equal(panel.window.document.querySelectorAll('[data-palette-id="builtin-npg"]').length, 1);
+    assert.equal(panel.window.document.querySelector('[data-palette-id="builtin-npg"] .color-swatch')?.getAttribute('data-color'), '#FFFFFF');
+    assert.equal(panel.window.document.querySelectorAll('#panel-palettes .palette-card').length, 9);
+    saved = panel.window.localStorage.getItem(paletteStorageKey)!;
+    assert.equal(JSON.parse(saved).palettes[0].id, 'builtin-npg');
+    await panel.click('palette-manage-groups');
+    await panel.click('palette-add-group');
+    await panel.input('palette-group-name', 'Journal Palettes');
+    await panel.click('palette-save-group');
+    assert.match(panel.window.document.querySelector('#panel-palettes .error')?.textContent || '', /already exists/);
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel(undefined, false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    const edited = reopened.window.document.querySelector('[data-palette-id="builtin-npg"]')!;
+    assert.equal(edited.querySelector('h3')?.textContent, 'My Nature Colors');
+    assert.equal(edited.querySelector('.color-swatch')?.getAttribute('data-color'), '#FFFFFF');
+    (edited.querySelector('[data-action="delete"]') as any).click();
+    await reopened.flush();
+    assert.ok(reopened.window.document.querySelector('[data-palette-id="builtin-npg"]'), 'Deleting a preset waits for confirmation');
+    await reopened.click('palette-confirm-delete');
+    assert.equal(reopened.window.document.querySelector('[data-palette-id="builtin-npg"]'), null);
+    saved = reopened.window.localStorage.getItem(paletteStorageKey)!;
+  } finally { await reopened.window.happyDOM.close(); }
+  const deleted = await createPanel(undefined, false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    assert.equal(deleted.window.document.querySelector('[data-palette-id="builtin-npg"]'), null);
+    await deleted.click('palette-group-journals');
+    assert.equal(deleted.window.document.querySelector('[data-palette-id="builtin-npg"]'), null);
+    assert.equal(deleted.window.document.querySelectorAll('#panel-palettes .palette-card').length, 4);
+  } finally { await deleted.window.happyDOM.close(); }
+});
+
+test('deleting a custom group also permanently deletes default palettes moved into it', async () => {
+  const panel = await createPanel();
+  let saved = '';
+  try {
+    await panel.click('palette-manage-groups');
+    await panel.click('palette-add-group');
+    await panel.input('palette-group-name', 'Experiment');
+    await panel.click('palette-save-group');
+    await panel.click('palette-close-manager');
+    const groupId = JSON.parse(panel.window.localStorage.getItem(paletteStorageKey)!).groups[0].id;
+    await panel.click('palette-group-journals');
+    (panel.window.document.querySelector('[data-palette-id="builtin-npg"] [data-action="edit"]') as any).click();
+    await panel.flush();
+    await panel.input('palette-card-group', groupId);
+    await panel.click('palette-save-card');
+    await manageGroup(panel, 'delete', groupId);
+    assert.match(panel.element('palette-group-manager').textContent || '', /all 1 palette/);
+    await panel.click('palette-confirm-delete');
+    await panel.click('palette-close-manager');
+    assert.equal(panel.window.document.querySelector('[data-palette-id="builtin-npg"]'), null);
+    saved = panel.window.localStorage.getItem(paletteStorageKey)!;
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel(undefined, false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    assert.equal(reopened.window.document.querySelector('[data-palette-id="builtin-npg"]'), null);
+  } finally { await reopened.window.happyDOM.close(); }
+});
+
+test('default groups can all be deleted and remain deleted after reopening; new groups still work', async () => {
+  const panel = await createPanel('{"language":"zh_CN"}');
+  let saved = '';
+  try {
+    await panel.click('palette-add-card');
+    await panel.input('palette-card-name', '期刊自定义');
+    await panel.click('palette-save-card');
+    await manageGroup(panel, 'delete', 'journals');
+    assert.match(panel.element('panel-palettes').textContent || '', /期刊配色.*全部 6 张色卡/);
+    assert.equal(panel.window.document.querySelectorAll('.palette-groups button').length, 4);
+    await panel.click('palette-confirm-delete');
+    assert.equal(panel.window.document.getElementById('palette-group-journals'), null);
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(paletteStorageKey)!).palettes.length, 0);
+    for (const id of ['categorical', 'sequential', 'diverging']) {
+      await manageGroup(panel, 'delete', id);
+      await panel.click('palette-confirm-delete');
+    }
+    await panel.click('palette-close-manager');
+    assert.equal(panel.window.document.querySelectorAll('.palette-groups button').length, 0);
+    assert.equal((panel.element('palette-add-card') as any).disabled, true);
+    assert.match(panel.element('panel-palettes').textContent || '', /暂无分组/);
+    saved = panel.window.localStorage.getItem(paletteStorageKey)!;
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel('{"language":"zh_CN"}', false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    assert.equal(reopened.window.document.querySelectorAll('.palette-groups button').length, 0);
+    await reopened.click('palette-manage-groups');
+    await reopened.click('palette-add-group');
+    await reopened.input('palette-group-name', '新实验');
+    await reopened.click('palette-save-group');
+    await reopened.click('palette-close-manager');
+    assert.equal((reopened.element('palette-add-card') as any).disabled, false);
+    await reopened.click('palette-add-card');
+    await reopened.input('palette-card-name', '新配色');
+    await reopened.click('palette-save-card');
+    assert.equal(reopened.window.document.querySelector('#panel-palettes h3')?.textContent, '新配色');
+    assert.equal(reopened.window.document.querySelectorAll('.palette-groups button').length, 1);
+  } finally { await reopened.window.happyDOM.close(); }
+});
+
+test('group settings open a keyboard-accessible modal and renamed defaults survive reopening', async () => {
+  const panel = await createPanel('{"language":"zh_CN"}');
+  let saved = '';
+  try {
+    assert.equal(panel.window.document.getElementById('palette-add-group'), null);
+    assert.equal(panel.window.document.getElementById('palette-group-manager'), null);
+    const settings = panel.element('palette-manage-groups');
+    assert.equal(settings.textContent?.trim(), '');
+    assert.equal(settings.getAttribute('aria-label'), '管理分组');
+    (settings as any).focus();
+    await panel.click('palette-manage-groups');
+    const modal = panel.element('palette-group-manager');
+    assert.equal(modal.getAttribute('role'), 'dialog');
+    assert.equal(modal.getAttribute('aria-modal'), 'true');
+    assert.equal(panel.window.document.activeElement?.id, 'palette-close-manager');
+    panel.element('palette-close-manager').dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    assert.equal(panel.window.document.activeElement?.id, 'palette-add-group');
+    await manageGroup(panel, 'rename', 'journals');
+    assert.equal((panel.element('palette-group-name') as any).value, '期刊配色');
+    await panel.input('palette-group-name', '论文常用');
+    await panel.click('palette-save-group');
+    assert.equal(panel.element('palette-group-journals').textContent, '论文常用');
+    assert.equal(panel.window.document.querySelectorAll('#panel-palettes .palette-card').length, 5);
+    saved = panel.window.localStorage.getItem(paletteStorageKey)!;
+    modal.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await panel.flush();
+    assert.equal(panel.window.document.getElementById('palette-group-manager'), null);
+    assert.equal(panel.window.document.activeElement, settings);
+  } finally { await panel.window.happyDOM.close(); }
+  const reopened = await createPanel('{"language":"zh_CN"}', false, undefined, (window) => window.localStorage.setItem(paletteStorageKey, saved));
+  try {
+    assert.equal(reopened.element('palette-group-journals').textContent, '论文常用');
+    assert.equal(reopened.window.document.getElementById('palette-add-group'), null);
+    await manageGroup(reopened, 'delete', 'journals');
+    assert.match(reopened.element('palette-group-manager').textContent || '', /论文常用.*全部 5 张色卡/);
+    await reopened.click('palette-close-manager');
+    assert.ok(reopened.window.document.getElementById('palette-group-journals'), 'Closing before confirmation preserves the group');
+  } finally { await reopened.window.happyDOM.close(); }
+});
+
+async function manageGroup(panel: Awaited<ReturnType<typeof createPanel>>, action: 'rename' | 'delete', id: string) {
+  if (!panel.window.document.getElementById('palette-group-manager')) await panel.click('palette-manage-groups');
+  const button = panel.window.document.querySelector(`[data-group-${action}="${id}"]`) as any;
+  assert.ok(button, `Missing group ${action} button for ${id}`);
+  button.click();
+  await panel.flush();
+}
+
+test('unreadable palette storage is not overwritten and clipboard failures show an error', async () => {
+  const panel = await createPanel(undefined, false, undefined, (window) => {
+    window.localStorage.setItem(paletteStorageKey, '{broken');
+    Object.defineProperty(window.navigator, 'clipboard', { value: undefined, configurable: true });
+    (window.document as any).execCommand = () => false;
+  });
+  try {
+    assert.match(panel.window.document.querySelector('#panel-palettes .error')?.textContent || '', /Could not read/);
+    assert.equal(panel.window.localStorage.getItem(paletteStorageKey), '{broken');
+    (panel.window.document.querySelector('#panel-palettes .color-swatch') as any).dispatchEvent(new panel.window.MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }));
+    await panel.flush();
+    assert.match(panel.window.document.getElementById('panel-palettes')?.textContent || '', /Could not copy/);
+    assert.doesNotMatch(panel.window.document.querySelector('#panel-palettes [role="status"]')?.textContent || '', /Copied/);
+    assert.equal(panel.window.document.querySelector('textarea'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
 
 async function createPanel(
   saved?: string,

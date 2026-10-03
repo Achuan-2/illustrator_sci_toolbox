@@ -38,6 +38,7 @@ test('translation keys, placeholders and all static component/host references ma
       .map((file) => fs.readFileSync(`src/js/components/${file}`, 'utf8'))
       .join('\n') +
     fs.readFileSync('src/jsx/ilst/arrange.jsx', 'utf8') +
+    fs.readFileSync('src/jsx/ilst/paletteFill.jsx', 'utf8') +
     fs.readFileSync('src/js/services/actions.ts', 'utf8');
   const references = [
     ...sources.matchAll(/(?:\$t|fail|sciError)\(['"]([^'"]+)['"]/g)

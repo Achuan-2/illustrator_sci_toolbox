@@ -29,6 +29,8 @@
 
 ## 2 功能介绍
 
+- 色卡：顶部提供“期刊配色、分类配色、连续配色、发散配色”四个默认分组，内置 23 套常用科研配色，包括 NPG、AAAS、NEJM、Lancet、JAMA、Okabe–Ito、Paul Tol、ColorBrewer 和 Viridis 等。左键点击颜色为所选形状应用填充色，右键复制 HEX 或 RGB 值；通过分组右侧的设置图标打开管理弹窗，新增、重命名和删除任意分组。在任意分组创建命名色卡，通过取色器或 HEX 输入添加一个或多个颜色。所有色卡（包括默认色卡）均支持直接编辑、调整所属分组和删除。色卡修改、色卡与分组删除状态、分组名称、当前分组和复制格式自动保存在本地。配色来源见 [色卡说明](docs/palettes.md)。
+
 <img width="2656" height="1508" alt="image" src="https://github.com/user-attachments/assets/a5174868-ee60-4b83-982a-84734649d3e4" />
 
 

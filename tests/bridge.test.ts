@@ -54,7 +54,8 @@ test('complete host output is ES3 and works without native JSON or a document', 
     'addBorder',
     'inspectZoomTarget',
     'applyZoomImages',
-    'syncZoomTracker'
+    'syncZoomTracker',
+    'applyPaletteFill'
   ]) {
     const result = JSON.parse(
       context.$[hostNamespace].call(operation, '%5B%5D')

@@ -1,4 +1,4 @@
-// These functions are concatenated from ilst/arrange.jsx inside the same private scope.
+// These functions are concatenated from ilst/*.jsx inside the same private scope.
 // Declarations describe that boundary; they do not change the Illustrator algorithms.
 declare var $: Record<string, unknown>;
 declare function sciError(key: string, args?: unknown[]): string;
@@ -23,6 +23,7 @@ declare function inspectZoomTarget(...args: unknown[]): string;
 declare function applyZoomImages(...args: unknown[]): string;
 declare function cancelZoomTarget(...args: unknown[]): string;
 declare function syncZoomTracker(...args: unknown[]): string;
+declare function applyPaletteFill(...args: unknown[]): string;
 
 var methods: Record<string, (...args: unknown[]) => string> = {
   arrangeImages: arrangeImages,
@@ -45,7 +46,8 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   inspectZoomTarget: inspectZoomTarget,
   applyZoomImages: applyZoomImages,
   cancelZoomTarget: cancelZoomTarget,
-  syncZoomTracker: syncZoomTracker
+  syncZoomTracker: syncZoomTracker,
+  applyPaletteFill: applyPaletteFill
 };
 
 $['com.example.achuanPlugin'] = {

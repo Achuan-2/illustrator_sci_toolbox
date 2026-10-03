@@ -1,5 +1,7 @@
 # 开发与发布
 
+色卡模块使用独立的 `illustrator_sci_plugin_palettes` 本地存储记录，避免将用户色卡混入插件设置或宿主文档。`paletteCatalog.ts` 保存默认分组和初始色值，`paletteLibrary.ts` 负责内容校验、HEX 规范化与复制格式，`PalettePanel.svelte` 提供色卡编辑，`PaletteGroupManager.svelte` 提供分组管理弹窗及键盘焦点约束。`palettes` 保存用户新增色卡及默认色卡的修改，按稳定 ID 合并显示，来源链接从目录读取；`deletedPaletteIds` 记录默认色卡删除状态，防止修改被删除后恢复初始色卡。删除分组依据合并后的实际所属关系处理移入和移出的色卡。`deletedGroupIds` 记录已删除的预置分组，`groupNames` 保存预置分组的自定义显示名称，所有字段保持旧版 version 1 记录兼容。旧版个人分组的色卡迁移到可用分组，只有恢复孤立数据且无可用分组时才生成恢复分组。无法读取存储时保留原记录，保存失败时保留当前面板中的修改并提示。复制优先使用 Clipboard API，CEP 旧版或权限拒绝时使用 `execCommand('copy')`，完成后恢复焦点及文本选择。自动化检查涵盖剪贴板接口模拟、编辑、删除确认和重新读取，不代表实机剪贴板验收。
+
 项目基于 [Bolt CEP](https://github.com/hyperbrew/bolt-cep) 的 `vite-cep-plugin`、Svelte 5、TypeScript 和 Vite。开发环境使用 Node.js 22 或以上、项目指定的 pnpm；安装包的宿主范围为 Illustrator CC 2018（22.0）及以上、CEP 8 及以上，前端按 Chromium 57 编译。这个范围是兼容目标，实际兼容性仍需要记录宿主验收结果。
 
 生产入口先加载浏览器 API 补丁（`globalThis`、`queueMicrotask`、`replaceAll`、`Promise.allSettled` 和 `Promise.finally`），并检测 flex gap，为旧版 CEP 使用 margin 间距。宿主脚本继续保持 ES3。根据 [Adobe CEP 版本表](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_8.x/Documentation/CEP%208.0%20HTML%20Extension%20Cookbook.md)，CC 2017 及更早版本使用 Chromium 41 或更旧引擎，缺少 Svelte 5 所需的原生 Proxy，因此不在当前安装包范围内。扩大 manifest 范围不能解决这一限制。

@@ -81,6 +81,7 @@ export interface HostArguments {
   applyZoomImages: [string];
   cancelZoomTarget: [];
   syncZoomTracker: [];
+  applyPaletteFill: [string];
 }
 
 export type HostOperation = keyof HostArguments;
