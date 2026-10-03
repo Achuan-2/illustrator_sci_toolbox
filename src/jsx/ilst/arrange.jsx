@@ -50,6 +50,10 @@ function getFontFullName(fontFamily, bold) {
 function getVisibleBounds(o) {
     var bounds, clippedItem, sandboxItem, sandboxLayer;
     var curItem;
+    if (getTag(o, "SCI_SCALE_WRAPPER")) {
+        var scalePicture = scaleWrapperPicture(o);
+        if (scalePicture !== o) return getVisibleBounds(scalePicture);
+    }
 
     // 跳过参考线
     if (o.guides) {
@@ -2229,6 +2233,7 @@ function getZoomSelection(selection) {
     var manualRect = null;
     for (var i = 0; selection && i < selection.length; i++) {
         var item = selection[i];
+        item = scaleWrapperPicture(item);
         if (selection.length === 2 && isPathRectangle(item)) {
             manualRect = item;
         } else if (item.typename === "RasterItem" || item.typename === "PlacedItem" || item.typename === "GroupItem") {
@@ -2313,6 +2318,8 @@ function readZoomEntries(doc, sourceItem) {
                 originalZoomRegion: { x: (z[0] - s[0]) / width, y: (s[1] - z[1]) / height,
                     width: (z[2] - z[0]) / width, height: (z[1] - z[3]) / height },
                 originalZoomRotation: 0,
+                scaleLengthUm: scaleReadOptions(zoom) ? scaleReadOptions(zoom).lengthUm : null,
+                scaleUnit: scaleReadOptions(zoom) ? scaleReadOptions(zoom).unit : null,
                 preservesLayout: true
             });
         } catch (recordError) {}
@@ -2601,6 +2608,7 @@ function inspectZoomTarget() {
         previewMimeType: linkedPreview ? linkedPreview.mimeType : "image/png",
         previewIsTemporary: !linkedPreview,
         existingEntries: existingEntries,
+        sourceScalebar: scaleReadOptions(sourceItem),
         manualRect: manualRectInfo
     };
 
@@ -2630,6 +2638,15 @@ function applyZoomImages(payloadJson) {
     for (var t = 0; t < targets.length; t++) {
         var bounds = getVisibleBounds(targets[t]) || targets[t].geometricBounds;
         if (bounds[2] <= bounds[0] || bounds[1] <= bounds[3]) return sciError("errors.zoomInvalidSelection");
+        var scaleEntries = t === 0 ? entries : additions;
+        for (var v = 0; v < scaleEntries.length; v++) {
+            var scaleOptions = scaleZoomOptions(targets[t], scaleEntries[v]);
+            var scaleFov = scaleZoomFov(targets[t], scaleEntries[v].region);
+            if (scaleOptions) {
+                try { validateScaleOptions(scaleOptions, scaleFov); }
+                catch (scaleError) { return sciError(String(scaleError.message)); }
+            }
+        }
     }
 
     // Duplication can retain direct selection on children of a clipping group.
@@ -2815,6 +2832,8 @@ function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, cr
         var zBounds = [zLeft, zTop, zLeft + zWidth, zTop - zHeight];
         if (!preserved) occupiedBounds.push(zBounds);
 
+        var zoomFov = scaleZoomFov(sourceItem, reg);
+        var zoomScaleOptions = scaleZoomOptions(sourceItem, entry);
         var existingZoomGroup = findItemByTag(doc, "ILST_ZOOM_ITEM_" + key);
         if (existingZoomGroup) {
             try { existingZoomGroup.remove(); } catch (e) {}
@@ -2822,6 +2841,7 @@ function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, cr
 
         var dup = sourceItem.duplicate();
         clearCopiedZoomTags(dup);
+        scaleClearDuplicate(dup);
         positionZoomDuplicate(dup, sBounds, [mLeft, mTop, mRight, mBottom], zBounds);
 
         var clipRect = targetLayer.pathItems.rectangle(zTop, zLeft, zWidth, zHeight);
@@ -2845,6 +2865,8 @@ function applyZoomToTarget(doc, sourceItem, manualRect, entries, deletedKeys, cr
         // including the separate visible border.
         clipRect.moveToBeginning(zoomGroup);
         zoomGroup.clipped = true;
+        if (zoomFov) scaleWriteFov(zoomGroup, zoomFov);
+        if (zoomScaleOptions && zoomFov) scaleDrawBar(doc, zoomGroup, zoomFov, zoomScaleOptions);
 
         var oldG1 = findItemByTag(doc, "ILST_ZOOM_GUIDE1_" + key);
         if (oldG1) { try { oldG1.remove(); } catch (e) {} }
@@ -3123,6 +3145,7 @@ function refreshTrackedZoomImage(group, sourceBounds, markerBounds, zoomBounds) 
     var duplicate = null, mask = null, border = null;
     for (var i = 0; i < group.zoom.pageItems.length; i++) {
         var child = group.zoom.pageItems[i];
+        if (child.parent !== group.zoom || getTag(child, "SCI_SCALE_BAR")) continue;
         if (child.clipping) mask = child;
         else if (child.typename === "PathItem") border = child;
         else duplicate = child;
@@ -3290,6 +3313,21 @@ function syncZoomTracker() {
                 refreshTrackedZoomImage(group, pBounds, mBounds, zBounds);
             }
             group.relRegion = relativeZoomBounds(mBounds, pBounds);
+            var trackedFov = scaleZoomFov(group.picture, group.relRegion);
+            var trackedOptions = scaleReadOptions(group.zoom);
+            if (trackedFov) {
+                var previousFov = scaleReadStoredFov(group.zoom);
+                var calibrationChanged = !previousFov || Math.abs(previousFov.width - trackedFov.width) > 0.000001 ||
+                    Math.abs(previousFov.height - trackedFov.height) > 0.000001 || previousFov.unit !== trackedFov.unit;
+                var outputResized = Math.abs((zBounds[2] - zBounds[0]) - (group.lastZBounds[2] - group.lastZBounds[0])) > 0.01 ||
+                    Math.abs((zBounds[1] - zBounds[3]) - (group.lastZBounds[1] - group.lastZBounds[3])) > 0.01;
+                if (trackedOptions && (calibrationChanged || outputResized)) {
+                    // Keep the represented length while recalculating its size
+                    // after crop/output changes. Invalid crops are edited in
+                    // the scale panel; background tracking must not throw.
+                    try { scaleDrawBar(doc, group.zoom, trackedFov, trackedOptions); } catch (scaleError) {}
+                } else if (calibrationChanged) scaleWriteFov(group.zoom, trackedFov);
+            }
         }
         zBounds = getVisibleBounds(group.zoom) || group.zoom.geometricBounds;
         group.lastPBounds = [pBounds[0], pBounds[1], pBounds[2], pBounds[3]];

@@ -380,7 +380,8 @@ export const actions = {
       sourceHeight: data.sourceHeight || 100,
       previewDataUrl,
       existingEntries: data.existingEntries || [],
-      manualRect: data.manualRect || null
+      manualRect: data.manualRect || null,
+      sourceScalebar: data.sourceScalebar || null
     };
   },
   applyZoom: async (payload: {

@@ -661,8 +661,20 @@ async function createPanel(
                   manualRect: null
                 }),
                 applyZoomImages: 'Success',
+                inspectScalebar: JSON.stringify({
+                  token: 'image-token', signature: 'image-token', documentKey: 'test.ai',
+                  fov: { width: 0.2, height: 0.1, unit: 'cm' },
+                  options: { orientation: 'horizontal', lengthUm: 75, thickness: 3, color: '#ffffff',
+                    showText: true, fontColor: '#ff0000', fontSize: 12, bold: true, position: 'BL', autoGroup: true }
+                }),
+                applyScalebar: 'OK',
                 syncZoomTracker: 'OK'
               };
+              if (operation === 'inspectScalebar') {
+                const selection = (window as any).__scaleSelection;
+                if (selection) data[operation] = JSON.stringify(selection);
+                if (JSON.parse(data[operation]).signature === args[0]) data[operation] = 'null';
+              }
               return JSON.stringify({
                 ok: true,
                 data: data[operation] || 'Success'
@@ -713,6 +725,56 @@ async function createPanel(
   };
   return { window, requests, alerts, element, input, click, flush };
 }
+
+test('scalebar selection loads automatically, follows FOV units and autosaves without read/import/save buttons', async () => {
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar');
+  try {
+    assert.equal(panel.requests.filter((r) => r.operation === 'inspectScalebar').length, 1);
+    assert.equal((panel.element('fov-width') as any).value, '0.2');
+    assert.equal((panel.element('fov-unit') as any).value, 'cm');
+    assert.equal((panel.element('scale-length') as any).value, '0.0075');
+    assert.equal((panel.element('scale-unit') as any).value, 'cm');
+    assert.equal((panel.element('scale-auto-group') as any).checked, true);
+    for (const id of ['inspect-scalebar-button', 'import-scale-tiff-button', 'save-fov-button', 'apply-scalebar-button'])
+      assert.equal(panel.window.document.getElementById(id), null);
+    await panel.input('scale-orientation', 'vertical');
+    assert.equal(panel.element('scale-length').previousElementSibling?.textContent, 'Height (cm):');
+    await panel.input('scale-length', '0.01');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const applied = panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!;
+    assert.equal(applied.operation, 'applyScalebar');
+    const payload = JSON.parse(applied.args[0] as string);
+    assert.equal(payload.token, 'image-token');
+    assert.equal(payload.fov.width, 0.2); assert.equal(payload.fov.unit, 'cm');
+    assert.equal(payload.options.orientation, 'vertical'); assert.equal(payload.options.lengthUm, 100);
+    assert.equal(payload.options.unit, 'cm'); assert.equal(payload.autoSave, true);
+    assert.equal(payload.options.bold, true); assert.equal(payload.options.fontColor, '#ff0000');
+    await panel.input('fov-width', '0.3');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const saved = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(saved.fov.width, 0.3); assert.equal(saved.saveOnly, false);
+    await panel.input('fov-unit', 'mm');
+    assert.equal((panel.element('scale-unit') as any).value, 'mm');
+    assert.equal((panel.element('scale-length') as any).value, '0.1');
+    await panel.input('language', 'zh_CN');
+    assert.equal(panel.element('scale-length').previousElementSibling?.textContent, 'Height（mm）：');
+    (panel.window as any).__scaleSelection = { token: 'second-image', signature: 'second-image', documentKey: 'test.ai',
+      fov: { width: 2, height: 1, unit: 'mm' }, options: null };
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((panel.element('fov-width') as any).value, '2');
+    assert.equal((panel.element('scale-unit') as any).value, 'mm');
+    assert.equal((panel.element('scale-length') as any).value, '0.05');
+    assert.equal(panel.element('apply-scalebar-button').textContent, '添加比例尺');
+    await panel.input('fov-height', '1.5');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const newFov = JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.equal(newFov.token, 'second-image'); assert.equal(newFov.saveOnly, true);
+    assert.equal(newFov.fov.height, 1.5);
+    await panel.click('apply-scalebar-button');
+    assert.equal(JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string).autoSave, false);
+    assert.deepEqual(panel.alerts, []);
+  } finally { await panel.window.happyDOM.close(); }
+});
 
 test('zoom automatic update switch persists and gates background host polling', async () => {
   const panel = await createPanel();
@@ -1129,10 +1191,11 @@ test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the i
   }
 });
 
-test('standalone zoom window renders standalone root and opens session', async () => {
+test('standalone zoom window restores source units and edits represented length in that unit', async () => {
   const updates: { type: string; enabled: boolean }[] = [];
   const session = {
     data: {
+      sourceScalebar: { lengthUm: 50, unit: 'cm' },
       sourceWidth: 500,
       sourceHeight: 400,
       previewDataUrl:
@@ -1152,7 +1215,8 @@ test('standalone zoom window renders standalone root and opens session', async (
           guideLineExtent: 'acrossImages',
           originalZoomRegion: { x: 1.1, y: 0, width: 0.8, height: 1 },
           originalZoomRotation: 0,
-          preservesLayout: true
+          preservesLayout: true,
+          scaleLengthUm: 75
         }
       ],
       manualRect: null
@@ -1187,6 +1251,8 @@ test('standalone zoom window renders standalone root and opens session', async (
     assert.ok(panel.window.document.querySelector('.zoom-standalone-root'));
     assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
     assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
+    assert.equal((panel.element('zoom-scale-length') as any).value, '0.0075');
+    await panel.input('zoom-scale-length', '0.01');
 
     await panel.click('zoom-auto-update');
     assert.equal((panel.element('zoom-auto-update') as unknown as HTMLInputElement).checked, false);
@@ -1217,6 +1283,8 @@ test('standalone zoom window renders standalone root and opens session', async (
     const applied = panel.requests.find((r) => r.operation === 'applyZoomImages')!;
     const editedEntry = JSON.parse(applied.args[0] as string).entries[0];
     assert.equal(editedEntry.recordKey, 'saved_zoom');
+    assert.equal(editedEntry.scaleLengthUm, 100);
+    assert.equal(editedEntry.scaleUnit, 'cm');
     assert.equal(editedEntry.strokeWidth, 4);
     assert.equal(editedEntry.placement, 'left');
     assert.equal(editedEntry.preservesLayout, false, 'Changing placement must release the saved layout');

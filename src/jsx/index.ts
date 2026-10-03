@@ -27,6 +27,8 @@ declare function applyPaletteFill(...args: unknown[]): string;
 declare function inspectPseudocolorLayerTargets(...args: unknown[]): string;
 declare function cancelPseudocolorLayerTargets(...args: unknown[]): string;
 declare function applyPseudocolorLayers(...args: unknown[]): string;
+declare function inspectScalebar(...args: unknown[]): string;
+declare function applyScalebar(...args: unknown[]): string;
 
 var methods: Record<string, (...args: unknown[]) => string> = {
   arrangeImages: arrangeImages,
@@ -53,7 +55,9 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   applyPaletteFill: applyPaletteFill,
   inspectPseudocolorLayerTargets: inspectPseudocolorLayerTargets,
   cancelPseudocolorLayerTargets: cancelPseudocolorLayerTargets,
-  applyPseudocolorLayers: applyPseudocolorLayers
+  applyPseudocolorLayers: applyPseudocolorLayers,
+  inspectScalebar: inspectScalebar,
+  applyScalebar: applyScalebar
 };
 
 $['com.example.achuanPlugin'] = {

@@ -29,7 +29,7 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         return code;
     }
     eval(read("/src/jsx/lib/json2.js"));
-    var code = read("/src/jsx/ilst/arrange.jsx");
+    var code = read("/src/jsx/ilst/arrange.jsx") + read("/src/jsx/ilst/scalebar.jsx");
     var doc = app.activeDocument;
     if (!doc) throw new Error("Open a document containing a raster or placed image first");
     var oldSelection = doc.selection, oldLayer = doc.activeLayer;

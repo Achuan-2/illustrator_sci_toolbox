@@ -9,6 +9,7 @@
   } from '../stores/zoomModal';
   import { actions } from '../services/actions';
   import { tooltip } from '../services/tooltip';
+  import { unitFactor, unitSymbol, lengthInUnit } from '../services/scalebar';
 
   let { standalone = false } = $props<{ standalone?: boolean }>();
   let isStandalone = $derived(standalone || isZoomWindow());
@@ -824,7 +825,9 @@
         ($settings.zoomGuideLineExtent as ZoomGuideLineExtent),
       originalZoomRegion: null,
       originalZoomRotation: 0,
-      preservesLayout: false
+      preservesLayout: false,
+      scaleLengthUm: $zoomModalState.sourceScalebar?.lengthUm ?? null,
+      scaleUnit: $zoomModalState.sourceScalebar?.unit ?? 'um'
     };
 
     entries.push(newEntry);
@@ -1086,6 +1089,17 @@
 
             <fieldset class="settings-group">
               <legend>{$t('zoom.zoomSettings')}</legend>
+              {#if $zoomModalState.sourceScalebar || activeEntry.scaleLengthUm != null}
+                <div class="settings-row control-group">
+                  <label for="zoom-scale-length">{$t('scale.zoomLength', { unit: unitSymbol(activeEntry.scaleUnit || 'um') })}</label>
+                  <input id="zoom-scale-length" type="number" min="0" step="any"
+                    bind:value={() => lengthInUnit(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
+                      (value) => { activeEntry.scaleLengthUm = Number(value) * unitFactor(activeEntry.scaleUnit || 'um'); }} />
+                  <select aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
+                    <option value="nm">nm</option><option value="um">μm</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">inch</option>
+                  </select>
+                </div>
+              {/if}
               <div class="settings-row">
                 <div class="control-group">
                   <label for="zoom-placement">{$t('zoom.placement')}</label>

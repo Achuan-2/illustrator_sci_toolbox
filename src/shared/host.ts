@@ -78,6 +78,8 @@ export interface HostArguments {
   copySpacing: [Direction];
   pasteSpacing: [Direction, number, boolean];
   inspectZoomTarget: [];
+  inspectScalebar: [string?];
+  applyScalebar: [string];
   applyZoomImages: [string];
   cancelZoomTarget: [];
   syncZoomTracker: [];

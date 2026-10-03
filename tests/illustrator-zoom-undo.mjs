@@ -58,7 +58,7 @@ try {
     fixture.layer=doc.layers.add();fixture.layer.name="SCI temporary undo test "+new Date().getTime();doc.activeLayer=fixture.layer;doc.selection=null;
     fixture.other=fixture.layer.pathItems.rectangle(20000,-19980,10,10);fixture.other.filled=false;fixture.other.stroked=false;
     var scope=';var fullIndex=readCurrentZoomRecords;readCurrentZoomRecords=function(doc){var index=fullIndex(doc),maps=["records","pictures","markers","guides1","guides2"];for(var i=0;i<maps.length;i++){var map=index[maps[i]];for(var key in map){var item=map[key];if(maps[i]==="records")item=item.zoom;if(item.layer!==testLayer)delete map[key];}}return index;};return {apply:applyZoomImages,sync:syncZoomTracker,tag:addTag,clear:clearCopiedZoomTags,find:findItemByTag,visible:getVisibleBounds,index:readCurrentZoomRecords,state:captureZoomTrackingState};';
-    fixture.api=new Function("JSON","testLayer",read("/src/jsx/ilst/arrange.jsx")+scope)(JSON,fixture.layer);
+    fixture.api=new Function("JSON","testLayer",read("/src/jsx/ilst/arrange.jsx")+read("/src/jsx/ilst/scalebar.jsx")+scope)(JSON,fixture.layer);
     fixture.source=original.duplicate(fixture.layer);fixture.api.clear(fixture.source);
     var p=fixture.api.visible(fixture.source);fixture.source.translate(-20000-p[0],20000-p[1]);
     fixture.api.tag(fixture.source,"ILST_ZOOM_ACTIVE_TARGET","1");

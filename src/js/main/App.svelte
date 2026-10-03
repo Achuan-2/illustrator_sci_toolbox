@@ -23,6 +23,7 @@
   import LabelsPanel from '../components/LabelsPanel.svelte';
   import SizePanel from '../components/SizePanel.svelte';
   import BorderPanel from '../components/BorderPanel.svelte';
+  import ScalebarPanel from '../components/ScalebarPanel.svelte';
   import ZoomPanel from '../components/ZoomPanel.svelte';
   import PseudocolorPanel from '../components/PseudocolorPanel.svelte';
   import PalettePanel from '../components/PalettePanel.svelte';
@@ -42,6 +43,7 @@
     { id: 'size', component: SizePanel },
     { id: 'labels', component: LabelsPanel },
     { id: 'border', component: BorderPanel },
+    { id: 'scalebar', component: ScalebarPanel },
     { id: 'zoom', component: ZoomPanel },
     { id: 'pseudocolor', component: PseudocolorPanel },
     { id: 'palettes', component: PalettePanel },
@@ -50,6 +52,7 @@
     { id: 'about', component: AboutPanel }
   ];
   let active = $state('relative');
+  let scaleRevision = $state(0);
   $effect(() => {
     document.documentElement.lang =
       $settings.language === 'zh_CN' ? 'zh-CN' : 'en';
@@ -61,6 +64,7 @@
     active = panels.some((panel) => panel.id === hash) ? hash : 'relative';
   }
   function activate(id: string) {
+    if (id === 'scalebar') scaleRevision += 1;
     active = id;
     location.hash = id;
   }
@@ -234,7 +238,11 @@
       {#each panels as panel}
         <!-- Keep mounted so changing tabs preserves in-progress values. -->
         <div hidden={active !== panel.id}>
-          <panel.component />
+          {#if panel.id === 'scalebar'}
+            <ScalebarPanel active={active === 'scalebar'} revision={scaleRevision} />
+          {:else}
+            <panel.component />
+          {/if}
         </div>
       {/each}
     </main>

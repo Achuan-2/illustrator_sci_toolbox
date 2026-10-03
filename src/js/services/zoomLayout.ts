@@ -42,6 +42,8 @@ export interface ZoomEntry {
   originalZoomRegion: NormalizedRegion | null;
   originalZoomRotation: number;
   preservesLayout?: boolean;
+  scaleLengthUm?: number | null;
+  scaleUnit?: string;
 }
 
 export const GAP_POINTS = (0.5 * 72) / 2.54; // ~14.17 points (0.5 cm)

@@ -6,8 +6,10 @@ import type {
   ZoomGuideLineExtent
 } from '../services/zoomLayout';
 import type { Settings } from './settings';
+import type { ScalebarOptions } from '../services/scalebar';
 
 export interface ZoomInspectData {
+  sourceScalebar?: ScalebarOptions | null;
   sourceWidth: number;
   sourceHeight: number;
   previewDataUrl: string;
@@ -28,6 +30,7 @@ export interface ZoomSession {
 }
 
 export interface ZoomModalState {
+  sourceScalebar: ScalebarOptions | null;
   open: boolean;
   sourceWidth: number;
   sourceHeight: number;
@@ -39,6 +42,7 @@ export interface ZoomModalState {
 }
 
 const initialState: ZoomModalState = {
+  sourceScalebar: null,
   open: false,
   sourceWidth: 100,
   sourceHeight: 100,
@@ -254,11 +258,16 @@ export function openZoomModal(
   }
 
   zoomModalState.set({
+    sourceScalebar: data.sourceScalebar || null,
     open: true,
     sourceWidth: data.sourceWidth,
     sourceHeight: data.sourceHeight,
     previewDataUrl: data.previewDataUrl,
-    entries,
+    entries: entries.map((entry) => ({
+      ...entry,
+      scaleLengthUm: entry.scaleLengthUm ?? data.sourceScalebar?.lengthUm ?? null,
+      scaleUnit: entry.scaleUnit ?? data.sourceScalebar?.unit ?? 'um'
+    })),
     deletedKeys: [],
     activeIndex: 0,
     error: ''
