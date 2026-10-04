@@ -33,7 +33,7 @@ Svelte 和 CSS 修改通过 Vite HMR 更新。`src/js/i18n/*.json` 修改会触�
 
 开发服务与生产文件页面具有不同 origin，localStorage 彼此独立。生产环境沿用 `illustrator_sci_plugin_settings` 存储键；切换开发模式后需要在开发页面重新设置语言和标注参数，不要将其误判为生产设置丢失。
 
-只有 `pnpm zxp`（以及调用它的 `pnpm zip`）生成静态入口和安装包，不依赖开发服务。打包后运行 `pnpm dev` 或 `pnpm build` 可恢复开发入口；如果面板仍停留在静态页面，关闭并重新打开一次。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
+`pnpm zxp` 生成静态入口、签名 ZXP 和同内容 ZIP，不依赖开发服务。打包后运行 `pnpm dev` 或 `pnpm build` 可恢复开发入口；如果面板仍停留在静态页面，关闭并重新打开一次。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
 
 ## 代码结构
 
@@ -57,7 +57,7 @@ Svelte 和 CSS 修改通过 Vite HMR 更新。`src/js/i18n/*.json` 修改会触�
 ```powershell
 pnpm check
 pnpm test
-pnpm zip
+pnpm zxp
 pnpm verify:package
 ```
 
@@ -65,11 +65,11 @@ pnpm verify:package
 
 ## 打包与本地发布
 
-`pnpm zxp` 生成签名安装包；`pnpm zip` 先生成签名 ZXP，再将同一文件复制为 `.zip`。两个文件内容完全相同，仅扩展名不同，分别用于安装器安装和手动解压安装。
+`pnpm zxp` 生成签名 ZXP 后，自动将同一文件复制为 `.zip`，两个文件统一放在 `dist/zxp`，无需另外运行 `pnpm zip`。两个文件内容完全相同，仅扩展名不同，分别用于安装器安装和手动解压安装。`pnpm zip` 保留为 `pnpm zxp` 的兼容别名。
 
 ```text
 dist/zxp/illustrator_sci_toolbox_v<version>.zxp
-dist/zip/illustrator_sci_toolbox_v<version>.zip
+dist/zxp/illustrator_sci_toolbox_v<version>.zip
 ```
 
 ZIP 解压后，将整个扩展文件夹复制到 CEP 扩展目录，确保 `CSXS/manifest.xml` 位于该文件夹的直接子目录中。Windows 目录为 `%APPDATA%\Adobe\CEP\extensions`，macOS 目录为 `~/Library/Application Support/Adobe/CEP/extensions`。重启 Illustrator 后打开插件。本地调试可使用 `dist/cep`。

@@ -22,10 +22,10 @@ pnpm() {
   [[ "$1" != "$RELEASE_TEST_FAIL" ]] || return 91
   case "$1" in
     release:notes) printf 'Release notes\\n' > release-notes.md ;;
-    zip)
-      mkdir -p dist/zxp dist/zip
+    zxp)
+      mkdir -p dist/zxp
       printf 'signed fixture' > dist/zxp/illustrator_sci_toolbox_v2.5.0.zxp
-      cp dist/zxp/illustrator_sci_toolbox_v2.5.0.zxp dist/zip/illustrator_sci_toolbox_v2.5.0.zip
+      cp dist/zxp/illustrator_sci_toolbox_v2.5.0.zxp dist/zxp/illustrator_sci_toolbox_v2.5.0.zip
       ;;
   esac
 }

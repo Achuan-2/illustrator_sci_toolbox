@@ -8,7 +8,7 @@ import { unzipSync, strFromU8 } from 'fflate';
 const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const filename = `illustrator_sci_toolbox_v${version}`;
 const zxpPath = path.resolve(`dist/zxp/${filename}.zxp`);
-const zipPath = path.resolve(`dist/zip/${filename}.zip`);
+const zipPath = path.join(path.dirname(zxpPath), `${filename}.zip`);
 const zxp = fs.readFileSync(zxpPath);
 const zip = fs.readFileSync(zipPath);
 assert.ok(

@@ -26,7 +26,7 @@ const options: CepOptions = {
     `dist/zxp/illustrator_sci_toolbox_v${cepConfig.version}`
   ),
   zipOutput: path.resolve(
-    `dist/zip/illustrator_sci_toolbox_v${cepConfig.version}`
+    `dist/zxp/illustrator_sci_toolbox_v${cepConfig.version}`
   ),
   packages: []
 };

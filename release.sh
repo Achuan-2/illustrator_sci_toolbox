@@ -35,7 +35,7 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 tag="v$version"
-packages=("dist/zxp/illustrator_sci_toolbox_v$version.zxp" "dist/zip/illustrator_sci_toolbox_v$version.zip")
+packages=("dist/zxp/illustrator_sci_toolbox_v$version.zxp" "dist/zxp/illustrator_sci_toolbox_v$version.zip")
 
 if "$publish"; then
   for tool in git gh; do
@@ -51,7 +51,7 @@ fi
 
 pnpm release:notes "$tag"
 pnpm test
-pnpm zip
+pnpm zxp
 pnpm verify:package
 for package in "${packages[@]}"; do
   [[ -s "$package" ]] || { printf '安装包不存在或为空：%s\n' "$package" >&2; exit 1; }

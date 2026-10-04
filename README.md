@@ -232,7 +232,7 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 pnpm install
 pnpm build  # 检查、构建并启动或复用热更新服务
 pnpm dev    # 直接启动或复用热更新服务，首次自动生成扩展文件
-pnpm zxp    # 生成静态扩展和签名安装包
+pnpm zxp    # 生成静态扩展、签名 ZXP，并自动复制为 ZIP
 ```
 
 ## ❤️用爱发电
