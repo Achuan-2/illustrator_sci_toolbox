@@ -304,7 +304,7 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 
 
-## 5 开发与发布
+## 本地开发
 
 项目架构为 Bolt CEP + Svelte + TypeScript，使用 pnpm 管理依赖。
 
