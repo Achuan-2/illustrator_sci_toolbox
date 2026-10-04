@@ -167,12 +167,20 @@ function scaleIsMergedImage(item) {
         (/^SCI_MERGE_CHANNELS:1(?:\n|$)/.test(item.note || "") || item.name === "SCI Merge Channels — Screen");
 }
 
+function scaleIsZoomImage(item) {
+    if (item.typename !== "GroupItem" || !item.tags) return false;
+    for (var i = 0; i < item.tags.length; i++) {
+        if (item.tags[i].name.indexOf("ILST_ZOOM_ITEM_") === 0) return true;
+    }
+    return false;
+}
+
 function scaleReadFov(item) {
     var stored = scaleReadStoredFov(item);
     if (stored) return stored;
     var rasters = [];
     scaleFindRaster(item, rasters);
-    if (!rasters.length || (rasters.length !== 1 && !scaleIsMergedImage(item))) return null;
+    if (!rasters.length || (rasters.length !== 1 && !scaleIsMergedImage(item) && !scaleIsZoomImage(item))) return null;
     var result = null;
     for (var i = 0; i < rasters.length; i++) {
         var image = rasters[i], fov = scaleReadStoredFov(image);
@@ -207,10 +215,8 @@ function scaleReadOptions(item) {
     } catch (error) { return null; }
 }
 
-function scaleSelectionTarget(doc) {
-    var selection = doc.selection;
-    if (!selection || selection.length !== 1) throw new Error("errors.scaleSelection");
-    var item = selection[0], current = item;
+function scaleResolveSelectionItem(doc, item) {
+    var current = item;
     while (current && current.typename !== "Layer" && current.typename !== "Document") {
         var key = getTag(current, "SCI_SCALE_BAR");
         if (key) {
@@ -223,6 +229,9 @@ function scaleSelectionTarget(doc) {
         }
         if (getTag(current, "SCI_SCALE_WRAPPER")) return scaleWrapperPicture(current);
         if (scaleReadOptions(current)) return current;
+        // A zoom's clipping group owns its calibration even before it has a
+        // scale, including when it contains several merged channel rasters.
+        if (scaleIsZoomImage(current)) return current;
         current = current.parent;
     }
     item = scaleWrapperPicture(item);
@@ -230,6 +239,46 @@ function scaleSelectionTarget(doc) {
     scaleFindRaster(item, rasters);
     if (rasters.length !== 1 && !(rasters.length > 1 && scaleIsMergedImage(item))) throw new Error("errors.scaleSelection");
     return item;
+}
+
+function scaleSelectionTargets(doc) {
+    var selection = doc.selection, targets = [];
+    if (!selection || !selection.length) throw new Error("errors.scaleSelection");
+    for (var i = 0; i < selection.length; i++) {
+        var target = scaleResolveSelectionItem(doc, selection[i]), duplicate = false;
+        for (var j = 0; j < targets.length; j++) if (targets[j] === target) duplicate = true;
+        if (!duplicate) targets.push(target);
+    }
+    return targets;
+}
+
+function scaleSelectionTarget(doc) {
+    var targets = scaleSelectionTargets(doc);
+    if (targets.length !== 1) throw new Error("errors.scaleSelection");
+    return targets[0];
+}
+
+function scaleTargetToken(doc, target) {
+    if (target.uuid) return target.uuid;
+    var token = getTag(target, "SCI_SCALE_TARGET");
+    // Older hosts have no UUID; copied tags must not pin two pictures to one ID.
+    if (token) {
+        var copies = [];
+        for (var i = 0; i < doc.pageItems.length; i++) {
+            if (doc.pageItems[i] !== target && getTag(doc.pageItems[i], "SCI_SCALE_TARGET") === token) copies.push(doc.pageItems[i]);
+        }
+        if (copies.length) {
+            // Retire the ambiguous ID everywhere. A pending save using it must
+            // fail rather than silently finding one of the copied pictures.
+            for (var c = 0; c < copies.length; c++) addTag(copies[c], "SCI_SCALE_TARGET", createZoomRecordKey(doc));
+            token = null;
+        }
+    }
+    if (!token) {
+        token = createZoomRecordKey(doc);
+        addTag(target, "SCI_SCALE_TARGET", token);
+    }
+    return token;
 }
 
 function scaleDocumentKey(doc) {
@@ -240,15 +289,16 @@ function inspectScalebar(previousSignature) {
     var signature = "no-document", documentKey = "";
     try {
         if (!app.documents.length) throw new Error("errors.noDocument");
-        var doc = app.activeDocument, target = scaleSelectionTarget(doc);
+        var doc = app.activeDocument, targets = scaleSelectionTargets(doc), tokens = [], inspected = [];
         documentKey = scaleDocumentKey(doc);
         // A token pins the inspected object; changing selection cannot apply
         // the old form's FOV to another image. Tokens persist across CEP reloads.
-        var token = target.uuid || getTag(target, "SCI_SCALE_TARGET") || createZoomRecordKey(doc);
-        if (!target.uuid && getTag(target, "SCI_SCALE_TARGET") !== token) addTag(target, "SCI_SCALE_TARGET", token);
-        signature = documentKey + "|" + token;
+        for (var i = 0; i < targets.length; i++) tokens.push(scaleTargetToken(doc, targets[i]));
+        signature = documentKey + "|" + tokens.slice(0).sort().join("|");
         if (signature === previousSignature) return "null";
-        return JSON.stringify({ token: token, signature: signature, documentKey: documentKey, fov: scaleReadFov(target), options: scaleReadOptions(target) });
+        for (var j = 0; j < targets.length; j++) inspected.push({token:tokens[j],fov:scaleReadFov(targets[j]),options:scaleReadOptions(targets[j])});
+        return JSON.stringify({ token: tokens[0], signature: signature, documentKey: documentKey,
+            fov: inspected[0].fov, options: inspected[0].options, targets: inspected });
     } catch (error) {
         if (previousSignature === undefined) return sciError(String(error.message));
         if (app.documents.length) signature = scaleDocumentKey(app.activeDocument) + "|no-image";
@@ -386,37 +436,67 @@ function scaleDrawBar(doc, target, fov, options) {
 function applyScalebar(payloadJson) {
     if (!app.documents.length) return sciError("errors.noDocument");
     try {
-        var doc = app.activeDocument, payload = JSON.parse(payloadJson), target = null;
+        var doc = app.activeDocument, payload = JSON.parse(payloadJson), targets = [], plans = [], results = [];
         if (payload.documentKey && payload.documentKey !== scaleDocumentKey(doc)) return sciError("errors.scaleTargetChanged");
-        if (payload.autoSave) {
-            // Save the inspected image even when the user has already selected
-            // another one. Background saves never steal another image's selection.
-            for (var i = 0; i < doc.pageItems.length; i++) {
-                var candidate = doc.pageItems[i];
-                if ((candidate.uuid || getTag(candidate, "SCI_SCALE_TARGET")) === payload.token) { target = candidate; break; }
+        var requested = payload.targets || [{token:payload.token}], batch = requested.length > 1;
+        if (!requested.length) return sciError("errors.scaleSelection");
+        var selectionTargets = payload.autoSave ? null : scaleSelectionTargets(doc);
+        if (selectionTargets && selectionTargets.length !== requested.length) return sciError("errors.scaleTargetChanged");
+        for (var i = 0; i < requested.length; i++) {
+            var target = null, candidates = selectionTargets || doc.pageItems;
+            for (var c = 0; c < candidates.length; c++) {
+                var candidate = candidates[c];
+                if ((candidate.uuid || getTag(candidate, "SCI_SCALE_TARGET")) === requested[i].token) { target = candidate; break; }
             }
             if (!target) return sciError("errors.scaleTargetChanged");
-        } else target = scaleSelectionTarget(doc);
-        if ((target.uuid || getTag(target, "SCI_SCALE_TARGET")) !== payload.token) return sciError("errors.scaleTargetChanged");
-        if (!validScaleFov(payload.fov, payload.options && payload.options.orientation)) return sciError("errors.scaleFov");
-        if (!payload.fov.width) payload.fov.width = 0;
-        if (!payload.fov.height) payload.fov.height = 0;
-        var currentOptions = payload.options;
-        if (payload.saveOnly) currentOptions = scaleReadOptions(target);
-        if (currentOptions) validateScaleOptions(currentOptions, payload.fov);
-        if (payload.saveOnly && !currentOptions) scaleWriteFov(target, payload.fov);
-        else {
-            var wasSelectedTarget = false;
-            if (payload.autoSave) {
-                try { wasSelectedTarget = scaleSelectionTarget(doc) === target; } catch (selectionError) {}
+            for (var d = 0; d < targets.length; d++) if (targets[d] === target) return sciError("errors.scaleTargetChanged");
+            targets.push(target);
+            // A batch keeps each picture's calibration unless the FOV fields
+            // were explicitly edited. Validate every plan before changing artwork.
+            var fov = batch && !payload.updateFov ? scaleReadFov(target) : payload.fov;
+            if (!validScaleFov(fov, payload.options && payload.options.orientation)) return sciError("errors.scaleFov");
+            fov = JSON.parse(JSON.stringify(fov));
+            if (!fov.width) fov.width = 0;
+            if (!fov.height) fov.height = 0;
+            var existingOptions = scaleReadOptions(target), currentOptions = payload.options;
+            if (payload.saveOnly && (!batch || !existingOptions)) currentOptions = existingOptions;
+            if (currentOptions) {
+                currentOptions = JSON.parse(JSON.stringify(currentOptions));
+                validateScaleOptions(currentOptions, fov);
             }
-            var selected = scaleDrawBar(doc, target, payload.fov, currentOptions);
-            if (!payload.autoSave || wasSelectedTarget) {
-                // Replacing a selected bar can invalidate its group's selection
-                // only after Illustrator redraws. Set the complete selection now
-                // instead of trusting the old selection length or selected flag.
-                doc.selection = [selected];
+            if (!currentOptions && !payload.saveOnly) return sciError("errors.scaleOptions");
+            plans.push({target:target,fov:fov,options:currentOptions});
+        }
+        // Record selected owners before replacing their scale labels. Restore
+        // only these owners afterwards, keeping other selected artwork intact.
+        var originalSelection = [], selectedPlans = [], affectsSelection = false;
+        for (var s = 0; doc.selection && s < doc.selection.length; s++) {
+            var item = doc.selection[s], selectedPlan = -1;
+            originalSelection.push(item);
+            try {
+                var owner = scaleResolveSelectionItem(doc, item);
+                for (var p = 0; p < plans.length; p++) if (plans[p].target === owner) selectedPlan = p;
+            } catch (selectionError) {}
+            selectedPlans.push(selectedPlan);
+            if (selectedPlan >= 0) affectsSelection = true;
+        }
+        for (var a = 0; a < plans.length; a++) {
+            var plan = plans[a];
+            if (plan.options) results.push(scaleDrawBar(doc, plan.target, plan.fov, plan.options));
+            else {
+                scaleWriteFov(plan.target, plan.fov);
+                results.push(getTag(plan.target.parent, "SCI_SCALE_WRAPPER") ? plan.target.parent : plan.target);
             }
+        }
+        if (!payload.autoSave) doc.selection = results;
+        else if (affectsSelection) {
+            var restored = [];
+            for (var r = 0; r < originalSelection.length; r++) {
+                var selected = selectedPlans[r] < 0 ? originalSelection[r] : results[selectedPlans[r]], duplicate = false;
+                for (var q = 0; q < restored.length; q++) if (restored[q] === selected) duplicate = true;
+                if (!duplicate) restored.push(selected);
+            }
+            doc.selection = restored;
         }
         return "OK";
     } catch (error) { return sciError(String(error.message)); }

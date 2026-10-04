@@ -13,7 +13,8 @@
     normalizeScalebarStyle,
     type ImageFov,
     type ScalebarOptions,
-    type ScalebarInspection
+    type ScalebarInspection,
+    type ScalebarTargetInspection
   } from '../services/scalebar';
 
   let { active = false, revision = 0 } = $props<{
@@ -31,11 +32,23 @@
   let message = $state('');
   let error = $state('');
   let hasScalebar = $state(false);
+  let targets = $state<ScalebarTargetInspection[]>([]);
+  let updateFov = $state(false);
+  let batch = $derived(targets.length > 1);
+  let missingFovCount = $derived(targets.filter((target) =>
+    !((options.orientation === 'vertical' ? target.fov?.height : target.fov?.width) ?? 0)
+  ).length);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingSave: ReturnType<typeof snapshot> | undefined;
   let editingRevision = 0;
   let maxLength = $derived.by(() => {
-    const maximum = maxScalebarLengthUm(fov, options.orientation);
+    const limits = batch && !updateFov
+      ? targets.map((target) => maxScalebarLengthUm(target.fov, options.orientation))
+      : [maxScalebarLengthUm(fov, options.orientation)];
+    // Each image is capped independently when a batch has different FOVs.
+    const maximum = limits.some((limit) => limit === undefined)
+      ? undefined
+      : Math.max(...(limits as number[]));
     return maximum === undefined
       ? undefined
       : lengthInUnit(maximum, options.unit || fov.unit);
@@ -62,6 +75,8 @@
       void flushSave();
       signature = result.signature || result.token;
       token = result.token;
+      targets = result.targets || (result.token ? [{ token: result.token, fov: result.fov, options: result.options }] : []);
+      updateFov = false;
       documentKey = result.documentKey || '';
       error = '';
       fov = result.fov
@@ -72,7 +87,7 @@
       options.unit = fovUnit(options.unit || fov.unit);
       displayLength = lengthInUnit(options.lengthUm, options.unit);
       clampLength();
-      hasScalebar = Boolean(result.options);
+      hasScalebar = targets.length > 0 && targets.every((target) => Boolean(target.options));
       message = result.errorKey
         ? $t(result.errorKey)
         : result.fov
@@ -89,6 +104,12 @@
     clampLength();
     return {
       token,
+      selectionSignature: signature,
+      targets: targets.map((target) => ({ token: target.token })),
+      updateFov,
+      calibrated: batch && !updateFov
+        ? missingFovCount === 0
+        : (options.orientation === 'vertical' ? fov.height : fov.width) > 0,
       documentKey,
       fov: { ...fov, source: 'manual' },
       options: {
@@ -104,6 +125,7 @@
       await bridge.call('applyScalebar', JSON.stringify(payload));
       if (
         payload.token === token &&
+        payload.selectionSignature === signature &&
         payload.documentKey === documentKey &&
         revision === editingRevision
       ) {
@@ -113,13 +135,15 @@
     } catch (cause) {
       if (
         payload.token === token &&
+        payload.selectionSignature === signature &&
         payload.documentKey === documentKey &&
         revision === editingRevision
       )
         report(cause);
     }
   }
-  function queueSave() {
+  function queueSave(event?: Event) {
+    if ((event?.target as HTMLElement | null)?.id?.startsWith('fov-')) updateFov = true;
     if (!token) return;
     const style = normalizeScalebarStyle(
       snapshot().options,
@@ -138,15 +162,7 @@
     saveTimer = undefined;
     const payload = pendingSave;
     pendingSave = undefined;
-    if (
-      !payload ||
-      !(
-        (payload.options.orientation === 'vertical'
-          ? payload.fov.height
-          : payload.fov.width) > 0
-      )
-    )
-      return;
+    if (!payload || !payload.calibrated) return;
     // An incomplete numeric input stays editable until a valid value is entered.
     if (
       !payload.saveOnly &&
@@ -179,7 +195,7 @@
     message = '';
     try {
       await bridge.call('applyScalebar', JSON.stringify(payload));
-      if (payload.token === token && payload.documentKey === documentKey) {
+      if (payload.token === token && payload.selectionSignature === signature && payload.documentKey === documentKey) {
         hasScalebar = true;
         message = $t('scale.saved');
       }
@@ -211,163 +227,174 @@
 <div class="panel active" id="panel-scalebar">
   <p class="hint">{$t('scale.description')}</p>
   {#if token}
+    {#if batch}<p id="scalebar-batch-info" class="hint">{$t('scale.batchInfo', { count: targets.length })}</p>{/if}
+    {#if batch && !updateFov && missingFovCount > 0}<p class="hint">{$t('scale.batchMissingFov', { count: missingFovCount })}</p>{/if}
     <form
       onsubmit={(event) => event.preventDefault()}
       oninput={queueSave}
-      onchange={() => {
-        queueSave();
+      onchange={(event) => {
+        queueSave(event);
         void flushSave();
       }}
     >
-      <h3>{$t('scale.fov')}</h3>
-      <div class="grid">
-        {#if options.orientation === 'horizontal'}
+      <fieldset class="settings-group">
+        <legend>{$t('scale.fov')}</legend>
+        <div class="grid">
+          {#if options.orientation === 'horizontal'}
+            <div class="input-group">
+              <label for="fov-width">{$t('scale.fovWidth')}</label><input
+                id="fov-width"
+                type="number"
+                min="0"
+                step="any"
+                bind:value={fov.width}
+              />
+            </div>
+          {:else}
+            <div class="input-group">
+              <label for="fov-height">{$t('scale.fovHeight')}</label><input
+                id="fov-height"
+                type="number"
+                min="0"
+                step="any"
+                bind:value={fov.height}
+              />
+            </div>
+          {/if}
           <div class="input-group">
-            <label for="fov-width">{$t('scale.fovWidth')}</label><input
-              id="fov-width"
-              type="number"
-              min="0"
-              step="any"
-              bind:value={fov.width}
-            />
-          </div>
-        {:else}
-          <div class="input-group">
-            <label for="fov-height">{$t('scale.fovHeight')}</label><input
-              id="fov-height"
-              type="number"
-              min="0"
-              step="any"
-              bind:value={fov.height}
-            />
-          </div>
-        {/if}
-        <div class="input-group">
-          <label for="fov-unit">{$t('scale.unit')}</label><select
-            id="fov-unit"
-            bind:value={fov.unit}
-            onchange={changeFovUnit}
-            ><option value="nm">nm</option><option value="um">μm</option><option
-              value="mm">mm</option
-            ><option value="cm">cm</option><option value="m">m</option><option
-              value="inch">inch</option
-            ></select
-          >
-        </div>
-      </div>
-      <h3>{$t('tabs.scalebar')}</h3>
-      <div class="grid">
-        <div class="input-group">
-          <label for="scale-orientation">{$t('scale.orientation')}</label
-          ><select id="scale-orientation" bind:value={options.orientation}
-            ><option value="horizontal">{$t('scale.horizontal')}</option><option
-              value="vertical">{$t('scale.vertical')}</option
-            ></select
-          >
-        </div>
-        <div class="input-group">
-          <label for="scale-length"
-            >{$t(
-              options.orientation === 'horizontal'
-                ? 'scale.width'
-                : 'scale.height',
-              { unit: unitSymbol(options.unit || fov.unit) }
-            )}</label
-          ><input
-            id="scale-length"
-            type="number"
-            min="0"
-            max={maxLength}
-            step="any"
-            bind:value={displayLength}
-          />
-        </div>
-        <div class="input-group">
-          <label for="scale-unit">{$t('scale.barUnit')}</label>
-          <select
-            id="scale-unit"
-            value={options.unit}
-            onchange={changeScaleUnit}
-          >
-            <option value="nm">nm</option><option value="um">μm</option><option
-              value="mm">mm</option
-            ><option value="cm">cm</option><option value="m">m</option><option
-              value="inch">inch</option
+            <label for="fov-unit">{$t('scale.unit')}</label><select
+              id="fov-unit"
+              bind:value={fov.unit}
+              onchange={changeFovUnit}
+              ><option value="nm">nm</option><option value="um">μm</option><option
+                value="mm">mm</option
+              ><option value="cm">cm</option><option value="m">m</option><option
+                value="inch">inch</option
+              ></select
             >
-          </select>
+          </div>
         </div>
-        <div class="input-group">
-          <label for="scale-thickness">{$t('scale.thickness')}</label><input
-            id="scale-thickness"
-            type="number"
-            min="0.1"
-            step="0.1"
-            bind:value={options.thickness}
-          />
+      </fieldset>
+      <fieldset class="settings-group">
+        <legend>{$t('scale.barStyle')}</legend>
+        <div class="grid">
+          <div class="input-group">
+            <label for="scale-orientation">{$t('scale.orientation')}</label
+            ><select id="scale-orientation" bind:value={options.orientation}
+              ><option value="horizontal">{$t('scale.horizontal')}</option><option
+                value="vertical">{$t('scale.vertical')}</option
+              ></select
+            >
+          </div>
+          <div class="input-group">
+            <label for="scale-length"
+              >{$t(
+                options.orientation === 'horizontal'
+                  ? 'scale.width'
+                  : 'scale.height',
+                { unit: unitSymbol(options.unit || fov.unit) }
+              )}</label
+            ><input
+              id="scale-length"
+              type="number"
+              min="0"
+              max={maxLength}
+              step="any"
+              bind:value={displayLength}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-unit">{$t('scale.barUnit')}</label>
+            <select
+              id="scale-unit"
+              value={options.unit}
+              onchange={changeScaleUnit}
+            >
+              <option value="nm">nm</option><option value="um">μm</option><option
+                value="mm">mm</option
+              ><option value="cm">cm</option><option value="m">m</option><option
+                value="inch">inch</option
+              >
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="scale-thickness">{$t('scale.thickness')}</label><input
+              id="scale-thickness"
+              type="number"
+              min="0.1"
+              step="0.1"
+              bind:value={options.thickness}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-color">{$t('scale.color')}</label><input
+              id="scale-color"
+              type="color"
+              bind:value={options.color}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-position">{$t('scale.position')}</label><select
+              id="scale-position"
+              bind:value={options.position}
+              ><option value="TL">{$t('scale.TL')}</option><option value="BL"
+                >{$t('scale.BL')}</option
+              ><option value="TR">{$t('scale.TR')}</option><option value="BR"
+                >{$t('scale.BR')}</option
+              ></select
+            >
+          </div>
+          <div class="input-group">
+            <label for="scale-auto-group">{$t('scale.autoGroup')}</label><input
+              id="scale-auto-group"
+              type="checkbox"
+              bind:checked={options.autoGroup}
+            />
+          </div>
         </div>
-        <div class="input-group">
-          <label for="scale-color">{$t('scale.color')}</label><input
-            id="scale-color"
-            type="color"
-            bind:value={options.color}
-          />
+      </fieldset>
+      <fieldset class="settings-group">
+        <legend>{$t('scale.fontStyle')}</legend>
+        <div class="grid">
+          <div class="input-group">
+            <label for="scale-show-text">{$t('scale.showText')}</label><input
+              id="scale-show-text"
+              type="checkbox"
+              bind:checked={options.showText}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-font-color">{$t('scale.fontColor')}</label><input
+              id="scale-font-color"
+              type="color"
+              bind:value={options.fontColor}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-font-size">{$t('scale.fontSize')}</label><input
+              id="scale-font-size"
+              type="number"
+              min="1"
+              step="0.5"
+              bind:value={options.fontSize}
+            />
+          </div>
+          <div class="input-group">
+            <label for="scale-bold">{$t('scale.bold')}</label><input
+              id="scale-bold"
+              type="checkbox"
+              bind:checked={options.bold}
+            />
+          </div>
         </div>
-        <div class="input-group">
-          <label for="scale-position">{$t('scale.position')}</label><select
-            id="scale-position"
-            bind:value={options.position}
-            ><option value="TL">{$t('scale.TL')}</option><option value="BL"
-              >{$t('scale.BL')}</option
-            ><option value="TR">{$t('scale.TR')}</option><option value="BR"
-              >{$t('scale.BR')}</option
-            ></select
-          >
-        </div>
-        <div class="input-group">
-          <label for="scale-show-text">{$t('scale.showText')}</label><input
-            id="scale-show-text"
-            type="checkbox"
-            bind:checked={options.showText}
-          />
-        </div>
-        <div class="input-group">
-          <label for="scale-font-color">{$t('scale.fontColor')}</label><input
-            id="scale-font-color"
-            type="color"
-            bind:value={options.fontColor}
-          />
-        </div>
-        <div class="input-group">
-          <label for="scale-font-size">{$t('scale.fontSize')}</label><input
-            id="scale-font-size"
-            type="number"
-            min="1"
-            step="0.5"
-            bind:value={options.fontSize}
-          />
-        </div>
-        <div class="input-group">
-          <label for="scale-bold">{$t('scale.bold')}</label><input
-            id="scale-bold"
-            type="checkbox"
-            bind:checked={options.bold}
-          />
-        </div>
-        <div class="input-group">
-          <label for="scale-auto-group">{$t('scale.autoGroup')}</label><input
-            id="scale-auto-group"
-            type="checkbox"
-            bind:checked={options.autoGroup}
-          />
-        </div>
-      </div>
+      </fieldset>
     </form>
     {#if !hasScalebar}<div class="toolbar">
         <button
           id="apply-scalebar-button"
           class="btn btn-primary"
           disabled={busy}
-          onclick={apply}>{$t('scale.add')}</button
+          onclick={apply}>{$t(batch ? 'scale.batchAdd' : 'scale.add')}</button
         >
       </div>{/if}
   {/if}
@@ -377,6 +404,19 @@
 </div>
 
 <style>
+  .settings-group {
+    min-width: 0;
+    margin: 0 0 12px;
+    padding: 10px 12px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .settings-group legend {
+    padding: 0 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+  }
   .scale-error {
     color: var(--danger);
   }

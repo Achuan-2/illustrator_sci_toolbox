@@ -19,13 +19,16 @@ export interface ScalebarOptions {
   position: 'TL' | 'TR' | 'BL' | 'BR';
   autoGroup: boolean;
 }
-export interface ScalebarInspection {
-  signature?: string;
-  documentKey?: string;
-  errorKey?: string;
+export interface ScalebarTargetInspection {
   token: string;
   fov: ImageFov | null;
   options: ScalebarOptions | null;
+}
+export interface ScalebarInspection extends ScalebarTargetInspection {
+  signature?: string;
+  documentKey?: string;
+  errorKey?: string;
+  targets?: ScalebarTargetInspection[];
 }
 
 export function fovUnit(unit: string): FovUnit {

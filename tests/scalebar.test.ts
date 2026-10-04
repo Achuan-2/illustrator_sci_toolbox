@@ -169,6 +169,58 @@ test('merged channel groups accept multiple rasters and require consistent calib
   assert.throws(() => host.scaleSelectionTarget(doc), /errors.scaleSelection/);
 });
 
+test('merged-channel zooms resolve the clipping frame before adding a scale and infer its cropped FOV', () => {
+  const host = vm.createContext({
+    getTag: () => null,
+    getVisibleBounds: (item: any) => item.visibleBounds || item.geometricBounds
+  });
+  vm.runInContext(source, host);
+  const layer = { typename: 'Layer' };
+  const zoom: any = {
+    typename: 'GroupItem', parent: layer, clipped: true, note: '',
+    tags: [{ name: 'ILST_ZOOM_ITEM_record', value: '{}' }],
+    geometricBounds: [0, 200, 400, 0], visibleBounds: [100, 150, 300, 50], pageItems: []
+  };
+  const merged: any = { typename: 'GroupItem', parent: zoom,
+    note: 'SCI_MERGE_CHANNELS:1', pageItems: [] };
+  const mask = { typename: 'PathItem', parent: zoom, clipping: true };
+  merged.pageItems = [0, 1].map(() => ({ typename: 'RasterItem', parent: merged,
+    note: '[SCI_FOV]{"width":200,"height":100,"unit":"um"}[/SCI_FOV]',
+    geometricBounds: zoom.geometricBounds }));
+  zoom.pageItems = [mask, merged];
+  const doc = { selection: [zoom], pageItems: [zoom, mask, merged, ...merged.pageItems] };
+  for (const selected of [zoom, mask, merged, merged.pageItems[0]]) {
+    doc.selection = [selected];
+    assert.equal(host.scaleSelectionTarget(doc), zoom, 'Bind to the visible zoom frame');
+  }
+  assert.deepEqual(plain(host.scaleReadFov(zoom)), { width: 100, height: 50, unit: 'um' });
+  zoom.note = '[SCI_FOV]{"width":80,"height":40,"unit":"um","source":"zoom"}[/SCI_FOV]';
+  assert.equal(host.scaleReadFov(zoom).width, 80, 'Saved crop calibration takes priority');
+  zoom.tags = [];
+  doc.selection = [zoom];
+  assert.throws(() => host.scaleSelectionTarget(doc), /errors.scaleSelection/,
+    'Unmarked multi-image groups remain ambiguous');
+});
+
+test('copied target tags on pre-UUID hosts become unique and retire the ambiguous pending-save token', () => {
+  let sequence = 0;
+  const first = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
+  const second = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
+  const third = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
+  const doc = { pageItems: [first, second, third] };
+  const host = vm.createContext({
+    getTag: (item: any, name: string) => item.tags[name] || null,
+    addTag: (item: any, name: string, value: string) => { item.tags[name] = value; },
+    createZoomRecordKey: () => `unique-${++sequence}`
+  });
+  vm.runInContext(source, host);
+  const tokens = doc.pageItems.map((item) => host.scaleTargetToken(doc, item));
+  assert.equal(new Set(tokens).size, 3);
+  assert.equal(tokens.includes('copied-token'), false);
+  assert.deepEqual(doc.pageItems.map((item) => host.scaleTargetToken(doc, item)), tokens,
+    'Once disambiguated, target tokens remain stable across polling');
+});
+
 test('FOV note round-trips while preserving unrelated text and tags', () => {
   const tags = new Map();
   context.getTag = (_: unknown, name: string) => tags.get(name) || null;

@@ -783,6 +783,44 @@ test('scalebar selection loads automatically, follows FOV units and autosaves wi
   } finally { await panel.window.happyDOM.close(); }
 });
 
+test('batch scalebar edits pin every image and only override FOV when the calibration fields change', async () => {
+  const first = { token: 'batch-first', fov: { width: 1000, height: 500, unit: 'um' },
+    options: { orientation: 'horizontal', lengthUm: 50, unit: 'um', thickness: 3, color: '#ffffff',
+      showText: true, fontColor: '#ff0000', fontSize: 12, bold: true, position: 'BL', autoGroup: true } };
+  const second = { token: 'batch-second', fov: { width: 2000, height: 1000, unit: 'um' }, options: null };
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    (window as any).__scaleSelection = { ...first, signature: 'batch-first|batch-second', documentKey: 'test.ai', targets: [first, second] };
+  });
+  try {
+    assert.ok(panel.element('scalebar-batch-info').textContent?.includes('2 images selected'));
+    assert.equal(panel.element('apply-scalebar-button').textContent, 'Add Scalebars to Selected Images');
+    assert.equal(panel.element('scale-length').getAttribute('max'), '1800');
+    await panel.input('scale-font-size', '14');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const payload = () => JSON.parse(panel.requests.filter((r) => r.operation === 'applyScalebar').at(-1)!.args[0] as string);
+    assert.deepEqual(payload().targets, [{ token: first.token }, { token: second.token }]);
+    assert.equal(payload().updateFov, false);
+    assert.equal(payload().saveOnly, true);
+    assert.equal(payload().options.fontSize, 14);
+    await panel.input('scale-length', '1500');
+    await panel.click('apply-scalebar-button');
+    assert.equal(payload().options.lengthUm, 1500, 'The host caps each image independently');
+    assert.equal(payload().autoSave, false);
+    assert.equal(payload().saveOnly, false);
+    assert.equal(panel.window.document.getElementById('apply-scalebar-button'), null);
+    await panel.input('scale-length', '0');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(payload().options.lengthUm, 0);
+    assert.equal(payload().autoSave, true);
+    assert.equal(payload().updateFov, false);
+    await panel.input('fov-width', '500');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(payload().updateFov, true);
+    assert.equal(payload().fov.width, 500);
+    assert.equal(panel.window.document.querySelector('[role="alert"]'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
 test('zero scalebar length autosaves its hidden state and a positive value restores it without adding again', async () => {
   const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#scalebar');
   try {
