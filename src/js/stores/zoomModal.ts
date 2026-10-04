@@ -56,7 +56,7 @@ const initialState: ZoomModalState = {
   error: ''
 };
 
-export const ZOOM_EXTENSION_ID = 'com.example.achuanPlugin.zoom';
+export const ZOOM_EXTENSION_ID = 'com.achuan-2.illustrator_sci_toolbox.zoom';
 const SESSION_KEY = 'sci_zoom_session';
 let lastSessionTimestamp = 0;
 
@@ -146,7 +146,7 @@ export function saveZoomSession(
   try {
     if (typeof window !== 'undefined' && window.__adobe_cep__?.dispatchEvent) {
       window.__adobe_cep__.dispatchEvent({
-        type: 'com.example.achuanPlugin.zoomSessionUpdate',
+        type: 'com.achuan-2.illustrator_sci_toolbox.zoomSessionUpdate',
         scope: 'APPLICATION',
         data: String(session.timestamp)
       });

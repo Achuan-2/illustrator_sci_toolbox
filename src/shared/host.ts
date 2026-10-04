@@ -69,6 +69,7 @@ export interface HostArguments {
     number
   ];
   updateLabelOffsets: [number, number, number];
+  updateLabelSessionIndex: [number, number];
   filterTextFrames: [];
   filterSelection: ['textOnly' | 'excludeText'];
   swapSelectedPositions: [SwapAnchor];
@@ -92,4 +93,4 @@ export interface HostArguments {
 export type HostOperation = keyof HostArguments;
 export type HostResponse =
   { ok: true; data: string } | { ok: false; error: string; args: string[] };
-export const hostNamespace = 'com.example.achuanPlugin';
+export const hostNamespace = 'com.achuan-2.illustrator_sci_toolbox';

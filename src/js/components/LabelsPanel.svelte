@@ -1,9 +1,35 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { settings } from '../stores/settings';
   import { workspace, labelPreview } from '../stores/workspace';
   import { t } from '../i18n';
-  import { actions, offsetInput, offsetWheel } from '../services/actions';
+  import {
+    actions,
+    labelIndexInput,
+    offsetInput,
+    offsetWheel
+  } from '../services/actions';
   import { tooltip } from '../services/tooltip';
+
+  let offsetX = $derived($settings.labelOffsetX);
+  let offsetY = $derived($settings.labelOffsetY);
+  let offsetXText = $state(String($settings.labelOffsetX));
+  let offsetYText = $state(String($settings.labelOffsetY));
+
+  // Numeric settings only change for valid input or wheel adjustments. Drafts
+  // such as "-" and "-." survive while the user finishes typing the number.
+  $effect(() => {
+    const value = offsetX;
+    untrack(() => {
+      if (Number(offsetXText) !== value) offsetXText = String(value);
+    });
+  });
+  $effect(() => {
+    const value = offsetY;
+    untrack(() => {
+      if (Number(offsetYText) !== value) offsetYText = String(value);
+    });
+  });
 </script>
 
 <div class="panel active" id="panel-labels">
@@ -45,29 +71,35 @@
     <div class="input-group">
       <label for="label-offset-x">{$t('labels.offsetX')}</label>
       <input
-        type="number"
+        type="text"
         id="label-offset-x"
+        inputmode="decimal"
+        autocomplete="off"
         use:tooltip={$workspace.labelEditing
           ? $t('labels.editingHint')
-          : undefined}
-        value={$settings.labelOffsetX}
+          : $t('labels.offsetXHint')}
+        bind:value={offsetXText}
         class:editing-mode={$workspace.labelEditing}
         oninput={(event) => offsetInput(event, 'labelOffsetX')}
         onwheel={(event) => offsetWheel(event, 'labelOffsetX')}
+        onblur={() => { offsetXText = String($settings.labelOffsetX); }}
       />
     </div>
     <div class="input-group">
       <label for="label-offset-y">{$t('labels.offsetY')}</label>
       <input
-        type="number"
+        type="text"
         id="label-offset-y"
+        inputmode="decimal"
+        autocomplete="off"
         use:tooltip={$workspace.labelEditing
           ? $t('labels.editingHint')
-          : undefined}
-        value={$settings.labelOffsetY}
+          : $t('labels.offsetYHint')}
+        bind:value={offsetYText}
         class:editing-mode={$workspace.labelEditing}
         oninput={(event) => offsetInput(event, 'labelOffsetY')}
         onwheel={(event) => offsetWheel(event, 'labelOffsetY')}
+        onblur={() => { offsetYText = String($settings.labelOffsetY); }}
       />
     </div>
     <div class="input-group">
@@ -89,6 +121,9 @@
         id="label-start-count"
         min="1"
         style="flex: 0 1 60px;"
+        use:tooltip={$workspace.labelEditing ? $t('labels.indexEditingHint') : ''}
+        class:editing-mode={$workspace.labelEditing}
+        oninput={labelIndexInput}
         bind:value={$workspace.labelStartCount}
       />
       <button

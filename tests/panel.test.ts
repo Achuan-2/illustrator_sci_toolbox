@@ -613,8 +613,10 @@ test('unreadable palette storage is not overwritten and clipboard failures show 
   } finally { await panel.window.happyDOM.close(); }
 });
 
+// Existing bilingual scenarios start with an explicit English preference.
+// Pass an empty string to exercise first-run defaults without stored settings.
 async function createPanel(
-  saved?: string,
+  saved = '{"language":"en"}',
   legacy = false,
   url = 'http://localhost:3000/main/index.html',
   configure?: (window: Window) => void
@@ -1080,6 +1082,118 @@ test('production Svelte panel switches tabs and persists language without losing
   }
 });
 
+test('original label directions support partial negative input and live editing', async () => {
+  const panel = await createPanel(JSON.stringify({ labelOffsetX: -8, labelOffsetY: -8 }));
+  try {
+    assert.equal((panel.element('label-offset-x') as any).value, '-8');
+    assert.equal((panel.element('label-offset-y') as any).value, '-8');
+    await panel.click('add-label-button');
+    const added = panel.requests.find((request) => request.operation === 'addLabelsToImages')!;
+    assert.deepEqual(added.args.slice(3, 5), [-8, -8]);
+    await panel.input('label-offset-x', '12');
+    await panel.input('label-offset-y', '10');
+    assert.deepEqual(panel.requests.at(-1)!.args.slice(0, 2), [12, 10]);
+    const callsBeforeTyping = panel.requests.length;
+    await panel.input('label-offset-x', '');
+    await panel.input('label-offset-x', '-');
+    assert.equal((panel.element('label-offset-x') as any).value, '-');
+    assert.equal(panel.requests.length, callsBeforeTyping, 'Incomplete values do not move labels');
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).labelOffsetX, 12);
+    await panel.input('label-offset-y', '-');
+    assert.equal((panel.element('label-offset-y') as any).value, '-');
+    await panel.input('label-offset-x', '-8');
+    assert.equal((panel.element('label-offset-y') as any).value, '-', 'Editing X preserves the unfinished Y value');
+    await panel.input('label-offset-y', '-.');
+    assert.equal((panel.element('label-offset-y') as any).value, '-.');
+    await panel.input('label-offset-y', '-.5');
+    assert.deepEqual(panel.requests.at(-1)!.args.slice(0, 2), [-8, -0.5]);
+    await panel.input('label-offset-y', '-0');
+    assert.equal((panel.element('label-offset-y') as any).value, '-0');
+    await panel.input('label-offset-y', '-0.');
+    assert.equal((panel.element('label-offset-y') as any).value, '-0.');
+    await panel.input('label-offset-y', '-0.5');
+    assert.deepEqual(panel.requests.at(-1)!.args.slice(0, 2), [-8, -0.5]);
+    const wheel = new panel.window.WheelEvent('wheel', {
+      deltaY: -1, shiftKey: true, bubbles: true, cancelable: true
+    });
+    // happy-dom's WheelEvent constructor does not retain modifier keys.
+    Object.defineProperty(wheel, 'shiftKey', { value: true });
+    panel.element('label-offset-x').dispatchEvent(wheel);
+    await panel.flush();
+    assert.equal((panel.element('label-offset-x') as any).value, '2');
+    assert.deepEqual(panel.requests.at(-1)!.args.slice(0, 2), [2, -0.5]);
+    await panel.input('label-offset-x', '-4');
+    await panel.input('label-offset-y', '0');
+    assert.deepEqual(panel.requests.at(-1)!.args.slice(0, 2), [-4, 0]);
+    const reopened = await createPanel(panel.window.localStorage.getItem(storageKey)!);
+    try {
+      assert.equal((reopened.element('label-offset-x') as any).value, '-4');
+      assert.equal((reopened.element('label-offset-y') as any).value, '0');
+    } finally { await reopened.window.happyDOM.close(); }
+    assert.deepEqual(panel.alerts, []);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
+test('first-run panel defaults to Chinese and remembers a subsequent English choice', async () => {
+  const panel = await createPanel('');
+  try {
+    assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
+    assert.equal(panel.element('copy-pos-button').textContent, '复制');
+    assert.equal((panel.element('language') as any).value, 'zh_CN');
+    await panel.input('language', 'en');
+    const reopened = await createPanel(panel.window.localStorage.getItem(storageKey)!);
+    try {
+      assert.equal(reopened.window.document.documentElement.lang, 'en');
+      assert.equal(reopened.element('copy-pos-button').textContent, 'Copy');
+    } finally {
+      await reopened.window.happyDOM.close();
+    }
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('editing the starting index renumbers only the latest label session without ending live offsets', async () => {
+  const panel = await createPanel();
+  try {
+    const updates = () => panel.requests.filter((request) => request.operation === 'updateLabelSessionIndex');
+    await panel.input('label-start-count', '4');
+    assert.equal(updates().length, 0, 'Before adding, the index only configures the next batch');
+    await panel.click('add-label-button');
+    const first = panel.requests.find((request) => request.operation === 'addLabelsToImages')!;
+    assert.equal(first.args[9], 4);
+    assert.equal(updates().length, 0, 'Automatic next-index changes must not renumber existing labels');
+    const input = panel.element('label-start-count') as unknown as HTMLInputElement;
+    input.focus();
+    await panel.click('label-start-count');
+    await panel.input('label-start-count', '8');
+    assert.deepEqual(updates().at(-1)?.args, [8, first.args[10]]);
+    assert.equal(input.value, '8', 'Keep the manually entered starting index visible');
+    assert.equal(panel.element('label-offset-x').classList.contains('editing-mode'), true);
+    await panel.input('label-offset-x', '-8');
+    assert.equal(panel.requests.at(-1)?.operation, 'updateLabelOffsets');
+    assert.equal(panel.requests.at(-1)?.args[2], first.args[10]);
+    const count = updates().length;
+    for (const invalid of ['', '0', '-1', '1.5']) await panel.input('label-start-count', invalid);
+    assert.equal(updates().length, count, 'Partial or invalid index edits never reach the host');
+    await panel.input('label-start-count', '26');
+    await panel.click('add-label-button');
+    const second = panel.requests.filter((request) => request.operation === 'addLabelsToImages').at(-1)!;
+    assert.notEqual(second.args[10], first.args[10]);
+    const afterAdd = updates().length;
+    await panel.input('label-start-count', '12');
+    assert.equal(updates().length, afterAdd + 1);
+    assert.deepEqual(updates().at(-1)?.args, [12, second.args[10]]);
+    input.dispatchEvent(new panel.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await panel.flush();
+    await panel.input('label-start-count', '2');
+    assert.equal(updates().length, afterAdd + 1, 'After leaving editing, configure the next batch normally');
+    assert.deepEqual(panel.alerts, []);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 test('production controls preserve dynamic placeholders, arrange visibility and label live editing', async () => {
   const panel = await createPanel();
   try {
@@ -1188,7 +1302,7 @@ test('zoom window opens before the host finishes capturing its preview', async (
   const panel = await createPanel(undefined, false, undefined, (window) => {
     const cep = (window as any).__adobe_cep__;
     const evaluate = cep.evalScript;
-    cep.getExtensions = () => JSON.stringify([{ id: 'com.example.achuanPlugin.zoom' }]);
+    cep.getExtensions = () => JSON.stringify([{ id: 'com.achuan-2.illustrator_sci_toolbox.zoom' }]);
     cep.requestOpenExtension = () => {
       openingSession = JSON.parse(window.localStorage.getItem('sci_zoom_session')!);
     };
@@ -1299,8 +1413,8 @@ test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the i
     };
     const prototype = window.HTMLCanvasElement.prototype;
     Object.defineProperties(prototype, {
-      clientWidth: { get: () => viewport.width },
-      clientHeight: { get: () => viewport.height }
+      clientWidth: { get: () => viewport.width, configurable: true },
+      clientHeight: { get: () => viewport.height, configurable: true }
     });
     prototype.getBoundingClientRect = (() => ({ left: 0, top: 0, ...viewport })) as any;
     prototype.getContext = function () {
@@ -1352,6 +1466,139 @@ test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the i
     await panel.window.happyDOM.close();
   }
 });
+
+for (const orientation of ['horizontal', 'vertical'] as const) {
+  test(`zoom preview clamps ${orientation} scalebars before confirmation and follows crop edits`, async () => {
+    type Frame = { images: number[][]; bars: number[][]; labels: string[] };
+    const frames = new Map<unknown, Frame>();
+    const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#zoom-window', (window) => {
+      window.localStorage.setItem('sci_zoom_session', JSON.stringify({
+        timestamp: Date.now(), settings: { language: 'zh_CN' },
+        data: {
+          sourceWidth: 500, sourceHeight: 250,
+          sourceFov: { width: 1000, height: 500, unit: 'um' },
+          sourceScalebar: { orientation, lengthUm: 500, unit: 'um', thickness: 2,
+            color: '#ffffff', showText: true, fontColor: '#ffffff', fontSize: 8,
+            bold: false, position: 'BR', autoGroup: true },
+          previewDataUrl: 'data:image/png;base64,preview', manualRect: null,
+          existingEntries: [{ recordKey: 'preview', name: '放大图 1',
+            region: { x: 0.1, y: 0.1, width: 0.25, height: 0.5 },
+            regionRotation: 0, strokeColor: '#ff0000', strokeWidth: 1.5,
+            strokeDash: 'dash', useRectangleColor: true, addGuideLines: false,
+            placement: 'right', guideLineExtent: 'acrossImages',
+            originalZoomRegion: null, originalZoomRotation: 0, scaleLengthUm: 500 }]
+        }
+      }));
+      (window as any).ResizeObserver = undefined;
+      (window as any).Image = class {
+        naturalWidth = 1000; naturalHeight = 500;
+        onload: (() => void) | null = null;
+        set src(_value: string) { Promise.resolve().then(() => this.onload?.()); }
+      };
+      const prototype = window.HTMLCanvasElement.prototype;
+      Object.defineProperties(prototype, {
+        clientWidth: { get: () => 600, configurable: true }, clientHeight: { get: () => 400, configurable: true }
+      });
+      prototype.getBoundingClientRect = (() => ({ left: 0, top: 0, width: 600, height: 400 })) as any;
+      prototype.getContext = function () {
+        const canvas = this;
+        return new Proxy({
+          clearRect: () => frames.set(canvas, { images: [], bars: [], labels: [] }),
+          drawImage: (_image: unknown, ...args: number[]) => frames.get(canvas)!.images.push(args),
+          fillRect: (...args: number[]) => frames.get(canvas)!.bars.push(args),
+          fillText: (label: string) => frames.get(canvas)!.labels.push(label),
+          measureText: () => ({ width: 40 })
+        }, { get: (target, key) => (target as any)[key] ?? (() => {}) }) as any;
+      };
+    });
+    try {
+      const settle = async () => {
+        await panel.flush();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      };
+      await settle();
+      const canvas = panel.window.document.querySelector('.layout-wrapper canvas')!;
+      const length = () => (panel.element('zoom-scale-length') as any).value;
+      const preview = () => frames.get(canvas)!;
+      const assertRatio = (ratio: number) => {
+        const crop = preview().images.find((args) => args.length === 8)!;
+        const bar = preview().bars.at(-1)!;
+        const axis = orientation === 'horizontal' ? 0 : 1;
+        assert.ok(Math.abs(bar[2 + axis] / crop[6 + axis] - ratio) < 1e-9);
+      };
+      assert.equal(length(), '225', 'Inherited excessive length is corrected when opening the preview');
+      assertRatio(0.9);
+      assert.ok(preview().labels.includes('225μm'));
+      assert.ok(preview().labels.includes('放大图 1（2×）'));
+      assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（2×）');
+      assert.equal(panel.requests.some((request) => request.operation === 'applyZoomImages'), false);
+
+      const scaleLength = panel.element('zoom-scale-length');
+      const scaleUnit = panel.element('zoom-scale-unit');
+      assert.equal(scaleLength.parentElement, scaleUnit.parentElement,
+        'Length and unit share the same layout row');
+      assert.ok(scaleLength.parentElement?.classList.contains('zoom-scale-controls'));
+      for (const id of ['zoom-scale-length', 'zoom-scale-unit', 'zoom-line-width']) {
+        const field = panel.element(id);
+        field.focus();
+        for (const key of ['Backspace', 'Delete']) {
+          const event = new panel.window.KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true });
+          field.dispatchEvent(event);
+          await panel.flush();
+          assert.equal(event.defaultPrevented, false, 'Text editing retains its native delete behavior');
+          assert.equal(panel.element('entry-selector').querySelectorAll('option').length, 1,
+            'Deleting input text must not remove the active zoom entry');
+          assert.equal(length(), '225');
+        }
+      }
+
+      const units = panel.element('zoom-scale-unit') as any;
+      assert.ok(units);
+      units.value = 'cm';
+      units.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
+      await settle();
+      assert.equal(length(), '0.0225');
+      await panel.input('zoom-scale-length', '0.01');
+      await settle();
+      assertRatio(0.4);
+      assert.ok(preview().labels.includes('0.01cm'));
+      await panel.input('zoom-scale-length', '1');
+      await settle();
+      assert.equal(length(), '0.0225');
+      assertRatio(0.9);
+
+      // Shrink the crop using its bottom-right resize handle.
+      const editor = panel.window.document.querySelector('.canvas-wrapper canvas')!;
+      editor.dispatchEvent(new panel.window.MouseEvent('mousedown', { clientX: 213.6, clientY: 228.8, button: 0, bubbles: true }));
+      editor.dispatchEvent(new panel.window.MouseEvent('mousemove', { clientX: 141.6, clientY: 156.8, bubbles: true }));
+      panel.window.dispatchEvent(new panel.window.MouseEvent('mouseup'));
+      await settle();
+      assert.ok(Math.abs(Number(length()) - 0.01125) < 1e-9);
+      assertRatio(0.9);
+      assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（4×）');
+      assert.ok(preview().labels.includes('放大图 1（4×）'));
+      assert.equal(panel.requests.some((request) => request.operation === 'applyZoomImages'), false);
+
+      await panel.input('zoom-scale-length', '0');
+      await settle();
+      assert.equal(preview().bars.length, 0, 'Zero hides the preview scalebar');
+      await panel.input('zoom-scale-length', '1');
+      await settle();
+      (panel.window.document.querySelector('.zoom-modal-footer .btn-primary') as any).click();
+      await panel.flush();
+      const applied = panel.requests.find((request) => request.operation === 'applyZoomImages')!;
+      const entry = JSON.parse(applied.args[0] as string).entries[0];
+      assert.ok(Math.abs(entry.scaleLengthUm - 112.5) < 1e-9);
+      assert.equal(entry.scaleUnit, 'cm');
+      assert.equal(entry.recordKey, 'preview');
+      assert.equal(entry.name, '放大图 1', 'Magnification is display-only and does not rewrite the saved name');
+      assert.deepEqual(JSON.parse(applied.args[0] as string).deletedKeys, []);
+      assert.deepEqual(panel.alerts, []);
+    } finally {
+      await panel.window.happyDOM.close();
+    }
+  });
+}
 
 test('standalone zoom window restores source units and edits represented length in that unit', async () => {
   const updates: { type: string; enabled: boolean }[] = [];
@@ -1415,6 +1662,7 @@ test('standalone zoom window restores source units and edits represented length 
     assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
     assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
     assert.equal((panel.element('zoom-scale-length') as any).value, '0.0075');
+    assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（2.67× / 3.33×）');
     assert.equal(panel.element('zoom-scale-length').getAttribute('max'), '0.0216');
     await panel.input('zoom-scale-length', '1');
     assert.equal((panel.element('zoom-scale-length') as any).value, '0.0216');
@@ -1424,7 +1672,7 @@ test('standalone zoom window restores source units and edits represented length 
 
     await panel.click('zoom-auto-update');
     assert.equal((panel.element('zoom-auto-update') as unknown as HTMLInputElement).checked, false);
-    assert.deepEqual(updates.at(-1), { type: 'com.example.achuanPlugin.settingsUpdate', enabled: false },
+    assert.deepEqual(updates.at(-1), { type: 'com.achuan-2.illustrator_sci_toolbox.settingsUpdate', enabled: false },
       'Notify the main panel only after saving the automatic update preference');
 
     await panel.input('zoom-line-width', '4');

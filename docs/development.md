@@ -22,7 +22,9 @@ pnpm build
 pnpm dev
 ```
 
-首次构建会按 Bolt 的默认行为，将 `dist/cep` 链接到当前用户的 Adobe CEP 扩展目录，扩展 ID 仍是 `com.example.achuanPlugin.panel`。启用对应 CEP 版本的 PlayerDebugMode，重启 Illustrator，在“窗口 → 扩展功能 → SCI Toolbox”打开面板。已有同 ID 的手动安装目录可能阻止创建链接，需要先将该安装目录移到备份位置，再运行 `pnpm symlink`。不要把整个源码仓库复制到扩展目录。
+首次构建会按 Bolt 的默认行为，将 `dist/cep` 链接到当前用户的 Adobe CEP 扩展目录，扩展包 ID 为 `com.achuan-2.illustrator_sci_toolbox`，主面板 ID 为 `com.achuan-2.illustrator_sci_toolbox.panel`。启用对应 CEP 版本的 PlayerDebugMode，重启 Illustrator，在“窗口 → 扩展功能 → SCI Toolbox”打开面板。已有同 ID 的手动安装目录可能阻止创建链接，需要先将该安装目录移到备份位置，再运行 `pnpm symlink`。不要把整个源码仓库复制到扩展目录。
+
+旧版扩展包 ID 为 `com.example.achuanPlugin`。由于新旧 ID 不同，安装器不会将新版识别为旧版的覆盖升级；安装新版前应卸载旧版，避免扩展列表出现重复面板。
 
 `pnpm dev` 使用固定端口 3000，面板会跳转到本地开发服务；浏览器也可以打开 `http://127.0.0.1:3000/`，根地址会跳转到 `/main/index.html` 预览界面。浏览器预览不提供 Illustrator 文档操作，点击功能会显示相应提示。
 
@@ -47,7 +49,7 @@ Svelte 和 CSS 修改通过 Vite HMR 更新。`src/jsx` 中的宿主入口、算
 | `vite.es.config.ts` | JSON2、算法与入口的 ES3 构建 |
 | `cep.config.ts` | 扩展 ID、最低宿主版本、面板和签名配置 |
 
-宿主算法集中在私有作用域中，通过 `$['com.example.achuanPlugin'].call()` 调用。前端参数统一序列化，宿主错误返回 `{ ok: false, error, args }`，翻译在前端完成。`ScriptPath` 不再指向前端脚本；桥接层等待宿主初始化成功后再执行操作。构建的 `jsx/index.js` 必须保留 UTF-8 BOM，确保 `$.evalFile()` 正确读取包含中文的脚本；缺少 BOM 时可能报“类型错误：无法转换”，导致所有宿主操作初始化失败。
+宿主算法集中在私有作用域中，通过 `$['com.achuan-2.illustrator_sci_toolbox'].call()` 调用。前端参数统一序列化，宿主错误返回 `{ ok: false, error, args }`，翻译在前端完成。`ScriptPath` 不再指向前端脚本；桥接层等待宿主初始化成功后再执行操作。构建的 `jsx/index.js` 必须保留 UTF-8 BOM，确保 `$.evalFile()` 正确读取包含中文的脚本；缺少 BOM 时可能报“类型错误：无法转换”，导致所有宿主操作初始化失败。
 
 ## 验证
 
@@ -70,6 +72,8 @@ dist/zip/illustrator_sci_toolbox_v<version>.zip
 ```
 
 ZIP 解压后，将整个扩展文件夹复制到 CEP 扩展目录，确保 `CSXS/manifest.xml` 位于该文件夹的直接子目录中。Windows 目录为 `%APPDATA%\Adobe\CEP\extensions`，macOS 目录为 `~/Library/Application Support/Adobe/CEP/extensions`。重启 Illustrator 后打开插件。本地调试可使用 `dist/cep`。
+
+主面板和“制作放大图”窗口打包在同一个扩展中，manifest 分别注册 `com.achuan-2.illustrator_sci_toolbox.panel` 和 `com.achuan-2.illustrator_sci_toolbox.zoom`，共用相对入口 `./main/index.html`。安装 ZXP 或解压 ZIP 后，选中图片，在主面板的“制作放大图”页打开编辑器即可，无需单独安装放大图窗口。程序通过 CEP 查询当前扩展的实际安装目录来加载 `jsx/index.js`，通过扩展 ID 打开窗口，不依赖开发者用户名或源码路径。开发机 CEP 目录里的 `com.achuan-2.illustrator_sci_toolbox` 链接只是指向 `dist/cep`；放大图会话使用系统临时目录及本地存储，所用 `fs`、`path`、`os` 均为内置 Node 模块，因此安装包不需要 `node_modules`。
 
 版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交并推送本次版本的代码。安装项目依赖和 GitHub CLI，运行 `gh auth login` 登录后，在 Git Bash 或其他 Bash 环境执行：
 

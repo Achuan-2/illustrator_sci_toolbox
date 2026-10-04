@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 // calls. A single script cannot reproduce the user's undo-history boundary.
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url)).replaceAll('\\', '/');
 const targets = await (await fetch('http://localhost:8088/json')).json();
-const target = targets.find((page) => page.type === 'page' && page.url.includes('com.example.achuanPlugin/main/index.html'));
+const target = targets.find((page) => page.type === 'page' && page.url.includes('com.achuan-2.illustrator_sci_toolbox/main/index.html'));
 assert.ok(target, 'Open the installed SCI panel in Illustrator first');
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolve, reject) => {
@@ -52,9 +52,9 @@ try {
       if(!original&&(item.typename==="RasterItem"||item.typename==="PlacedItem"))original=item;
     }
     if(!original)throw new Error("The document must contain an image");
-    var fixture={doc:doc,oldSelection:doc.selection,oldLayer:doc.activeLayer,itemCount:doc.pageItems.length,documentCount:app.documents.length,oldCall:$["com.example.achuanPlugin"].call};
+    var fixture={doc:doc,oldSelection:doc.selection,oldLayer:doc.activeLayer,itemCount:doc.pageItems.length,documentCount:app.documents.length,oldCall:$["com.achuan-2.illustrator_sci_toolbox"].call};
     $.SCI_ZOOM_UNDO_TEST=fixture;
-    $["com.example.achuanPlugin"].call=function(operation,payload){if(operation==="syncZoomTracker")return JSON.stringify({ok:true,data:"OK"});return fixture.oldCall(operation,payload);};
+    $["com.achuan-2.illustrator_sci_toolbox"].call=function(operation,payload){if(operation==="syncZoomTracker")return JSON.stringify({ok:true,data:"OK"});return fixture.oldCall(operation,payload);};
     fixture.layer=doc.layers.add();fixture.layer.name="SCI temporary undo test "+new Date().getTime();doc.activeLayer=fixture.layer;doc.selection=null;
     fixture.other=fixture.layer.pathItems.rectangle(20000,-19980,10,10);fixture.other.filled=false;fixture.other.stroked=false;
     var scope=';var fullIndex=readCurrentZoomRecords;readCurrentZoomRecords=function(doc){var index=fullIndex(doc),maps=["records","pictures","markers","guides1","guides2"];for(var i=0;i<maps.length;i++){var map=index[maps[i]];for(var key in map){var item=map[key];if(maps[i]==="records")item=item.zoom;if(item.layer!==testLayer)delete map[key];}}return index;};return {apply:applyZoomImages,sync:syncZoomTracker,tag:addTag,clear:clearCopiedZoomTags,find:findItemByTag,visible:getVisibleBounds,index:readCurrentZoomRecords,state:captureZoomTrackingState};';
@@ -167,7 +167,7 @@ try {
 } finally {
   try {
     if (setupStarted) {
-      const cleanup = await native('(function(){var fixture=$.SCI_ZOOM_UNDO_TEST;if(!fixture)return "NO_FIXTURE";var doc=fixture.doc;doc.selection=null;if(fixture.layer)fixture.layer.remove();doc.activeLayer=fixture.oldLayer;doc.selection=fixture.oldSelection;$["com.example.achuanPlugin"].call=fixture.oldCall;delete $.SCI_ZOOM_UNDO_TEST;return JSON.stringify({cleanup:doc.pageItems.length===fixture.itemCount&&app.documents.length===fixture.documentCount});})()');
+      const cleanup = await native('(function(){var fixture=$.SCI_ZOOM_UNDO_TEST;if(!fixture)return "NO_FIXTURE";var doc=fixture.doc;doc.selection=null;if(fixture.layer)fixture.layer.remove();doc.activeLayer=fixture.oldLayer;doc.selection=fixture.oldSelection;$["com.achuan-2.illustrator_sci_toolbox"].call=fixture.oldCall;delete $.SCI_ZOOM_UNDO_TEST;return JSON.stringify({cleanup:doc.pageItems.length===fixture.itemCount&&app.documents.length===fixture.documentCount});})()');
       assert.equal(JSON.parse(cleanup).cleanup, true);
     }
   } finally {

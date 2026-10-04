@@ -79,7 +79,11 @@
       return;
     if (event.type === 'change' && !target.matches('input[type="checkbox"]'))
       return;
-    if (target.id !== 'label-offset-x' && target.id !== 'label-offset-y')
+    if (
+      target.id !== 'label-offset-x' &&
+      target.id !== 'label-offset-y' &&
+      target.id !== 'label-start-count'
+    )
       exitLabelEditing();
   }
 
@@ -144,7 +148,7 @@
       };
       if (window.__adobe_cep__?.addEventListener) {
         window.__adobe_cep__.addEventListener(
-          'com.example.achuanPlugin.zoomSessionUpdate',
+          'com.achuan-2.illustrator_sci_toolbox.zoomSessionUpdate',
           onCepUpdate
         );
       }
@@ -154,7 +158,7 @@
         window.removeEventListener('focus', onFocus);
         if (window.__adobe_cep__?.removeEventListener) {
           window.__adobe_cep__.removeEventListener(
-            'com.example.achuanPlugin.zoomSessionUpdate',
+            'com.achuan-2.illustrator_sci_toolbox.zoomSessionUpdate',
             onCepUpdate
           );
         }
@@ -170,7 +174,7 @@
     };
     if (window.__adobe_cep__?.addEventListener) {
       window.__adobe_cep__.addEventListener(
-        'com.example.achuanPlugin.settingsUpdate',
+        'com.achuan-2.illustrator_sci_toolbox.settingsUpdate',
         onSettingsUpdate
       );
     }
@@ -188,7 +192,7 @@
       if (syncTimer) clearInterval(syncTimer);
       if (window.__adobe_cep__?.removeEventListener) {
         window.__adobe_cep__.removeEventListener(
-          'com.example.achuanPlugin.settingsUpdate',
+          'com.achuan-2.illustrator_sci_toolbox.settingsUpdate',
           onSettingsUpdate
         );
       }

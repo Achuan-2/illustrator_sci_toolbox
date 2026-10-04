@@ -283,12 +283,30 @@ function liveOffsets(): void {
   }, true);
 }
 
+export function labelIndexInput(event: Event): void {
+  const input = event.currentTarget as HTMLInputElement;
+  const start = input.valueAsNumber;
+  if (!Number.isSafeInteger(start) || start < 1) return;
+  const w = get(workspace);
+  // Only explicit edits renumber the batch. The automatic next index after
+  // adding labels must not change the labels that were just created.
+  if (!w.labelEditing || w.labelSession === null) return;
+  void run(async () => {
+    await bridge.call('updateLabelSessionIndex', start, w.labelSession!);
+  }, true);
+}
+
 export function offsetInput(
   event: Event,
   key: 'labelOffsetX' | 'labelOffsetY'
 ): void {
   const input = event.currentTarget as HTMLInputElement;
-  settings.update((value) => ({ ...value, [key]: input.valueAsNumber }));
+  const text = input.value.trim();
+  // Keep partial signed/decimal input local until it forms a valid number.
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return;
+  const offset = Number(text);
+  if (!Number.isFinite(offset)) return;
+  settings.update((value) => ({ ...value, [key]: offset }));
   liveOffsets();
 }
 

@@ -1,6 +1,6 @@
 # 中英文文案维护
 
-默认语言为英文，语言和标注参数仍保存在 `illustrator_sci_plugin_settings`。`en.json` 与 `zh_CN.json` 的 key 和占位参数必须保持一致，缺少中文条目时回退到英文。
+默认语言为简体中文，语言和标注参数仍保存在 `illustrator_sci_plugin_settings`，已有语言选择继续保留。`en.json` 与 `zh_CN.json` 的 key 和占位参数必须保持一致，缺少中文条目时回退到英文。
 
 Svelte 组件中使用 `{$t('common.copy')}`，提示使用 `title={$t('labels.editingHint')}`，动态参数使用 `{$t('relative.multipleValues', { count: 2 })}`。语言切换由 store 驱动，表单值不依赖 DOM 文本更新。
 

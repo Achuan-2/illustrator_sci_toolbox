@@ -11,6 +11,7 @@ declare function addBorder(...args: unknown[]): string;
 declare function addLabelsToImages(...args: unknown[]): string;
 declare function updateLabelIndex(...args: unknown[]): string;
 declare function updateLabelOffsets(...args: unknown[]): string;
+declare function updateLabelSessionIndex(...args: unknown[]): string;
 declare function filterTextFrames(...args: unknown[]): string;
 declare function filterSelection(...args: unknown[]): string;
 declare function swapSelectedPositions(...args: unknown[]): string;
@@ -40,6 +41,7 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   addLabelsToImages: addLabelsToImages,
   updateLabelIndex: updateLabelIndex,
   updateLabelOffsets: updateLabelOffsets,
+  updateLabelSessionIndex: updateLabelSessionIndex,
   filterTextFrames: filterTextFrames,
   filterSelection: filterSelection,
   swapSelectedPositions: swapSelectedPositions,
@@ -60,7 +62,7 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   applyScalebar: applyScalebar
 };
 
-$['com.example.achuanPlugin'] = {
+$['com.achuan-2.illustrator_sci_toolbox'] = {
   call: function (operation: string, payload: string): string {
     try {
       if (!Object.prototype.hasOwnProperty.call(methods, operation))

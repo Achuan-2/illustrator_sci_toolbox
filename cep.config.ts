@@ -3,7 +3,7 @@ import { version } from './package.json';
 
 const config: CEP_Config = {
   version,
-  id: 'com.example.achuanPlugin',
+  id: 'com.achuan-2.illustrator_sci_toolbox',
   displayName: 'SCI Toolbox',
   symlink: 'local',
   port: 3000,
@@ -32,14 +32,14 @@ const config: CEP_Config = {
   panels: [
     {
       name: 'main',
-      id: 'com.example.achuanPlugin.panel',
+      id: 'com.achuan-2.illustrator_sci_toolbox.panel',
       mainPath: './main/index.html',
       panelDisplayName: 'SCI Toolbox',
       autoVisible: true
     },
     {
       name: 'zoom',
-      id: 'com.example.achuanPlugin.zoom',
+      id: 'com.achuan-2.illustrator_sci_toolbox.zoom',
       mainPath: './main/index.html',
       panelDisplayName: '制作放大图',
       autoVisible: true,

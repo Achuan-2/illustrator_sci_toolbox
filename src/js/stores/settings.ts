@@ -14,6 +14,7 @@ export interface Settings {
   fontBold: boolean;
   labelOffsetX: number;
   labelOffsetY: number;
+  labelOffsetsVersion: number;
   labelTemplate: string;
   fontColor: string;
   labelsOrder: Order;
@@ -36,12 +37,13 @@ export interface Settings {
 
 export const storageKey = 'illustrator_sci_plugin_settings';
 export const defaults: Settings = {
-  language: 'en',
+  language: 'zh_CN',
   fontFamily: 'ArialMT',
   fontSize: 8,
   fontBold: false,
   labelOffsetX: -6,
   labelOffsetY: -6,
+  labelOffsetsVersion: 2,
   labelTemplate: 'a',
   fontColor: '#000000',
   labelsOrder: 'grid',
@@ -74,12 +76,23 @@ export function normalizeSettings(value: unknown): Settings {
     Object.assign(result, { [key]: item });
   }
   result.scalebarStyle = normalizeScalebarStyle(saved.scalebarStyle);
+  // Restore right/down positive offsets. Convert only the temporary left/up
+  // convention (version 1); original settings without a version stay intact.
+  if (saved.labelOffsetsVersion === 1) {
+    for (const key of ['labelOffsetX', 'labelOffsetY'] as const) {
+      const offset = saved[key];
+      if (typeof offset === 'number' && Number.isFinite(offset))
+        result[key] = -offset || 0;
+    }
+  }
+  result.labelOffsetsVersion = defaults.labelOffsetsVersion;
   // Reset the old auto-saved Keep Originals default once. Subsequent explicit
   // choices retain this version and continue to persist across panel reloads.
   if (saved.pseudocolorDefaultsVersion !== defaults.pseudocolorDefaultsVersion)
     result.pseudocolorKeepOriginal = defaults.pseudocolorKeepOriginal;
   result.pseudocolorDefaultsVersion = defaults.pseudocolorDefaultsVersion;
-  result.language = result.language === 'zh_CN' ? 'zh_CN' : 'en';
+  if (result.language !== 'en' && result.language !== 'zh_CN')
+    result.language = defaults.language;
   if (
     !['grid', 'stacking', 'horizontal', 'vertical'].includes(result.labelsOrder)
   )

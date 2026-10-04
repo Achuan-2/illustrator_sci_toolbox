@@ -36,9 +36,34 @@ assert.ok(
   'Manifest version must match package.json'
 );
 assert.ok(
-  manifest.includes('com.example.achuanPlugin.panel'),
-  'Keep the installed panel ID'
+  manifest.includes('ExtensionBundleId="com.achuan-2.illustrator_sci_toolbox"'),
+  'The installer must use the renamed extension bundle ID'
 );
+assert.ok(
+  manifest.includes('com.achuan-2.illustrator_sci_toolbox.panel'),
+  'The package must register the renamed panel ID'
+);
+assert.match(
+  manifest,
+  /<Extension\s+Id="com\.achuan-2\.illustrator_sci_toolbox\.zoom"\s+Version="[^"]+"\s*\/>/,
+  'The package must register the zoom editor extension'
+);
+const zoomDispatch = manifest.match(
+  /<Extension\s+Id="com\.achuan-2\.illustrator_sci_toolbox\.zoom">([\s\S]*?)<\/Extension>/
+)?.[1];
+assert.ok(zoomDispatch, 'The package must configure the zoom editor window');
+assert.match(
+  zoomDispatch,
+  /<MainPath>\.\/main\/index\.html<\/MainPath>/,
+  'The zoom editor must use the bundled relative HTML entry'
+);
+assert.match(zoomDispatch, /<Type>Modeless<\/Type>/);
+for (const parameter of ['--enable-nodejs', '--mixed-context']) {
+  assert.ok(
+    zoomDispatch.includes(`<Parameter>${parameter}</Parameter>`),
+    `The zoom editor needs ${parameter} for built-in Node APIs and session sharing`
+  );
+}
 assert.match(
   manifest,
   /<Host\s+Name="ILST"\s+Version="\[22\.0,99\.9\]"\s*\/>/,

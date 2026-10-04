@@ -48,7 +48,7 @@ test('translation keys, placeholders and all static component/host references ma
     assert.ok(dictionaries.en[key], `Missing key: ${key}`);
 });
 
-test('default English, legacy settings and malformed storage normalize safely', () => {
+test('default Chinese, legacy settings and malformed storage normalize safely', () => {
   for (const saved of [
     null,
     '{}',
@@ -57,7 +57,10 @@ test('default English, legacy settings and malformed storage normalize safely', 
     '{"language":"fr"}',
     '{"fontSize":12}'
   ]) {
-    assert.equal(readSettings({ getItem: () => saved }).language, 'en');
+    assert.equal(readSettings({ getItem: () => saved }).language, 'zh_CN');
+  }
+  for (const language of ['en', 'zh_CN'] as const) {
+    assert.equal(readSettings({ getItem: () => JSON.stringify({ language }) }).language, language);
   }
   assert.equal(normalizeSettings({ fontSize: 12 }).fontSize, 12);
   assert.equal(normalizeSettings({}).pseudocolorKeepOriginal, false);
@@ -73,6 +76,23 @@ test('default English, legacy settings and malformed storage normalize safely', 
     normalizeSettings({ fontSize: null }).fontSize,
     defaults.fontSize
   );
+});
+
+test('original label offsets are preserved and temporary inverted offsets migrate once', () => {
+  const original = normalizeSettings({ labelOffsetX: -8, labelOffsetY: -8 });
+  assert.equal(original.labelOffsetX, -8);
+  assert.equal(original.labelOffsetY, -8);
+  const migrated = normalizeSettings({ labelOffsetX: 8, labelOffsetY: 8, labelOffsetsVersion: 1 });
+  assert.equal(migrated.labelOffsetX, -8);
+  assert.equal(migrated.labelOffsetY, -8);
+  assert.equal(migrated.labelOffsetsVersion, 2);
+  assert.deepEqual(normalizeSettings(migrated), migrated);
+  const opposite = normalizeSettings({ labelOffsetX: 3, labelOffsetY: 4 });
+  assert.equal(opposite.labelOffsetX, 3);
+  assert.equal(opposite.labelOffsetY, 4);
+  assert.equal(normalizeSettings({ labelOffsetX: 0 }).labelOffsetX, 0);
+  assert.equal(normalizeSettings({ labelOffsetY: null }).labelOffsetY, defaults.labelOffsetY);
+  assert.equal(normalizeSettings({ labelOffsetX: Infinity }).labelOffsetX, defaults.labelOffsetX);
 });
 
 test('scalebar preferences reject invalid storage and retain valid style fields', () => {

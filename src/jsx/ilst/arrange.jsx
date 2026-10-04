@@ -859,6 +859,14 @@ function arrangeImages(columns, rowGap, colGap, useWidth, wVal, useHeight, hVal,
     return '{"success":true}';
 }
 
+function getLabelContents(labelTemplate, index) {
+    var alphabet = labelTemplate.indexOf("A") !== -1 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "abcdefghijklmnopqrstuvwxyz";
+    var label = alphabet.charAt(index % alphabet.length);
+    if (labelTemplate === "A)" || labelTemplate === "a)") return label + ")";
+    if (labelTemplate === "(A)" || labelTemplate === "(a)") return "(" + label + ")";
+    return label;
+}
+
 function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOffsetY, labelTemplate, fontColor, order, reverseOrder, startCount, sessionId) {
     if (app.documents.length === 0) return sciError("errors.noDocument");
 
@@ -872,31 +880,15 @@ function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOf
     startCount = parseInt(startCount) || 1;
     var startIndex = startCount - 1;
 
-    var templates = {
-        "A": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        "a": "abcdefghijklmnopqrstuvwxyz",
-        "(A)": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        "(a)": "abcdefghijklmnopqrstuvwxyz",
-        "A)": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        "a)": "abcdefghijklmnopqrstuvwxyz"
-    };
-
-    var labels = templates[labelTemplate] || templates["A"];
+    labelTemplate = /^(A|a|\(A\)|\(a\)|A\)|a\))$/.test(labelTemplate) ? labelTemplate : "A";
     var ordered = getOrderedSelection(selection, order || "stacking", !!reverseOrder);
 
     for (var i = 0; i < ordered.length; i++) {
         try {
             var item = ordered[i];
-            var labelIndex = (startIndex + i) % labels.length;
-            var label = labels[labelIndex];
-            if (labelTemplate === "A)" || labelTemplate === "a)") {
-                label += ")";
-            } else if (labelTemplate === "(A)" || labelTemplate === "(a)") {
-                label = "(" + label + ")";
-            }
             var v = getVisibleInfo(item);
             var textFrame = doc.textFrames.add();
-            textFrame.contents = label;
+            textFrame.contents = getLabelContents(labelTemplate, startIndex + i);
             // 将标签放在可视左上位置并加偏移
             textFrame.top = v.top - labelOffsetY;
             textFrame.left = v.left + labelOffsetX;
@@ -932,13 +924,45 @@ function addLabelsToImages(fontFamily, fontSize, fontBold, labelOffsetX, labelOf
             }
 
             // 记录基准信息与会话ID在 note，JSON 字符串
-            var payload = '{"sid":' + (sessionId || 0) + ',"baseL":' + v.left + ',"baseT":' + v.top + '}';
+            // Preserve creation order and template even if labels move or the
+            // document's textFrames collection changes its stacking order.
+            var payload = JSON.stringify({
+                sid: sessionId || 0,
+                baseL: v.left,
+                baseT: v.top,
+                index: i,
+                template: labelTemplate
+            });
             try { textFrame.note = payload; } catch (e) { }
         } catch (e) {
             return sciError("errors.addLabel", [i + 1, e.message]);
         }
     }
     return (startCount + ordered.length).toString();
+}
+
+function updateLabelSessionIndex(startCount, sessionId) {
+    if (app.documents.length === 0) return sciError("errors.noDocument");
+    if (!isFinite(startCount) || startCount < 1 || Math.floor(startCount) !== startCount || !sessionId) {
+        return "Success|0";
+    }
+    var frames = app.activeDocument.textFrames;
+    var count = 0;
+    for (var i = 0; i < frames.length; i++) {
+        var frame = frames[i];
+        var data;
+        try { data = JSON.parse(frame.note); } catch (e) { continue; }
+        if (!data || data.sid !== sessionId ||
+            typeof data.index !== "number" || data.index < 0 || Math.floor(data.index) !== data.index ||
+            typeof data.template !== "string") continue;
+        try {
+            frame.contents = getLabelContents(data.template, startCount - 1 + data.index);
+            count++;
+        } catch (e) {
+            return sciError("errors.updateTextFrame", [data.index + 1, e.message]);
+        }
+    }
+    return "Success|" + count;
 }
 
 function updateLabelIndex(fontFamily, fontSize, fontBold, labelTemplate, fontColor, order, reverseOrder, startCount) {

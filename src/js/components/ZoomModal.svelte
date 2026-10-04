@@ -13,7 +13,8 @@
     unitFactor,
     unitSymbol,
     lengthInUnit,
-    maxScalebarLengthUm
+    maxScalebarLengthUm,
+    normalizeScalebarStyle
   } from '../services/scalebar';
 
   let { standalone = false } = $props<{ standalone?: boolean }>();
@@ -59,6 +60,31 @@
   let activeIndex = $state(0);
 
   let activeEntry = $derived(entries[activeIndex] ?? null);
+
+  let entryLabels = $derived.by(() => {
+    const source: Rect = {
+      left: 0,
+      top: 0,
+      width: $zoomModalState.sourceWidth,
+      height: $zoomModalState.sourceHeight
+    };
+    const layout = calculateZoomLayout(source, entries, GAP_POINTS * 2);
+    return entries.map((entry) => {
+      const bounds = layout.get(entry);
+      if (!bounds || !(source.width > 0) || !(source.height > 0))
+        return entry.name;
+      // Use actual output/crop dimensions, independent of canvas pan and zoom.
+      const horizontal = bounds.width / (source.width * entry.region.width);
+      const vertical = bounds.height / (source.height * entry.region.height);
+      const x = Number(horizontal.toPrecision(3));
+      const y = Number(vertical.toPrecision(3));
+      return `${entry.name}（${x === y ? `${x}×` : `${x}× / ${y}×`}）`;
+    });
+  });
+
+  function entryLabel(entry: ZoomEntry): string {
+    return entryLabels[entries.indexOf(entry)] ?? entry.name;
+  }
 
   function maxZoomScaleLength(entry: ZoomEntry) {
     const fov = $zoomModalState.sourceFov;
@@ -284,10 +310,11 @@
       // Label badge
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.font = '11px sans-serif';
-      const textW = ctx.measureText(entry.name).width;
+      const label = entryLabel(entry);
+      const textW = ctx.measureText(label).width;
       ctx.fillRect(rx, ry - 18, textW + 8, 18);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(entry.name, rx + 4, ry - 5);
+      ctx.fillText(label, rx + 4, ry - 5);
       ctx.restore();
     });
 
@@ -315,7 +342,7 @@
       // Active label badge
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
       ctx.font = 'bold 11px sans-serif';
-      const badgeText = `${activeEntry.name} ${$t('zoom.current')}`;
+      const badgeText = `${entryLabel(activeEntry)} ${$t('zoom.current')}`;
       const textW = ctx.measureText(badgeText).width;
       ctx.fillRect(rx, ry - 20, textW + 8, 20);
       ctx.fillStyle = '#4ea1ff';
@@ -508,15 +535,92 @@
       }
       ctx.restore();
 
+      renderZoomScalebar(
+        ctx,
+        entry,
+        zoomScreen,
+        scale * srcW / $zoomModalState.sourceWidth
+      );
+
       // Label below zoom image
       ctx.fillStyle = '#b8b8b8';
       ctx.font = '10px sans-serif';
       ctx.fillText(
-        entry.name,
+        entryLabel(entry),
         zoomScreen.left,
         zoomScreen.top + zoomScreen.height + 12
       );
     });
+  }
+
+  function renderZoomScalebar(
+    ctx: CanvasRenderingContext2D,
+    entry: ZoomEntry,
+    bounds: Rect,
+    pixelsPerPoint: number
+  ) {
+    const maximum = maxZoomScaleLength(entry);
+    const lengthUm = Math.min(entry.scaleLengthUm ?? 0, maximum ?? Infinity);
+    if (!(lengthUm > 0) || maximum === undefined || !(pixelsPerPoint > 0))
+      return;
+
+    const style = normalizeScalebarStyle($zoomModalState.sourceScalebar);
+    const vertical =
+      ($zoomModalState.sourceScalebar?.orientation || entry.scaleOrientation || 'horizontal') === 'vertical';
+    const right = style.position === 'TR' || style.position === 'BR';
+    const top = style.position === 'TL' || style.position === 'TR';
+    // The same physical crop limit drives the input, preview and host payload.
+    const length =
+      lengthUm / maximum * 0.9 * (vertical ? bounds.height : bounds.width);
+    const thickness = style.thickness * pixelsPerPoint;
+    const barWidth = vertical ? thickness : length;
+    const barHeight = vertical ? length : thickness;
+    const unit = entry.scaleUnit || $zoomModalState.sourceScalebar?.unit || 'um';
+    const label = `${lengthInUnit(lengthUm, unit)}${unitSymbol(unit)}`;
+    const textHeight = style.showText ? style.fontSize * pixelsPerPoint : 0;
+    const gap = style.showText ? Math.max(2, style.thickness) * pixelsPerPoint : 0;
+
+    ctx.save();
+    ctx.font = `${style.bold ? 'bold ' : ''}${style.fontSize * pixelsPerPoint}px Arial`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    const textWidth = style.showText ? ctx.measureText(label).width : 0;
+    const groupWidth = vertical
+      ? barWidth + gap + textWidth
+      : Math.max(barWidth, textWidth);
+    const groupHeight = vertical
+      ? Math.max(barHeight, textHeight)
+      : barHeight + gap + textHeight;
+    const margin = Math.min(bounds.width, bounds.height) * 0.04;
+    const left = Math.max(bounds.left, Math.min(
+      right
+        ? bounds.left + bounds.width - margin - groupWidth
+        : bounds.left + margin,
+      bounds.left + bounds.width - groupWidth
+    ));
+    const y = Math.max(bounds.top, Math.min(
+      top
+        ? bounds.top + margin
+        : bounds.top + bounds.height - margin - groupHeight,
+      bounds.top + bounds.height - groupHeight
+    ));
+
+    ctx.fillStyle = style.color;
+    ctx.fillRect(
+      left + (vertical ? gap + textWidth : right ? groupWidth - barWidth : 0),
+      y + (vertical ? 0 : gap + textHeight),
+      barWidth,
+      barHeight
+    );
+    if (style.showText) {
+      ctx.fillStyle = style.fontColor;
+      ctx.fillText(
+        label,
+        left + (!vertical && right ? groupWidth - textWidth : 0),
+        y + (vertical && !top ? groupHeight - textHeight : 0)
+      );
+    }
+    ctx.restore();
   }
 
   function renderAll() {
@@ -813,6 +917,15 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     if (!$zoomModalState.open) return;
+    // Form editing owns its keys; Delete/Backspace must not remove a zoom entry.
+    const target = e.target;
+    if (
+      e.defaultPrevented ||
+      e.isComposing ||
+      (target instanceof Element &&
+        target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))
+    )
+      return;
     if (e.code === 'Space' && !spaceHeld) {
       spaceHeld = true;
       if (canvasEl) canvasEl.style.cursor = 'grab';
@@ -886,7 +999,7 @@
   function notifySettingsUpdate() {
     try {
       window.__adobe_cep__?.dispatchEvent?.({
-        type: 'com.example.achuanPlugin.settingsUpdate',
+        type: 'com.achuan-2.illustrator_sci_toolbox.settingsUpdate',
         scope: 'APPLICATION',
         data: ''
       });
@@ -1006,7 +1119,7 @@
               onchange={renderAll}
             >
               {#each entries as entry, i}
-                <option value={i}>{entry.name}</option>
+                <option value={i}>{entryLabels[i]}</option>
               {/each}
             </select>
             <button class="btn btn-sm btn-secondary" onclick={addNewEntry}>
@@ -1128,13 +1241,13 @@
             <fieldset class="settings-group">
               <legend>{$t('zoom.zoomSettings')}</legend>
               {#if $zoomModalState.sourceScalebar || activeEntry.scaleLengthUm != null}
-                <div class="settings-row control-group">
+                <div class="control-group zoom-scale-controls">
                   <label for="zoom-scale-length">{$t('scale.zoomLength', { unit: unitSymbol(activeEntry.scaleUnit || 'um') })}</label>
                   <input id="zoom-scale-length" type="number" min="0" step="any"
                     max={maxZoomDisplayLength}
                     bind:value={() => lengthInUnit(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
                       (value) => { activeEntry.scaleLengthUm = Math.min(Number(value) * unitFactor(activeEntry.scaleUnit || 'um'), maxZoomScaleLength(activeEntry) ?? Infinity); }} />
-                  <select aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
+                  <select id="zoom-scale-unit" aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
                     <option value="nm">nm</option><option value="um">μm</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">inch</option>
                   </select>
                 </div>
@@ -1409,6 +1522,20 @@
   .control-group label {
     color: var(--muted, #b8b8b8);
     font-size: 12px;
+  }
+
+  .zoom-scale-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(50px, 70px) auto;
+    gap: 6px;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .zoom-scale-controls input[type='number'] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .control-group input[type='number'] {
