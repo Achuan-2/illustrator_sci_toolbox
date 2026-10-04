@@ -1347,15 +1347,34 @@
                   percent: Math.round(zoomFactor * 100)
                 })}
               </span>
-              <button class="btn btn-xs" onclick={fitImage}>
-                {$t('zoom.fitWindow')}
+              <button class="btn btn-xs canvas-tool-button" onclick={fitImage}>
+                <svg
+                  width="16" height="16" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true" focusable="false"
+                >
+                  <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5" />
+                  <rect x="7" y="7" width="10" height="10" rx="1" />
+                </svg>
+                <span>{$t('zoom.fitWindow')}</span>
               </button>
               <button
-                class="btn btn-xs"
+                class="btn btn-xs canvas-tool-button"
                 class:btn-active={panToolActive}
+                aria-pressed={panToolActive}
                 onclick={() => (panToolActive = !panToolActive)}
               >
-                {$t('zoom.panTool')}
+                <svg
+                  width="16" height="16" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true" focusable="false"
+                >
+                  <path d="M8 12V6a1.5 1.5 0 0 1 3 0V4a1.5 1.5 0 0 1 3 0v2a1.5 1.5 0 0 1 3 0v2a1.5 1.5 0 0 1 3 0v7c0 3.5-2.5 6-6 6h-2c-1.6 0-2.8-.7-3.7-2L3.8 13a1.7 1.7 0 0 1 2.5-2.3L8 12Z" />
+                  <path d="M11 6v6M14 6v6M17 8v5" />
+                </svg>
+                <span>{$t('zoom.panTool')}</span>
               </button>
               <span class="canvas-hint">{$t('zoom.panHint')}</span>
             </div>
@@ -1636,6 +1655,17 @@
     border-bottom: 1px solid #333333;
     font-size: 11px;
     flex-shrink: 0;
+  }
+
+  .canvas-tool-button {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .canvas-tool-button svg {
+    flex-shrink: 0;
+    margin-right: 4px;
   }
 
   .zoom-indicator {
