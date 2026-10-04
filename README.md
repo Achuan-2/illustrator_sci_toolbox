@@ -230,9 +230,9 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 ```bash
 pnpm install
-pnpm build  # 首次生成完整的 CEP 扩展文件
-pnpm dev    # 启动开发服务，再在 Illustrator 中打开开发面板
-pnpm zxp # 打包
+pnpm build  # 检查、构建并启动或复用热更新服务
+pnpm dev    # 直接启动或复用热更新服务，首次自动生成扩展文件
+pnpm zxp    # 生成静态扩展和签名安装包
 ```
 
 ## ❤️用爱发电

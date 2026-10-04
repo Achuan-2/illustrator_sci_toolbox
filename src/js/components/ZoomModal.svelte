@@ -98,12 +98,18 @@
     );
   }
 
+  function displayZoomScaleLength(lengthUm: number, unit: string) {
+    // Round the input display without losing the physical length used by the
+    // preview and the 90% crop limit when switching units or resizing regions.
+    return Number(lengthInUnit(lengthUm, unit).toFixed(2));
+  }
+
   let maxZoomDisplayLength = $derived.by(() => {
     if (!activeEntry) return undefined;
     const maximum = maxZoomScaleLength(activeEntry);
     return maximum === undefined
       ? undefined
-      : lengthInUnit(maximum, activeEntry.scaleUnit || 'um');
+      : displayZoomScaleLength(maximum, activeEntry.scaleUnit || 'um');
   });
 
   function normalizeScaleLengthInput(event: Event) {
@@ -1202,6 +1208,8 @@
                     onchange={renderAll}
                   />
                 </div>
+              </div>
+              <div class="settings-row">
                 <div class="control-group">
                   <label for="zoom-line-style">{$t('zoom.lineStyle')}</label>
                   <select
@@ -1249,6 +1257,8 @@
                     {$t('zoom.addGuides')}
                   </label>
                 </div>
+              </div>
+              <div class="settings-row">
                 <div class="control-group">
                   <label for="zoom-guide-extent">{$t('zoom.guideExtent')}</label
                   >
@@ -1277,7 +1287,7 @@
                   <input id="zoom-scale-length" type="number" min="0" step="any"
                     max={maxZoomDisplayLength}
                     oninput={normalizeScaleLengthInput}
-                    bind:value={() => lengthInUnit(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
+                    bind:value={() => displayZoomScaleLength(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
                       setZoomScaleLength} />
                   <select id="zoom-scale-unit" aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
                     <option value="nm">nm</option><option value="um">μm</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">inch</option>
@@ -1558,21 +1568,21 @@
 
   .zoom-scale-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(50px, 70px) auto;
+    grid-template-columns: minmax(0, 1fr) 90px auto;
     gap: 6px;
     width: 100%;
     margin-right: 0;
+  }
+
+  .control-group input[type='number'] {
+    width: 60px;
+    padding: 2px 6px;
   }
 
   .zoom-scale-controls input[type='number'] {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
-  }
-
-  .control-group input[type='number'] {
-    width: 60px;
-    padding: 2px 6px;
   }
 
   .control-group input[type='color'] {

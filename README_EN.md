@@ -166,7 +166,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## Development and release
 
-The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, `pnpm build`, then `pnpm dev`. Frontend changes use HMR; host script changes rebuild and reload the panel. Run `bash release.sh` to build and verify ZIP/ZXP locally, then publish the matching CHANGELOG entry and Baidu/Quark cloud drive links through GitHub CLI (`gh`). Packages are not uploaded to GitHub Releases. Use `bash release.sh --no-release` to build locally without publishing. See [Development and release](docs/development.md) for setup and verification boundaries.
+The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, then `pnpm build` to check, build and start or reuse the development server. `pnpm dev` starts or reuses the same server and prepares the extension on first use. Both commands keep the panel in development mode; `pnpm test` also preserves this entry. Frontend changes use HMR; translation JSON and host script changes reload the panel. Only `pnpm zxp` (also used by `pnpm zip`) produces a static extension and signed packages. Run `bash release.sh` to build and verify ZIP/ZXP locally, then publish the matching CHANGELOG entry and Baidu/Quark cloud drive links through GitHub CLI (`gh`). Packages are not uploaded to GitHub Releases. Use `bash release.sh --no-release` to build locally without publishing. See [Development and release](docs/development.md) for setup and verification boundaries.
 
 ## ❤️Powered by Love
 

@@ -399,7 +399,8 @@ export const actions = {
       previewDataUrl,
       existingEntries: data.existingEntries || [],
       manualRect: data.manualRect || null,
-      sourceScalebar: data.sourceScalebar || null
+      sourceScalebar: data.sourceScalebar || null,
+      sourceFov: data.sourceFov || null
     };
   },
   applyZoom: async (payload: {

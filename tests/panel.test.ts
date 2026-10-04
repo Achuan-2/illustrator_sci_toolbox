@@ -1308,7 +1308,13 @@ test('zoom window opens before the host finishes capturing its preview', async (
     };
     cep.evalScript = (script: string, callback: (result: string) => void) => {
       if (script.includes('"inspectZoomTarget"')) {
-        finishCapture = () => evaluate(script, callback);
+        finishCapture = () => evaluate(script, (result: string) => {
+          const response = JSON.parse(result);
+          const data = JSON.parse(response.data);
+          data.sourceFov = { width: 1000, height: 500, unit: 'um' };
+          data.sourceScalebar = { orientation: 'horizontal', lengthUm: 50, unit: 'um' };
+          callback(JSON.stringify({ ...response, data: JSON.stringify(data) }));
+        });
       } else evaluate(script, callback);
     };
   });
@@ -1321,6 +1327,9 @@ test('zoom window opens before the host finishes capturing its preview', async (
     await panel.flush();
     const readySession = JSON.parse(panel.window.localStorage.getItem('sci_zoom_session')!);
     assert.ok(readySession.data.previewDataUrl);
+    assert.deepEqual(readySession.data.sourceFov, { width: 1000, height: 500, unit: 'um' },
+      'The separate window must receive the physical calibration needed to draw and clamp scales');
+    assert.equal(readySession.data.sourceScalebar.lengthUm, 50);
     assert.ok(readySession.timestamp > openingSession.timestamp);
     assert.equal((panel.element('make-zoom-button') as any).disabled, false);
   } finally {
@@ -1471,24 +1480,28 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
   test(`zoom preview clamps ${orientation} scalebars before confirmation and follows crop edits`, async () => {
     type Frame = { images: number[][]; bars: number[][]; labels: string[]; fonts: string[]; outlines: number[][] };
     const frames = new Map<unknown, Frame>();
-    const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#zoom-window', (window) => {
-      window.localStorage.setItem('sci_zoom_session', JSON.stringify({
-        timestamp: Date.now(), settings: { language: 'zh_CN' },
-        data: {
-          sourceWidth: 500, sourceHeight: 250,
-          sourceFov: { width: 1000, height: 500, unit: 'um' },
-          sourceScalebar: { orientation, lengthUm: 500, unit: 'um', thickness: 2,
-            color: '#ffffff', showText: true, fontColor: '#ffffff', fontSize: 8,
-            bold: false, position: 'BR', autoGroup: true },
-          previewDataUrl: 'data:image/png;base64,preview', manualRect: null,
-          existingEntries: [{ recordKey: 'preview', name: '放大图 1',
-            region: { x: 0.1, y: 0.1, width: 0.25, height: 0.5 },
-            regionRotation: 0, strokeColor: '#ff0000', strokeWidth: 1.5,
-            strokeDash: 'dash', useRectangleColor: true, addGuideLines: false,
-            placement: 'right', guideLineExtent: 'acrossImages',
-            originalZoomRegion: null, originalZoomRotation: 0, scaleLengthUm: 500 }]
-        }
-      }));
+    const panel = await createPanel('{"language":"zh_CN"}', true, 'http://localhost:3000/main/index.html#zoom', (window) => {
+      const inspection = {
+        sourceWidth: 500, sourceHeight: 250,
+        sourceFov: { width: 1000, height: 500, unit: 'um' },
+        sourceScalebar: { orientation, lengthUm: 500, unit: 'um', thickness: 2,
+          color: '#ffffff', showText: true, fontColor: '#ffffff', fontSize: 8,
+          bold: false, position: 'BR', autoGroup: true },
+        previewDataUrl: 'data:image/png;base64,preview', manualRect: null,
+        existingEntries: [{ recordKey: 'preview', name: '放大图 1',
+          region: { x: 0.1, y: 0.1, width: 0.25, height: 0.5 },
+          regionRotation: 0, strokeColor: '#ff0000', strokeWidth: 1.5,
+          strokeDash: 'dash', useRectangleColor: true, addGuideLines: false,
+          placement: 'right', guideLineExtent: 'acrossImages',
+          originalZoomRegion: null, originalZoomRotation: 0, scaleLengthUm: 500 }]
+      };
+      const cep = (window as any).__adobe_cep__;
+      const evaluate = cep.evalScript;
+      cep.evalScript = (script: string, callback: (result: string) => void) => {
+        if (script.includes('"inspectZoomTarget"')) {
+          callback(JSON.stringify({ ok: true, data: JSON.stringify(inspection) }));
+        } else evaluate(script, callback);
+      };
       (window as any).ResizeObserver = undefined;
       (window as any).Image = class {
         naturalWidth = 1000; naturalHeight = 500;
@@ -1520,6 +1533,7 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
         await panel.flush();
         await new Promise((resolve) => setTimeout(resolve, 40));
       };
+      await panel.click('make-zoom-button');
       await settle();
       const canvas = panel.window.document.querySelector('.layout-wrapper canvas')!;
       const length = () => (panel.element('zoom-scale-length') as any).value;
@@ -1543,6 +1557,11 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（2×）');
       assert.equal(panel.requests.some((request) => request.operation === 'applyZoomImages'), false);
 
+      await panel.input('zoom-scale-length', '26.038');
+      await settle();
+      assert.equal(length(), '26.04', 'Length input displays at most two decimal places');
+      assertRatio(26.038 / 250);
+
       const scaleLength = panel.element('zoom-scale-length');
       const scaleUnit = panel.element('zoom-scale-unit');
       assert.equal(scaleLength.parentElement, scaleUnit.parentElement,
@@ -1558,7 +1577,7 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
           assert.equal(event.defaultPrevented, false, 'Text editing retains its native delete behavior');
           assert.equal(panel.element('entry-selector').querySelectorAll('option').length, 1,
             'Deleting input text must not remove the active zoom entry');
-          assert.equal(length(), '225');
+          assert.equal(length(), '26.04');
         }
       }
 
@@ -1567,7 +1586,8 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       units.value = 'cm';
       units.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
       await settle();
-      assert.equal(length(), '0.0225');
+      assert.equal(length(), '0', 'Unit conversions keep the same two-decimal display precision');
+      assertRatio(26.038 / 250);
       await panel.input('zoom-scale-length', '');
       await settle();
       assert.equal(preview().bars.length, 0, 'Clearing the length hides the bar immediately');
@@ -1580,7 +1600,7 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       assert.ok(preview().labels.includes('0.01cm'));
       await panel.input('zoom-scale-length', '1');
       await settle();
-      assert.equal(length(), '0.0225');
+      assert.equal(length(), '0.02');
       assertRatio(0.9);
 
       // Shrink the crop using its bottom-right resize handle.
@@ -1589,7 +1609,7 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       editor.dispatchEvent(new panel.window.MouseEvent('mousemove', { clientX: 141.6, clientY: 156.8, bubbles: true }));
       panel.window.dispatchEvent(new panel.window.MouseEvent('mouseup'));
       await settle();
-      assert.ok(Math.abs(Number(length()) - 0.01125) < 1e-9);
+      assert.equal(length(), '0.01');
       assertRatio(0.9);
       assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（4×）');
       assert.ok(preview().labels.includes('放大图 1（4×）'));
@@ -1686,11 +1706,11 @@ test('standalone zoom window restores source units and edits represented length 
     assert.ok(panel.window.document.querySelector('.zoom-standalone-root'));
     assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
     assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
-    assert.equal((panel.element('zoom-scale-length') as any).value, '0.0075');
+    assert.equal((panel.element('zoom-scale-length') as any).value, '0.01');
     assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（2.67× / 3.33×）');
-    assert.equal(panel.element('zoom-scale-length').getAttribute('max'), '0.0216');
+    assert.equal(panel.element('zoom-scale-length').getAttribute('max'), '0.02');
     await panel.input('zoom-scale-length', '1');
-    assert.equal((panel.element('zoom-scale-length') as any).value, '0.0216');
+    assert.equal((panel.element('zoom-scale-length') as any).value, '0.02');
     await panel.input('zoom-scale-length', '0');
     assert.equal((panel.element('zoom-scale-length') as any).value, '0');
     await panel.input('zoom-scale-length', '0.01');

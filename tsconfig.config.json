@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node"], "verbatimModuleSyntax": false },
-  "include": ["cep.config.ts", "vite.config.ts", "vite.es.config.ts"]
+  "include": ["cep.config.ts", "vite.config.ts", "vite.es.config.ts", "scripts/start-dev.ts"]
 }

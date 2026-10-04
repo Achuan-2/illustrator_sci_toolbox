@@ -7,6 +7,7 @@ import cepConfig from './cep.config';
 import { buildExtendScript, hostSources, isHostSource } from './vite.es.config';
 import { panelEntryRedirect } from './scripts/panel-entry';
 import { cepPackage } from './scripts/cep-package';
+import { developmentPanel } from './scripts/development-panel';
 
 const outDir = path.resolve('dist/cep');
 const isPackage = process.env.ZXP_PACKAGE === 'true';
@@ -75,7 +76,8 @@ export default defineConfig(({ command }) => {
           svelte(),
           panelEntryRedirect(),
           illustratorScripts(),
-          cepPackage(options)
+          cepPackage(options),
+          developmentPanel(cepConfig.port, !isPackage)
         ],
     server: { host: '127.0.0.1', port: cepConfig.port, strictPort: true },
     build: {

@@ -12,27 +12,28 @@
 
 生产入口先加载浏览器 API 补丁（`globalThis`、`queueMicrotask`、`replaceAll`、`Promise.allSettled` 和 `Promise.finally`），并检测 flex gap，为旧版 CEP 使用 margin 间距。宿主脚本继续保持 ES3。根据 [Adobe CEP 版本表](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_8.x/Documentation/CEP%208.0%20HTML%20Extension%20Cookbook.md)，CC 2017 及更早版本使用 Chromium 41 或更旧引擎，缺少 Svelte 5 所需的原生 Proxy，因此不在当前安装包范围内。扩大 manifest 范围不能解决这一限制。
 
-旧版 Illustrator 应使用 `pnpm build` 生成的静态产物或签名安装包验证；Vite 开发服务和 HMR 不属于旧版宿主的兼容承诺。开发工具的 Node.js 要求不影响安装包在 Illustrator 内的运行。
+旧版 Illustrator 应使用 `pnpm zxp` 生成的静态产物或签名安装包验证；Vite 开发服务和 HMR 不属于旧版宿主的兼容承诺。开发工具的 Node.js 要求不影响安装包在 Illustrator 内的运行。
 
 ## 本地开发
 
 ```powershell
 pnpm install
 pnpm build
-pnpm dev
 ```
+
+`pnpm build` 完成类型检查和构建后，自动启动开发服务；已有当前项目的服务时直接复用并刷新已连接的面板。`pnpm dev` 直接启动或复用同一服务，首次使用时自动补齐扩展文件。新启动的服务会持续占用终端，按 Ctrl+C 停止；输入 `r` 再按 Enter 可重启服务。两个命令都保留热更新入口，`pnpm test` 的构建也不会切回静态页面。
 
 首次构建会按 Bolt 的默认行为，将 `dist/cep` 链接到当前用户的 Adobe CEP 扩展目录，扩展包 ID 为 `com.achuan-2.illustrator_sci_toolbox`，主面板 ID 为 `com.achuan-2.illustrator_sci_toolbox.panel`。启用对应 CEP 版本的 PlayerDebugMode，重启 Illustrator，在“窗口 → 扩展功能 → SCI Toolbox”打开面板。已有同 ID 的手动安装目录可能阻止创建链接，需要先将该安装目录移到备份位置，再运行 `pnpm symlink`。不要把整个源码仓库复制到扩展目录。
 
 旧版扩展包 ID 为 `com.example.achuanPlugin`。由于新旧 ID 不同，安装器不会将新版识别为旧版的覆盖升级；安装新版前应卸载旧版，避免扩展列表出现重复面板。
 
-`pnpm dev` 使用固定端口 3000，面板会跳转到本地开发服务；浏览器也可以打开 `http://127.0.0.1:3000/`，根地址会跳转到 `/main/index.html` 预览界面。浏览器预览不提供 Illustrator 文档操作，点击功能会显示相应提示。
+开发服务使用固定端口 3000，面板会跳转到 `http://localhost:3000/main/index.html`，并保留查询参数和页面位置；浏览器也可以打开 `http://localhost:3000/`，根地址会跳转到 `/main/index.html` 预览界面。浏览器预览不提供 Illustrator 文档操作，点击功能会显示相应提示。
 
-Svelte 和 CSS 修改通过 Vite HMR 更新。`src/jsx` 中的宿主入口、算法或 JSON2 修改会重新生成 `dist/cep/jsx/index.js`，触发面板整页刷新，并在下一次操作前重新加载宿主代码。整页刷新会重置复制的数据、标注编辑会话等临时状态，已经写入 Illustrator 文档的内容不受影响，也不会因刷新自动执行文档操作。
+Svelte 和 CSS 修改通过 Vite HMR 更新。`src/js/i18n/*.json` 修改会触发整页刷新，重新加载翻译；`src/jsx` 中的宿主入口、算法或 JSON2 修改会重新生成 `dist/cep/jsx/index.js`，触发面板整页刷新，并在下一次操作前重新加载宿主代码。整页刷新会重置复制的数据、标注编辑会话等临时状态，已经写入 Illustrator 文档的内容不受影响，也不会因刷新自动执行文档操作。
 
 开发服务与生产文件页面具有不同 origin，localStorage 彼此独立。生产环境沿用 `illustrator_sci_plugin_settings` 存储键；切换开发模式后需要在开发页面重新设置语言和标注参数，不要将其误判为生产设置丢失。
 
-停止开发后运行 `pnpm build`，恢复面板的静态入口，随后重新打开面板。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
+只有 `pnpm zxp`（以及调用它的 `pnpm zip`）生成静态入口和安装包，不依赖开发服务。打包后运行 `pnpm dev` 或 `pnpm build` 可恢复开发入口；如果面板仍停留在静态页面，关闭并重新打开一次。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
 
 ## 代码结构
 
@@ -60,7 +61,7 @@ pnpm zip
 pnpm verify:package
 ```
 
-`pnpm test` 先构建，然后验证宿主 ES3 语法、无原生 JSON 的运行环境、调用队列与参数安全、设置记忆、翻译、标签预览和实际生产 Svelte 包的 DOM 交互。DOM/CEP 适配器不等于 Illustrator 验收：排图、位置、尺寸、标签、边框和选择操作仍需在 Illustrator 中验证。
+`pnpm test` 先构建，然后验证宿主 ES3 语法、无原生 JSON 的运行环境、调用队列与参数安全、设置记忆、翻译、标签预览和编译后 Svelte 包的 DOM 交互；面板入口保留开发模式，测试结束后命令退出。DOM/CEP 适配器不等于 Illustrator 验收：排图、位置、尺寸、标签、边框和选择操作仍需在 Illustrator 中验证。
 
 ## 打包与本地发布
 

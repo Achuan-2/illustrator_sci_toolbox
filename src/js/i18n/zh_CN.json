@@ -345,7 +345,7 @@
   "scale.noMetadata": "没有找到可用的标定信息，请填写 FOV 宽度、高度和单位，修改后自动保存。",
   "scale.fovSaved": "FOV 信息已保存。",
   "scale.saved": "比例尺已更新。",
-  "scale.zoomLength": "放大图比例尺长度（{unit}）：",
+  "scale.zoomLength": "比例尺长度（{unit}）：",
   "scale.barUnit": "比例尺单位：",
   "scale.autoSaved": "已自动保存。",
   "errors.scaleSelection": "请选择一张或多张图片、图片编组，或已有比例尺。",

@@ -88,7 +88,7 @@ for (const file of [
 }
 const html = strFromU8(extension['main/index.html']);
 assert.ok(
-  !html.includes('localhost:'),
+  !/localhost:|127\.0\.0\.1:|\/@vite\/client/.test(html),
   'Production must not depend on a dev server'
 );
 assert.ok(
