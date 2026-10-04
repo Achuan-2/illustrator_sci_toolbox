@@ -12,7 +12,7 @@
     "dev": "node --import tsx scripts/start-dev.ts",
     "check": "cross-env SCI_CHECK=true svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.config.json && tsc -p tsconfig.host.json",
     "test": "vite build && node --import tsx --test tests/*.test.ts",
-    "build": "pnpm check && vite build && pnpm dev",
+    "build": "pnpm check && vite build",
     "zxp": "pnpm check && cross-env ZXP_PACKAGE=true vite build && node scripts/create-zip-package.mjs",
     "zip": "pnpm zxp",
     "symlink": "cross-env BOLT_ACTION=symlink vite",

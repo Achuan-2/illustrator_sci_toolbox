@@ -21,7 +21,7 @@ pnpm install
 pnpm build
 ```
 
-`pnpm build` 完成类型检查和构建后，自动启动开发服务；已有当前项目的服务时直接复用并刷新已连接的面板。`pnpm dev` 直接启动或复用同一服务，首次使用时自动补齐扩展文件。新启动的服务会持续占用终端，按 Ctrl+C 停止；输入 `r` 再按 Enter 可重启服务。两个命令都保留热更新入口，`pnpm test` 的构建也不会切回静态页面。
+`pnpm build` 完成类型检查和静态构建后退出，生成的 `dist/cep` 不依赖开发服务。`pnpm dev` 启动或复用热更新服务，首次使用时自动补齐扩展文件，并将面板入口切换到动态页面。开发服务持续占用终端，按 Ctrl+C 停止；输入 `r` 再按 Enter 可重启服务。停止 dev 后运行 `pnpm build`，再关闭并重新打开面板，即可使用静态页面。`pnpm test` 的构建也使用静态入口。
 
 首次构建会按 Bolt 的默认行为，将 `dist/cep` 链接到当前用户的 Adobe CEP 扩展目录，扩展包 ID 为 `com.achuan-2.illustrator_sci_toolbox`，主面板 ID 为 `com.achuan-2.illustrator_sci_toolbox.panel`。启用对应 CEP 版本的 PlayerDebugMode，重启 Illustrator，在“窗口 → 扩展功能 → SCI Toolbox”打开面板。已有同 ID 的手动安装目录可能阻止创建链接，需要先将该安装目录移到备份位置，再运行 `pnpm symlink`。不要把整个源码仓库复制到扩展目录。
 
@@ -33,7 +33,7 @@ Svelte 和 CSS 修改通过 Vite HMR 更新。`src/js/i18n/*.json` 修改会触�
 
 开发服务与生产文件页面具有不同 origin，localStorage 彼此独立。生产环境沿用 `illustrator_sci_plugin_settings` 存储键；切换开发模式后需要在开发页面重新设置语言和标注参数，不要将其误判为生产设置丢失。
 
-`pnpm zxp` 生成静态入口、签名 ZXP 和同内容 ZIP，不依赖开发服务。打包后运行 `pnpm dev` 或 `pnpm build` 可恢复开发入口；如果面板仍停留在静态页面，关闭并重新打开一次。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
+`pnpm zxp` 生成静态入口、签名 ZXP 和同内容 ZIP，不依赖开发服务。`pnpm dev` 启用动态入口，`pnpm build` 恢复静态入口；切换后关闭并重新打开面板即可加载对应页面。`pnpm symlink` 和 `pnpm delsymlink` 用于管理开发链接。
 
 ## 代码结构
 

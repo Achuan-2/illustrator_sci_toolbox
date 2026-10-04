@@ -5,7 +5,7 @@ import type { Plugin } from 'vite';
 export const developmentStatusPath = '/__sci/dev/status';
 export const developmentReloadPath = '/__sci/dev/reload';
 
-/** Build and serve use the same CEP entry; only release packages stay static. */
+/** Only serving switches the panel to HMR; builds keep their compiled HTML. */
 export function developmentPanel(port: number, enabled: boolean): Plugin {
   const html = `<!doctype html>
 <html>
@@ -26,16 +26,6 @@ export function developmentPanel(port: number, enabled: boolean): Plugin {
     configResolved(config) {
       if (!enabled || config.command !== 'serve') return;
       writeEntry(config.build.outDir);
-    },
-    generateBundle: {
-      order: 'post',
-      handler(_options, bundle) {
-        if (!enabled) return;
-        const entry = bundle['main/index.html'];
-        if (entry?.type !== 'asset')
-          throw new Error('Missing CEP panel HTML entry');
-        entry.source = html;
-      }
     },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {

@@ -47,7 +47,7 @@ test('development root redirects to the panel entry and preserves query paramete
   }
 });
 
-test('build preserves HMR, packaging stays static, and locale changes refresh connected panels', { timeout: 15000 }, async () => {
+test('builds stay static, dev restores HMR, and locale changes refresh connected panels', { timeout: 15000 }, async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sci-development-panel-'));
   const root = path.join(directory, 'src');
   const outDir = path.join(directory, 'dist');
@@ -85,6 +85,9 @@ test('build preserves HMR, packaging stays static, and locale changes refresh co
     assert.deepEqual(await status.json(), { root: root.replace(/\\/g, '/') });
 
     await buildPanel(true);
+    assert.match(fs.readFileSync(entry, 'utf8'), /Static panel/);
+    assert.doesNotMatch(fs.readFileSync(entry, 'utf8'), /localhost|location\.replace/);
+    await fetchLocal(origin + developmentReloadPath, { method: 'POST' });
     let destination = '';
     const html = fs.readFileSync(entry, 'utf8');
     vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)![1], {
