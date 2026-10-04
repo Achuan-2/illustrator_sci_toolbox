@@ -1469,7 +1469,7 @@ test('drawing enables Confirm, edits stay reactive and CEP 8 resize refits the i
 
 for (const orientation of ['horizontal', 'vertical'] as const) {
   test(`zoom preview clamps ${orientation} scalebars before confirmation and follows crop edits`, async () => {
-    type Frame = { images: number[][]; bars: number[][]; labels: string[] };
+    type Frame = { images: number[][]; bars: number[][]; labels: string[]; fonts: string[]; outlines: number[][] };
     const frames = new Map<unknown, Frame>();
     const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#zoom-window', (window) => {
       window.localStorage.setItem('sci_zoom_session', JSON.stringify({
@@ -1503,10 +1503,14 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       prototype.getContext = function () {
         const canvas = this;
         return new Proxy({
-          clearRect: () => frames.set(canvas, { images: [], bars: [], labels: [] }),
+          clearRect: () => frames.set(canvas, { images: [], bars: [], labels: [], fonts: [], outlines: [] }),
           drawImage: (_image: unknown, ...args: number[]) => frames.get(canvas)!.images.push(args),
           fillRect: (...args: number[]) => frames.get(canvas)!.bars.push(args),
-          fillText: (label: string) => frames.get(canvas)!.labels.push(label),
+          fillText(label: string) {
+            frames.get(canvas)!.labels.push(label);
+            frames.get(canvas)!.fonts.push((this as any).font);
+          },
+          strokeRect: (...args: number[]) => frames.get(canvas)!.outlines.push(args),
           measureText: () => ({ width: 40 })
         }, { get: (target, key) => (target as any)[key] ?? (() => {}) }) as any;
       };
@@ -1529,6 +1533,12 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       assert.equal(length(), '225', 'Inherited excessive length is corrected when opening the preview');
       assertRatio(0.9);
       assert.ok(preview().labels.includes('225μm'));
+      const bar = preview().bars.at(-1)!;
+      assert.ok(bar[orientation === 'horizontal' ? 3 : 2] >= 1.5, 'Small previews keep the scalebar visible');
+      assert.ok(parseFloat(preview().fonts[preview().labels.indexOf('225μm')]) >= 10, 'Small previews keep scale text readable');
+      assert.ok(preview().outlines.some((outline) => JSON.stringify(outline) === JSON.stringify(bar)), 'Scalebars have a contrast outline on bright/dark images');
+      const cropPixels = preview().images.find((args) => args.length === 8)!;
+      assert.deepEqual(cropPixels.slice(0, 4), [100, 50, 250, 250], 'Crop sampling stays in image pixels when layout uses points');
       assert.ok(preview().labels.includes('放大图 1（2×）'));
       assert.equal(panel.element('entry-selector').textContent?.trim(), '放大图 1（2×）');
       assert.equal(panel.requests.some((request) => request.operation === 'applyZoomImages'), false);
@@ -1558,6 +1568,12 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       units.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
       await settle();
       assert.equal(length(), '0.0225');
+      await panel.input('zoom-scale-length', '');
+      await settle();
+      assert.equal(preview().bars.length, 0, 'Clearing the length hides the bar immediately');
+      await panel.input('zoom-scale-length', '00.01');
+      await settle();
+      assert.equal(length(), '0.01', 'Normalize leading zeros without losing the decimal portion');
       await panel.input('zoom-scale-length', '0.01');
       await settle();
       assertRatio(0.4);
@@ -1582,6 +1598,15 @@ for (const orientation of ['horizontal', 'vertical'] as const) {
       await panel.input('zoom-scale-length', '0');
       await settle();
       assert.equal(preview().bars.length, 0, 'Zero hides the preview scalebar');
+      units.value = 'um';
+      units.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
+      await panel.input('zoom-scale-length', '02');
+      await settle();
+      assert.equal(length(), '2', 'Typing a digit after zero must not keep a leading zero');
+      assert.ok(preview().labels.includes('2μm'), 'Positive input restores the bar and its label without confirmation');
+      assertRatio(2 / 125);
+      units.value = 'cm';
+      units.dispatchEvent(new panel.window.Event('change', { bubbles: true }));
       await panel.input('zoom-scale-length', '1');
       await settle();
       (panel.window.document.querySelector('.zoom-modal-footer .btn-primary') as any).click();

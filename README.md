@@ -224,9 +224,16 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 ## 5 开发与发布
 
-项目架构为 Bolt CEP + Svelte + TypeScript。使用 pnpm，运行 `pnpm install`、`pnpm build`、`pnpm dev` 开始开发。前端支持 HMR，宿主脚本修改触发重新构建和面板刷新。
+项目架构为 Bolt CEP + Svelte + TypeScript，使用 pnpm 管理依赖。
 
-运行根目录的 `bash release.sh`，在本地生成并验证 ZIP/ZXP，通过 GitHub CLI（`gh`）发布对应 CHANGELOG 及百度、夸克网盘地址，不上传安装包到 GitHub；使用 `bash release.sh --no-release` 只打包，详见[开发与发布文档](docs/development.md)。
+常用开发流程如下：
+
+```bash
+pnpm install
+pnpm build  # 首次生成完整的 CEP 扩展文件
+pnpm dev    # 启动开发服务，再在 Illustrator 中打开开发面板
+pnpm zxp # 打包
+```
 
 ## ❤️用爱发电
 

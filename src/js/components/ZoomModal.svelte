@@ -106,6 +106,22 @@
       : lengthInUnit(maximum, activeEntry.scaleUnit || 'um');
   });
 
+  function normalizeScaleLengthInput(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    // Svelte's numeric binding considers "02" and 2 equal and leaves the
+    // original text in place. Remove only redundant zeros, preserving 0.02.
+    const normalized = input.value.replace(/^0+(?=\d)/, '');
+    if (normalized !== input.value) input.value = normalized;
+  }
+
+  function setZoomScaleLength(value: number | undefined) {
+    if (!activeEntry) return;
+    const length = Number(value) * unitFactor(activeEntry.scaleUnit || 'um');
+    activeEntry.scaleLengthUm = Number.isFinite(length)
+      ? Math.max(0, Math.min(length, maxZoomScaleLength(activeEntry) ?? Infinity))
+      : 0;
+  }
+
   // Crop edits can shrink the physical FOV after a length has been entered.
   $effect(() => {
     for (const entry of entries) {
@@ -392,8 +408,12 @@
       return;
     }
 
-    const srcW = img.naturalWidth;
-    const srcH = img.naturalHeight;
+    // The host reports image dimensions in millimeters. Layout gaps and
+    // scalebar font/thickness are in points; image pixels are only for cropping.
+    const pointsPerMm = 72 / 25.4;
+    const srcW = $zoomModalState.sourceWidth * pointsPerMm;
+    const srcH = $zoomModalState.sourceHeight * pointsPerMm;
+    if (!(srcW > 0) || !(srcH > 0)) return;
     const sourceRect: Rect = { left: 0, top: 0, width: srcW, height: srcH };
 
     // Calculate overall layout bounds
@@ -470,10 +490,10 @@
       ctx.clip();
       ctx.drawImage(
         img,
-        regionRect.left,
-        regionRect.top,
-        regionRect.width,
-        regionRect.height,
+        entry.region.x * img.naturalWidth,
+        entry.region.y * img.naturalHeight,
+        entry.region.width * img.naturalWidth,
+        entry.region.height * img.naturalHeight,
         zoomScreen.left,
         zoomScreen.top,
         zoomScreen.width,
@@ -539,7 +559,7 @@
         ctx,
         entry,
         zoomScreen,
-        scale * srcW / $zoomModalState.sourceWidth
+        scale
       );
 
       // Label below zoom image
@@ -572,16 +592,19 @@
     // The same physical crop limit drives the input, preview and host payload.
     const length =
       lengthUm / maximum * 0.9 * (vertical ? bounds.height : bounds.width);
-    const thickness = style.thickness * pixelsPerPoint;
+    // Keep annotations legible in the small preview while retaining the
+    // physical length ratio. These minima do not affect Illustrator output.
+    const thickness = Math.max(1.5, style.thickness * pixelsPerPoint);
+    const fontSize = Math.max(10, style.fontSize * pixelsPerPoint);
     const barWidth = vertical ? thickness : length;
     const barHeight = vertical ? length : thickness;
     const unit = entry.scaleUnit || $zoomModalState.sourceScalebar?.unit || 'um';
     const label = `${lengthInUnit(lengthUm, unit)}${unitSymbol(unit)}`;
-    const textHeight = style.showText ? style.fontSize * pixelsPerPoint : 0;
-    const gap = style.showText ? Math.max(2, style.thickness) * pixelsPerPoint : 0;
+    const textHeight = style.showText ? fontSize : 0;
+    const gap = style.showText ? Math.max(2, style.thickness * pixelsPerPoint) : 0;
 
     ctx.save();
-    ctx.font = `${style.bold ? 'bold ' : ''}${style.fontSize * pixelsPerPoint}px Arial`;
+    ctx.font = `${style.bold ? 'bold ' : ''}${fontSize}px Arial`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
     const textWidth = style.showText ? ctx.measureText(label).width : 0;
@@ -605,20 +628,28 @@
       bounds.top + bounds.height - groupHeight
     ));
 
+    const barLeft = left + (vertical ? gap + textWidth : right ? groupWidth - barWidth : 0);
+    const barTop = y + (vertical ? 0 : gap + textHeight);
+    // A contrasting outline makes white bars visible on bright images, and
+    // dark bars visible on dark images, without changing their saved colors.
+    const contrast = (color: string) => {
+      const rgb = [1, 3, 5].map((start) => parseInt(color.slice(start, start + 2), 16));
+      return rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114 > 128 ? '#000000' : '#ffffff';
+    };
+    ctx.strokeStyle = contrast(style.color);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barLeft, barTop, barWidth, barHeight);
     ctx.fillStyle = style.color;
-    ctx.fillRect(
-      left + (vertical ? gap + textWidth : right ? groupWidth - barWidth : 0),
-      y + (vertical ? 0 : gap + textHeight),
-      barWidth,
-      barHeight
-    );
+    ctx.fillRect(barLeft, barTop, barWidth, barHeight);
     if (style.showText) {
+      const textLeft = left + (!vertical && right ? groupWidth - textWidth : 0);
+      const textTop = y + (vertical && !top ? groupHeight - textHeight : 0);
+      ctx.strokeStyle = contrast(style.fontColor);
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(label, textLeft, textTop);
       ctx.fillStyle = style.fontColor;
-      ctx.fillText(
-        label,
-        left + (!vertical && right ? groupWidth - textWidth : 0),
-        y + (vertical && !top ? groupHeight - textHeight : 0)
-      );
+      ctx.fillText(label, textLeft, textTop);
     }
     ctx.restore();
   }
@@ -1245,8 +1276,9 @@
                   <label for="zoom-scale-length">{$t('scale.zoomLength', { unit: unitSymbol(activeEntry.scaleUnit || 'um') })}</label>
                   <input id="zoom-scale-length" type="number" min="0" step="any"
                     max={maxZoomDisplayLength}
+                    oninput={normalizeScaleLengthInput}
                     bind:value={() => lengthInUnit(activeEntry.scaleLengthUm || 0, activeEntry.scaleUnit || 'um'),
-                      (value) => { activeEntry.scaleLengthUm = Math.min(Number(value) * unitFactor(activeEntry.scaleUnit || 'um'), maxZoomScaleLength(activeEntry) ?? Infinity); }} />
+                      setZoomScaleLength} />
                   <select id="zoom-scale-unit" aria-label={$t('scale.barUnit')} bind:value={activeEntry.scaleUnit}>
                     <option value="nm">nm</option><option value="um">μm</option><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="inch">inch</option>
                   </select>
