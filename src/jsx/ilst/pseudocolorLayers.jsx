@@ -80,6 +80,17 @@ function pseudocolorSameBounds(a, b) {
     return true;
 }
 
+function pseudocolorImageName(source) {
+    if (source.name) return source.name;
+    // Unnamed linked artwork shows its file name in Illustrator's Layers panel.
+    // Embedded rasters may no longer expose a file, so retain the existing fallback.
+    try {
+        var file = source.file;
+        if (file && file.name) return decodeURIComponent(file.name);
+    } catch (error) {}
+    return "Image";
+}
+
 function readPseudocolorLayerEntry(item, doc) {
     var wrapper = null;
     if (getTag(item, "SCI_SCALE_WRAPPER")) {
@@ -119,7 +130,7 @@ function readPseudocolorLayerEntry(item, doc) {
     if (wrapper) item = wrapper;
     return {item:item,picture:picture,parent:item.parent,source:source,sourceParent:source.parent,
         fov:scaleReadFov(picture),scalebar:scaleReadOptions(picture),
-        parts:parts,lut:parts ? parts.lut : null,name:source.name || "Image",bounds:[b[0],b[1],b[2],b[3]]};
+        parts:parts,lut:parts ? parts.lut : null,name:pseudocolorImageName(source),bounds:[b[0],b[1],b[2],b[3]]};
 }
 
 function pseudocolorSharedScalebar(targets, indices) {
@@ -198,15 +209,17 @@ function validatePseudocolorLayerSession(session) {
     return null;
 }
 
-function makePseudocolorLayerGroup(parent, entry, lut, left, top) {
-    var b = entry.bounds, group = parent.groupItems.add();
+function makePseudocolorLayerGroup(parent, entry, lut, left, top, outputBounds) {
+    var b = entry.bounds, output = outputBounds || b;
+    var width = output[2]-output[0], height = output[1]-output[3];
+    var group = parent.groupItems.add();
     group.name = "LUT " + lut + " — " + entry.name;
     group.note = pseudocolorChannelPrefix + lut;
     group.isIsolated = true;
     // A neutral backdrop prevents the raster's antialiased edge from exposing
     // a saturated tint. Darken keeps gray in enabled RGB components and zeros
     // the others for the seven supported colors, without cropping the image.
-    var backdrop = group.pathItems.rectangle(top, left, b[2]-b[0], b[1]-b[3]);
+    var backdrop = group.pathItems.rectangle(top, left, width, height);
     var black = new RGBColor(); black.red = 0; black.green = 0; black.blue = 0;
     backdrop.name = "Black background";
     backdrop.note = "SCI_PSEUDOCOLOR_BACKGROUND:1";
@@ -217,9 +230,14 @@ function makePseudocolorLayerGroup(parent, entry, lut, left, top) {
     scaleClearDuplicate(image);
     if (entry.fov) scaleWriteFov(image, entry.fov);
     image.name = entry.parts ? entry.source.name : "Source " + entry.name;
-    image.translate(left - b[0], top - b[1]);
+    // Normalize only the duplicate; source images and their existing tints stay intact.
+    if (outputBounds && (Math.abs(width-(b[2]-b[0])) > 0.001 || Math.abs(height-(b[1]-b[3])) > 0.001))
+        image.resize(width/(b[2]-b[0])*100, height/(b[1]-b[3])*100,
+            true, true, true, true, 100, Transformation.CENTER);
+    var imageBounds = image.geometricBounds;
+    image.translate(left - imageBounds[0], top - imageBounds[1]);
     image.blendingMode = BlendModes.NORMAL;
-    var tint = group.pathItems.rectangle(top, left, b[2]-b[0], b[1]-b[3]);
+    var tint = group.pathItems.rectangle(top, left, width, height);
     tint.name = "Color " + lut;
     tint.note = "SCI_PSEUDOCOLOR_TINT:1";
     tint.stroked = false; tint.filled = true; tint.fillColor = pseudocolorLayerRGB(lut);
@@ -233,8 +251,6 @@ function recolorPseudocolorLayer(entry, lut) {
     parts.tint.name = "Color " + lut;
     parts.channel.note = pseudocolorChannelPrefix + lut;
     if (parts.channel.name.indexOf("LUT ") === 0) parts.channel.name = "LUT " + lut + " — " + entry.name;
-    if (entry.item !== parts.channel && entry.item.name.indexOf("SCI Pseudocolor ") === 0)
-        entry.item.name = "SCI Pseudocolor " + lut;
 }
 
 function applyPseudocolorLayers(payload) {
@@ -269,9 +285,7 @@ function applyPseudocolorLayers(payload) {
             if (indices.length < 2 || indices.length > 7) return sciError("errors.mergeCount");
             var first = session.targets[indices[0]], right = -Infinity;
             for (var n = 0; n < indices.length; n++) {
-                var b = session.targets[indices[n]].bounds, ref = first.bounds;
-                if (Math.abs((b[2]-b[0])-(ref[2]-ref[0])) > 0.001 ||
-                    Math.abs((b[1]-b[3])-(ref[1]-ref[3])) > 0.001) return sciError("errors.mergeSize");
+                var b = session.targets[indices[n]].bounds;
                 right = Math.max(right, b[2]);
             }
         }
@@ -285,7 +299,7 @@ function applyPseudocolorLayers(payload) {
                 created.push(root);
                 results.push(root);
                 root.move(entry.item, ElementPlacement.PLACEBEFORE);
-                root.name = "SCI Pseudocolor " + request.lut;
+                root.name = entry.name;
                 root.note = pseudocolorRootNote;
                 root.isIsolated = true;
                 var left = entry.bounds[0];
@@ -314,7 +328,8 @@ function applyPseudocolorLayers(payload) {
             merged.note = "SCI_MERGE_CHANNELS:1";
             for (var m = 0; m < indices.length; m++) {
                 var index = indices[m];
-                var channel = makePseudocolorLayerGroup(merged, session.targets[index], channels[index].lut, right+10, first.bounds[1]);
+                var channel = makePseudocolorLayerGroup(merged, session.targets[index], channels[index].lut,
+                    right+10, first.bounds[1], first.bounds);
                 channel.blendingMode = m === 0 ? BlendModes.NORMAL : BlendModes.SCREEN;
             }
             var sharedScale = pseudocolorSharedScalebar(session.targets, indices);

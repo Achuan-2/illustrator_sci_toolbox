@@ -37,20 +37,3 @@ export function enabledChannelIndices(channels: LayerChannel[]): number[] {
   });
   return indices;
 }
-export function mergeSizeMatches(
-  dimensions: { width: number; height: number }[],
-  indices: number[]
-): boolean {
-  const first = dimensions[indices[0]];
-  return (
-    !!first &&
-    indices.every((index) => {
-      const size = dimensions[index];
-      return (
-        !!size &&
-        Math.abs(size.width - first.width) <= 0.001 &&
-        Math.abs(size.height - first.height) <= 0.001
-      );
-    })
-  );
-}

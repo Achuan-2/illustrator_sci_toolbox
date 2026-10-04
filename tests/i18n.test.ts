@@ -96,6 +96,15 @@ test('original label offsets are preserved and temporary inverted offsets migrat
 });
 
 test('scalebar preferences reject invalid storage and retain valid style fields', () => {
+  const legacy = { ...defaults.scalebarStyle, lengthUm: 1.8, thickness: 4 };
+  const migrated = normalizeSettings({ scalebarStyle: legacy });
+  assert.equal(migrated.scalebarStyle.lengthUm, 50);
+  assert.equal(migrated.scalebarStyle.thickness, 4);
+  assert.equal(migrated.scalebarDefaultsVersion, defaults.scalebarDefaultsVersion);
+  assert.equal(normalizeSettings({
+    scalebarStyle: legacy,
+    scalebarDefaultsVersion: defaults.scalebarDefaultsVersion
+  }).scalebarStyle.lengthUm, 1.8);
   for (const saved of [null, [], 'bad', { lengthUm: -1, fontSize: 0, thickness: Infinity,
     color: 'red', fontColor: null, orientation: 'diagonal', position: 'center', bold: 'true' }]) {
     assert.deepEqual(normalizeSettings({ scalebarStyle: saved }).scalebarStyle, defaults.scalebarStyle);

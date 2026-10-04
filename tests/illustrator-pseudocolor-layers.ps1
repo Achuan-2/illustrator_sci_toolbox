@@ -34,8 +34,8 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         ';return {applyLayers:applyPseudocolorLayers,' +
         'inspectLayers:inspectPseudocolorLayerTargets,' +
         'failSecondCopy:function(){var original=makePseudocolorLayerGroup,count=0;' +
-        'makePseudocolorLayerGroup=function(parent,entry,lut,left,top){if(++count===2)throw new Error("Fixture duplication failure");' +
-        'return original(parent,entry,lut,left,top);};return function(){makePseudocolorLayerGroup=original;};},' +
+        'makePseudocolorLayerGroup=function(parent,entry,lut,left,top,outputBounds){if(++count===2)throw new Error("Fixture duplication failure");' +
+        'return original(parent,entry,lut,left,top,outputBounds);};return function(){makePseudocolorLayerGroup=original;};},' +
         'failSecondUpdate:function(){var original=recolorPseudocolorLayer,count=0;' +
         'recolorPseudocolorLayer=function(entry,lut){original(entry,lut);if(++count===2)throw new Error("Fixture color setter failure");};' +
         'return function(){recolorPseudocolorLayer=original;};}};')(JSON);
@@ -67,6 +67,7 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         var placed = doc.placedItems.add(); placed.file = seed;
         placed.width = 720; placed.height = 540; placed.position = [0, 800]; placed.embed();
         var first = doc.rasterItems[0], second = first.duplicate();
+        first.name = "实验图片 01.tif"; second.name = "实验图片 02.tif";
         second.position = [760, 800];
         doc.selection = [first, second];
 
@@ -76,6 +77,7 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         assert(layerResult === "1", "Native tint failed: " + layerResult);
         timings.layerTint = new Date().getTime() - layerStart;
         var tintRoot = doc.selection[0], tinted = tintRoot.groupItems[0];
+        assert(tintRoot.name === first.name, "New pseudocolor group must retain the source filename");
         assert(tinted.pathItems[0].fillColor.red === 255 && tinted.pathItems[0].fillColor.green === 0,
             "Tint object is not red");
         assert(tinted.rasterItems[0].blendingMode === BlendModes.NORMAL, "Source image must retain Normal blending");
@@ -134,6 +136,9 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         edgeSource.remove();
         checks.push("seven native colors retain intensity and fractional-position black edges retain full image dimensions");
         var recolorBounds = tintRoot.geometricBounds, recolorCount = doc.pageItems.length;
+        doc.selection = [tintRoot];
+        assert(api.applyLayers(JSON.stringify({mode:"batch",lut:"green"})) === "1", "Filename-preserving recolor failed");
+        assert(tintRoot.name === first.name, "Recolor changed the preserved filename");
         tintRoot.name = "Fixture pseudocolor";
         tinted.name = "Fixture channel"; tinted.pathItems[0].name = "Fixture tint";
         for (var repeat = 0; repeat < 2; repeat++) {
@@ -210,6 +215,73 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         doc.selection = [first,tintRoot];
         assert(api.applyLayers(JSON.stringify({mode:"merge"})) === "2", "Mixed grayscale and tinted merge failed");
         checks.push("legacy Multiply results and configured recoloring merges; mixed-update rollback, stale internal sources and mixed channel selections");
+        // Exercise independent width/height scaling on raster, linked and tinted sources.
+        var unequalRaster = second.duplicate(); unequalRaster.width = 360; unequalRaster.height = 810;
+        var unequalTint = greenRoot.duplicate();
+        unequalTint.resize(50, 150, true, true, true, true, 100, Transformation.CENTER);
+        var unequalLinked = doc.placedItems.add(); unequalLinked.file = seed;
+        unequalLinked.width = 180; unequalLinked.height = 270;
+        function checkUnequalMerge(items, skipFirst, failCopy) {
+            var snapshots = [], channels = [];
+            for (var i = 0; i < items.length; i++) {
+                var bounds = items[i].geometricBounds;
+                snapshots.push([bounds[0],bounds[1],bounds[2],bounds[3]]);
+            }
+            doc.selection = items;
+            var session = JSON.parse(api.inspectLayers()), reference = session.targets[skipFirst ? 1 : 0];
+            for (var j = 0; j < session.targets.length; j++)
+                channels.push({enabled:!skipFirst || j > 0,lut:session.targets[j].lut || (j % 2 ? "green" : "red")});
+            var countBefore = doc.pageItems.length, restore = failCopy ? api.failSecondCopy() : null;
+            var applied;
+            try { applied = api.applyLayers(JSON.stringify({mode:"merge",sessionId:session.sessionId,channels:channels})); }
+            finally { if (restore) restore(); }
+            if (failCopy) {
+                assert(applied.indexOf("Error: errors.layerApply") === 0, "Expected unequal merge copy failure");
+                assert(doc.pageItems.length === countBefore, "Failed unequal merge left partial artwork");
+                assert(doc.selection.length === items.length, "Failed unequal merge lost the input selection");
+            } else {
+                assert(applied === String(items.length-(skipFirst ? 1 : 0)), "Unequal merge failed: " + applied);
+                var merged = doc.selection[0];
+                assert(Math.abs(merged.width-reference.width) < 0.01 && Math.abs(merged.height-reference.height) < 0.01,
+                    "Merge must use the first enabled channel dimensions");
+                for (var k = 0; k < merged.groupItems.length; k++) {
+                    var channel = merged.groupItems[k], source = channel.rasterItems.length ? channel.rasterItems[0] : channel.placedItems[0];
+                    assert(Math.abs(source.width-reference.width) < 0.01 && Math.abs(source.height-reference.height) < 0.01,
+                        "Copied image was not resized along both axes");
+                    assert(Math.abs(source.left-merged.left) < 0.01 && Math.abs(source.top-merged.top) < 0.01,
+                        "Resized copies must align at the top left");
+                    for (var p = 0; p < channel.pathItems.length; p++)
+                        assert(Math.abs(channel.pathItems[p].width-reference.width) < 0.01 && Math.abs(channel.pathItems[p].height-reference.height) < 0.01,
+                            "Background and tint must match the resized source");
+                }
+                merged.remove();
+            }
+            for (var o = 0; o < items.length; o++) {
+                var current = items[o].geometricBounds;
+                for (var axis = 0; axis < 4; axis++)
+                    assert(Math.abs(current[axis]-snapshots[o][axis]) < 0.001, "Unequal merge changed an original");
+            }
+        }
+        checkUnequalMerge([first,unequalRaster], false, false);
+        checkUnequalMerge([first,unequalTint,unequalLinked], true, false);
+        checkUnequalMerge([unequalRaster,unequalLinked], false, true);
+        // Linked items can have an empty name while displaying their file in Layers.
+        unequalLinked.name = ""; doc.selection = [unequalLinked];
+        assert(api.applyLayers(JSON.stringify({mode:"batch",lut:"red",keepOriginal:true})) === "1", "Unnamed linked tint failed");
+        var linkedRoot = doc.selection[0];
+        assert(linkedRoot.name === decodeURIComponent(seed.name), "Unnamed linked artwork must use its actual filename");
+        linkedRoot.remove();
+        unequalLinked.name = "SCI Pseudocolor red.png"; doc.selection = [unequalLinked];
+        assert(api.applyLayers(JSON.stringify({mode:"batch",lut:"red",keepOriginal:true})) === "1", "Named linked tint failed");
+        linkedRoot = doc.selection[0];
+        assert(linkedRoot.name === unequalLinked.name, "Named linked artwork lost its name");
+        assert(api.applyLayers(JSON.stringify({mode:"batch",lut:"blue"})) === "1", "Named linked recolor failed");
+        assert(doc.selection[0] === linkedRoot && linkedRoot.name === unequalLinked.name,
+            "Filename matching the legacy prefix must survive recoloring");
+        linkedRoot.remove();
+        unequalRaster.remove(); unequalTint.remove(); unequalLinked.remove();
+        checks.push("new groups retain raster and linked filenames; recoloring preserves names including the legacy prefix");
+        checks.push("unequal raster, linked and tinted channels match the first enabled channel; originals stay intact and failures roll back");
         doc.selection = [first,second];
         var pageCount = doc.pageItems.length;
         var restoreCopy = api.failSecondCopy();
@@ -232,6 +304,7 @@ $taskScript = '(function () { var repositoryRoot = ' + $taskRootJson + ';' + @'
         var replaced = api.applyLayers(JSON.stringify({mode:"batch",lut:"blue",keepOriginal:false}));
         assert(replaced === "1", "In-place layer replacement failed");
         assert(doc.selection[0].groupItems[0].rasterItems.length === 1, "Replacement lost the editable source copy");
+        assert(doc.selection[0].name === "实验图片 01.tif", "In-place replacement lost the source filename");
         var removed = false;
         try { removed = !first.parent; } catch (removedError) { removed = true; }
         assert(removed, "In-place replacement must remove the original object after staging succeeds");

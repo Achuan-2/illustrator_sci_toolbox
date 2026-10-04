@@ -72,7 +72,6 @@
   "merge.include": "Include channel",
   "merge.apply": "Merge Channels",
   "errors.mergeCount": "Select 2–7 channels to merge.",
-  "errors.mergeSize": "Channels must have the same width and height. Use matching image sizes and reload; images are not automatically stretched.",
   "pseudocolor.lut": "Color:",
   "pseudocolor.keepOriginal": "Keep originals:",
   "pseudocolor.apply": "Apply Pseudocolor",

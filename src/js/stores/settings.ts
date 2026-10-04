@@ -33,6 +33,7 @@ export interface Settings {
   pseudocolorKeepOriginal: boolean;
   pseudocolorDefaultsVersion: number;
   scalebarStyle: ScalebarStyle;
+  scalebarDefaultsVersion: number;
 }
 
 export const storageKey = 'illustrator_sci_plugin_settings';
@@ -61,7 +62,8 @@ export const defaults: Settings = {
   pseudocolorLut: 'red',
   pseudocolorKeepOriginal: false,
   pseudocolorDefaultsVersion: 1,
-  scalebarStyle: normalizeScalebarStyle(null)
+  scalebarStyle: normalizeScalebarStyle(null),
+  scalebarDefaultsVersion: 1
 };
 
 export function normalizeSettings(value: unknown): Settings {
@@ -76,6 +78,13 @@ export function normalizeSettings(value: unknown): Settings {
     Object.assign(result, { [key]: item });
   }
   result.scalebarStyle = normalizeScalebarStyle(saved.scalebarStyle);
+  // Replace the legacy 1.8 um preference once; later explicit lengths persist.
+  if (
+    saved.scalebarDefaultsVersion !== defaults.scalebarDefaultsVersion &&
+    Math.abs(result.scalebarStyle.lengthUm - 1.8) < 0.000001
+  )
+    result.scalebarStyle.lengthUm = defaults.scalebarStyle.lengthUm;
+  result.scalebarDefaultsVersion = defaults.scalebarDefaultsVersion;
   // Restore right/down positive offsets. Convert only the temporary left/up
   // convention (version 1); original settings without a version stay intact.
   if (saved.labelOffsetsVersion === 1) {

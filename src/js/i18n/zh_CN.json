@@ -72,7 +72,6 @@
   "merge.include": "参与合并",
   "merge.apply": "合并通道",
   "errors.mergeCount": "请选择 2–7 个通道进行合并。",
-  "errors.mergeSize": "参与合并的图片宽高必须一致，请统一图片尺寸后重新读取；不会自动拉伸图片。",
   "pseudocolor.lut": "颜色：",
   "pseudocolor.keepOriginal": "保留原图：",
   "pseudocolor.apply": "应用伪彩",

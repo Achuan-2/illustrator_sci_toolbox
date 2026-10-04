@@ -299,14 +299,21 @@ test('color dropdown previews all seven colors and supports keyboard, Escape and
   } finally { await panel.window.happyDOM.close(); }
 });
 
-test('channel size errors only block merging and coloring invalidates previously read channels', async () => {
+test('different channel sizes allow merging and coloring invalidates previously read channels', async () => {
   const panel = await createPanel(undefined, false, undefined, (window) => configureLayerPanel(window, [
-    {name:'first', width:100, height:100, lut:'red'}, {name:'second', width:200, height:100, lut:'green'}
+    {name:'first', width:100, height:100, lut:'red'}, {name:'second', width:200, height:50, lut:'green'}
   ]));
   try {
     await panel.click('merge-read-button');
-    assert.equal((panel.element('merge-apply-button') as any).disabled, true);
-    assert.match(panel.element('merge-channels-group').querySelector('.error')?.textContent || '', /same width and height/);
+    assert.equal((panel.element('merge-apply-button') as any).disabled, false);
+    assert.equal(panel.element('merge-channels-group').querySelector('.error'), null);
+    await panel.click('merge-apply-button');
+    const mergeRequest = panel.requests.find((request) =>
+      request.operation === 'applyPseudocolorLayers' && JSON.parse(request.args[0] as string).mode === 'merge'
+    );
+    assert.ok(mergeRequest);
+    assert.equal(JSON.parse(mergeRequest.args[0] as string).channels.length, 2);
+    await panel.click('merge-read-button');
     assert.equal((panel.element('pseudocolor-apply-button') as any).disabled, false);
     await panel.click('pseudocolor-apply-button');
     assert.equal(panel.window.document.getElementById('merge-lut-0'), null);
@@ -864,6 +871,32 @@ test('scalebar form clamps saved styles, typed lengths and smaller FOVs to 90% w
     assert.equal(payload.options.lengthUm, 1.8);
     assert.equal(payload.options.unit, 'nm');
     assert.equal(panel.window.document.querySelector('[role="alert"]'), null);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
+test('legacy 1.8 scalebar defaults become 50 for new images while existing bars retain their lengths', async () => {
+  const panel = await createPanel(JSON.stringify({ scalebarStyle: {
+    lengthUm: 1.8, thickness: 4, position: 'TL'
+  } }), true, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    (window as any).__scaleSelection = {
+      token: 'new-image', signature: 'new-image', documentKey: 'test.ai',
+      fov: { width: 500, height: 200, unit: 'um' }, options: null
+    };
+  });
+  try {
+    assert.equal((panel.element('scale-length') as any).value, '50');
+    assert.equal((panel.element('scale-thickness') as any).value, '4');
+    assert.equal((panel.element('scale-position') as any).value, 'TL');
+    assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).scalebarStyle.lengthUm, 50);
+    (panel.window as any).__scaleSelection = {
+      token: 'existing-image', signature: 'existing-image', documentKey: 'test.ai',
+      fov: { width: 500, height: 200, unit: 'um' },
+      options: { orientation: 'horizontal', lengthUm: 1.8, thickness: 2, color: '#ffffff',
+        showText: true, fontColor: '#ffffff', fontSize: 8, bold: false, position: 'BR', autoGroup: true }
+    };
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((panel.element('scale-length') as any).value, '1.8');
+    assert.equal(panel.requests.filter((request) => request.operation === 'applyScalebar').length, 0);
   } finally { await panel.window.happyDOM.close(); }
 });
 

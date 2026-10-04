@@ -6,7 +6,6 @@
   import {
     defaultMergeChannels,
     enabledChannelIndices,
-    mergeSizeMatches,
     isLayerColor,
     type LayerChannel,
     type LayerColorId
@@ -40,7 +39,6 @@
     if (!session) return '';
     const indices = enabledChannelIndices(channels);
     if (indices.length < 2 || indices.length > 7) return 'errors.mergeCount';
-    if (!mergeSizeMatches(session.targets, indices)) return 'errors.mergeSize';
     return '';
   });
 
