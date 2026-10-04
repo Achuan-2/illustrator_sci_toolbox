@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { cep, runAction, type CepOptions } from 'vite-cep-plugin';
+import { runAction, type CepOptions } from 'vite-cep-plugin';
 import cepConfig from './cep.config';
 import { buildExtendScript, hostSources, isHostSource } from './vite.es.config';
 import { panelEntryRedirect } from './scripts/panel-entry';
+import { cepPackage } from './scripts/cep-package';
 
 const outDir = path.resolve('dist/cep');
 const isPackage = process.env.ZXP_PACKAGE === 'true';
@@ -20,8 +21,12 @@ const options: CepOptions = {
   isMetaPackage: false,
   isServe: false,
   debugReact: false,
-  zxpOutput: path.resolve(`dist/zxp/SCI-Toolbox-${cepConfig.version}`),
-  zipOutput: path.resolve(`dist/zip/SCI-Toolbox-${cepConfig.version}`),
+  zxpOutput: path.resolve(
+    `dist/zxp/illustrator_sci_toolbox_v${cepConfig.version}`
+  ),
+  zipOutput: path.resolve(
+    `dist/zip/illustrator_sci_toolbox_v${cepConfig.version}`
+  ),
   packages: []
 };
 
@@ -66,7 +71,12 @@ export default defineConfig(({ command }) => {
     // the installed panel into a dev-server redirect or register an extension.
     plugins: isCheck
       ? [svelte()]
-      : [svelte(), panelEntryRedirect(), illustratorScripts(), cep(options)],
+      : [
+          svelte(),
+          panelEntryRedirect(),
+          illustratorScripts(),
+          cepPackage(options)
+        ],
     server: { host: '127.0.0.1', port: cepConfig.port, strictPort: true },
     build: {
       outDir,

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { unzipSync, strFromU8 } from 'fflate';
 
 const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-const filename = `SCI-Toolbox-${version}`;
+const filename = `illustrator_sci_toolbox_v${version}`;
 const zxpPath = path.resolve(`dist/zxp/${filename}.zxp`);
 const zipPath = path.resolve(`dist/zip/${filename}.zip`);
 const zxp = fs.readFileSync(zxpPath);
@@ -15,9 +15,21 @@ assert.ok(
   zxp.length > 0 && zip.length > 0,
   'Both release files must be nonempty'
 );
-assert.deepEqual(zip, zxp, 'ZIP must be a byte-for-byte copy of the signed ZXP');
+assert.deepEqual(
+  zip,
+  zxp,
+  'ZIP must be a byte-for-byte copy of the signed ZXP'
+);
 
 const extension = unzipSync(zxp);
+for (const file of Object.keys(extension)) {
+  assert.ok(
+    !file
+      .split('/')
+      .some((part) => part === '.debug' || part === 'node_modules'),
+    `Do not ship development files: ${file}`
+  );
+}
 const manifest = strFromU8(extension['CSXS/manifest.xml']);
 assert.ok(
   manifest.includes(`ExtensionBundleVersion="${version}"`),

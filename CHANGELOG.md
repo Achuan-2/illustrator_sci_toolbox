@@ -1,10 +1,11 @@
-## Unreleased
-
-- ♻️ 迁移到 Bolt CEP + Svelte + TypeScript，分离界面、设置和 Illustrator 宿主调用
-- ⚡ 支持前端 HMR，以及宿主代码修改后的重新构建与面板刷新
-- 🐛 修复宿主入口配置和零值设置恢复，保留现有功能及中英文文案
+## v2.5.0 / 20261003
+- ✨ 支持比例尺 [#35](https://github.com/Achuan-2/illustrator_sci_plugin/issues/35)
+- ✨ 支持制作放大图
+- ✨ 新增科研色卡管理与填充、复制功能
+- ✨ 相对位置新增中心参考点
+- ♻️ 迁移到 Bolt CEP + Svelte + TypeScript，分离界面、设置和 Illustrator 宿主调用，支持前端 HMR，以及宿主代码修改后的重新构建与面板刷新
 - 👷 使用 GitHub Actions 按版本 tag 发布 ZIP、ZXP 和对应版本说明
-- 🔧 安装包兼容目标扩展至 Illustrator CC 2018 及以上，补齐旧版浏览器 API 和布局支持；ZIP 改为包含 ZXP 和文档的分发包
+
 
 ## v2.4.2 / 20261001
 

@@ -158,11 +158,6 @@
 
 下载插件 ZXP 安装包或 ZIP 分发包（选一个就好）
 
-下载地址：
-
-GitHub Releases: https://github.com/Achuan-2/illustrator_sci_toolbox/releases
-
-<img width="1521" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 
 百度网盘地址：https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit
 
@@ -231,7 +226,7 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 项目架构为 Bolt CEP + Svelte + TypeScript。使用 pnpm，运行 `pnpm install`、`pnpm build`、`pnpm dev` 开始开发。前端支持 HMR，宿主脚本修改触发重新构建和面板刷新。
 
-版本 tag 通过 GitHub Actions 自动发布 ZIP、ZXP 和对应 CHANGELOG，详见[开发与发布文档](docs/development.md)。
+运行根目录的 `bash release.sh`，在本地生成并验证 ZIP/ZXP，通过 GitHub CLI（`gh`）发布对应 CHANGELOG 及百度、夸克网盘地址，不上传安装包到 GitHub；使用 `bash release.sh --no-release` 只打包，详见[开发与发布文档](docs/development.md)。
 
 ## ❤️用爱发电
 

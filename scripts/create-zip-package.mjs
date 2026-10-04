@@ -6,7 +6,7 @@ export function createZipPackage(rootDir = process.cwd()) {
   const { version } = JSON.parse(
     fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')
   );
-  const filename = `SCI-Toolbox-${version}`;
+  const filename = `illustrator_sci_toolbox_v${version}`;
   const zxpPath = path.join(rootDir, 'dist/zxp', `${filename}.zxp`);
   const zipPath = path.join(rootDir, 'dist/zip', `${filename}.zip`);
   // Preserve the signed archive byte-for-byte for manual CEP installation.

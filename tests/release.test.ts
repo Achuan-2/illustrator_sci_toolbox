@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-// These helpers are also called by the release workflow.
+// These helpers are also called by release.sh.
 import { releaseNotes, validateTag } from '../scripts/release-notes.mjs';
 
 test('release validates exact tag version and extracts only the matching CHANGELOG entry', () => {

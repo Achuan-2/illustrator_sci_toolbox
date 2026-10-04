@@ -106,7 +106,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## 3 How to Use This Plugin
 
-1. Download the ZXP installer or ZIP distribution from [GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases). The installer targets Illustrator CC 2018 (22.0) or later; individual host versions still require testing.
+1. Download the ZXP installer or ZIP distribution using the Baidu or Quark cloud drive links in [GitHub Releases](https://github.com/Achuan-2/illustrator_sci_toolbox/releases). The installer targets Illustrator CC 2018 (22.0) or later; individual host versions still require testing.
 
     <img width="1521" height="461" alt="PixPin_2025-09-13_09-24-45" src="https://github.com/user-attachments/assets/69ef348b-2ab4-4c69-9670-2b77573581bb" />
 
@@ -166,7 +166,7 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 ## Development and release
 
-The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, `pnpm build`, then `pnpm dev`. Frontend changes use HMR; host script changes rebuild and reload the panel. Version tags trigger GitHub Actions to publish ZIP and ZXP packages with the matching CHANGELOG entry. See [Development and release](docs/development.md) for setup and verification boundaries.
+The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, `pnpm build`, then `pnpm dev`. Frontend changes use HMR; host script changes rebuild and reload the panel. Run `bash release.sh` to build and verify ZIP/ZXP locally, then publish the matching CHANGELOG entry and Baidu/Quark cloud drive links through GitHub CLI (`gh`). Packages are not uploaded to GitHub Releases. Use `bash release.sh --no-release` to build locally without publishing. See [Development and release](docs/development.md) for setup and verification boundaries.
 
 ## ❤️Powered by Love
 

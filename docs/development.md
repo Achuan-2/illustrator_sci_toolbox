@@ -60,20 +60,26 @@ pnpm verify:package
 
 `pnpm test` 先构建，然后验证宿主 ES3 语法、无原生 JSON 的运行环境、调用队列与参数安全、设置记忆、翻译、标签预览和实际生产 Svelte 包的 DOM 交互。DOM/CEP 适配器不等于 Illustrator 验收：排图、位置、尺寸、标签、边框和选择操作仍需在 Illustrator 中验证。
 
-## 打包与 GitHub Actions 发布
+## 打包与本地发布
 
 `pnpm zxp` 生成签名安装包；`pnpm zip` 先生成签名 ZXP，再将同一文件复制为 `.zip`。两个文件内容完全相同，仅扩展名不同，分别用于安装器安装和手动解压安装。
 
 ```text
-dist/zxp/SCI-Toolbox-<version>.zxp
-dist/zip/SCI-Toolbox-<version>.zip
+dist/zxp/illustrator_sci_toolbox_v<version>.zxp
+dist/zip/illustrator_sci_toolbox_v<version>.zip
 ```
 
 ZIP 解压后，将整个扩展文件夹复制到 CEP 扩展目录，确保 `CSXS/manifest.xml` 位于该文件夹的直接子目录中。Windows 目录为 `%APPDATA%\Adobe\CEP\extensions`，macOS 目录为 `~/Library/Application Support/Adobe/CEP/extensions`。重启 Illustrator 后打开插件。本地调试可使用 `dist/cep`。
 
-版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交后推送同版本的 `v<version>` tag。`.github/workflows/release.yml` 会安装锁定依赖、验证 tag、执行检查和测试、调用 Bolt 签名并复制 ZIP、校验两个文件内容完全相同及 ZXP 签名，再创建或更新 GitHub Release，同时上传 ZIP、ZXP 和对应版本说明。签名要求时间戳服务器成功，失败会停止发布。
+版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交并推送本次版本的代码。安装项目依赖和 GitHub CLI，运行 `gh auth login` 登录后，在 Git Bash 或其他 Bash 环境执行：
 
-普通分支提交及 PR 只运行 CI 检查。工作流使用仓库的 `GITHUB_TOKEN`，不需要本地 PowerShell 发布脚本或 `gh release`。构建、测试和打包命令本身不会提交代码、推送 tag 或发布 Release。
+```bash
+bash release.sh
+```
+
+脚本从自身目录运行，读取 `origin` 对应的 GitHub 仓库，并确认当前 HEAD 已上传。随后提取对应版本说明，执行测试、类型检查、打包和包验证，再通过 `gh release create` 发布对应 CHANGELOG 及百度、夸克网盘地址。ZIP 和 ZXP 仅保存在本地，不作为 GitHub Release 附件上传；本地安装包需自行上传到网盘。网盘链接保存在 `scripts/release-notes.mjs` 的发布说明页脚中。版本 Release 已存在时，只使用 `gh release edit` 更新发布说明，不修改已有附件，也不删除或移动已有 tag。新 tag 由 GitHub 基于当前 HEAD 创建。打包时在签名前递归排除 `.debug` 和 `node_modules`；验证检查排除项、版本号、ZIP/ZXP 字节一致性及 ZXP 签名。时间戳签名、测试或验证失败都会停止发布。
+
+使用 `bash release.sh --no-release` 只生成并验证本地安装包和发布说明，不需要 GitHub 登录。脚本不自动暂存、提交或推送代码；项目不再使用 GitHub workflows，普通构建、测试和打包命令也不会发布 Release。
 
 ## Illustrator 回归检查
 
