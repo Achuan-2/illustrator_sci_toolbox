@@ -14,6 +14,7 @@ git() {
   case "$*" in
     'remote get-url origin') printf 'https://github.com/example/toolbox.git\\n' ;;
     'rev-parse HEAD') printf '0123456789012345678901234567890123456789\\n' ;;
+    'status --porcelain'|'diff --quiet'|'diff --cached --quiet') ;;
     *) return 90 ;;
   esac
 }
@@ -47,7 +48,7 @@ gh() {
   esac
 }
 export -f record node git pnpm gh
-script="$1/release.sh"
+script="$1/gh_release.sh"
 shift
 bash "$script" "$@"
 `;
@@ -58,8 +59,8 @@ function runRelease(mode = 'new', fail = '', args: string[] = []) {
   );
   try {
     fs.writeFileSync(
-      path.join(directory, 'release.sh'),
-      fs.readFileSync('release.sh', 'utf8').replace(/\r\n/g, '\n')
+      path.join(directory, 'gh_release.sh'),
+      fs.readFileSync('gh_release.sh', 'utf8').replace(/\r\n/g, '\n')
     );
     const logfile = path.join(directory, 'commands.log');
     const result = spawnSync(
@@ -107,6 +108,20 @@ test('release updates existing notes without uploading packages or recreating th
     result.log,
     /^gh .*\.(zxp|zip)|gh release (create|upload)/m
   );
+});
+
+test('release still creates or updates when the working tree has no changes', () => {
+  for (const mode of ['new', 'existing']) {
+    const result = runRelease(mode);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.log, /pnpm zxp/);
+    assert.match(result.log, /pnpm verify:package/);
+    assert.match(
+      result.log,
+      mode === 'new' ? /gh release create / : /gh release edit /
+    );
+    assert.doesNotMatch(result.log, /git (add|commit|push|tag)/);
+  }
 });
 
 test('release stops on failed package verification or GitHub listing', () => {

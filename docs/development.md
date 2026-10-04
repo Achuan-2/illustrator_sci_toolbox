@@ -79,12 +79,12 @@ ZIP 解压后，将整个扩展文件夹复制到 CEP 扩展目录，确保 `CSX
 版本号以 `package.json` 为单一来源。发布前更新版本号及 `CHANGELOG.md` 对应版本条目，提交并推送本次版本的代码。安装项目依赖和 GitHub CLI，运行 `gh auth login` 登录后，在 Git Bash 或其他 Bash 环境执行：
 
 ```bash
-bash release.sh
+bash gh_release.sh
 ```
 
-脚本从自身目录运行，读取 `origin` 对应的 GitHub 仓库，并确认当前 HEAD 已上传。随后提取对应版本说明，执行测试、类型检查、打包和包验证，再通过 `gh release create` 发布对应 CHANGELOG 及百度、夸克网盘地址。ZIP 和 ZXP 仅保存在本地，不作为 GitHub Release 附件上传；本地安装包需自行上传到网盘。网盘链接保存在 `scripts/release-notes.mjs` 的发布说明页脚中。版本 Release 已存在时，只使用 `gh release edit` 更新发布说明，不修改已有附件，也不删除或移动已有 tag。新 tag 由 GitHub 基于当前 HEAD 创建。打包时在签名前递归排除 `.debug` 和 `node_modules`；验证检查排除项、版本号、ZIP/ZXP 字节一致性及 ZXP 签名。时间戳签名、测试或验证失败都会停止发布。
+脚本从自身目录运行，读取 `origin` 对应的 GitHub 仓库，并确认当前 HEAD 已上传。随后提取对应版本说明，执行测试、类型检查、打包和包验证，再通过 `gh release create` 发布对应 CHANGELOG 及百度、夸克网盘地址。工作区没有改动或没有新增提交时也会执行发布。ZIP 和 ZXP 仅保存在本地，不作为 GitHub Release 附件上传；本地安装包需自行上传到网盘。网盘链接保存在 `scripts/release-notes.mjs` 的发布说明页脚中。版本 Release 已存在时，只使用 `gh release edit` 更新发布说明，不修改已有附件，也不删除或移动已有 tag。新 tag 由 GitHub 基于当前 HEAD 创建。打包时在签名前递归排除 `.debug` 和 `node_modules`；验证检查排除项、版本号、ZIP/ZXP 字节一致性及 ZXP 签名。时间戳签名、测试或验证失败都会停止发布。
 
-使用 `bash release.sh --no-release` 只生成并验证本地安装包和发布说明，不需要 GitHub 登录。脚本不自动暂存、提交或推送代码；项目不再使用 GitHub workflows，普通构建、测试和打包命令也不会发布 Release。
+使用 `bash gh_release.sh --no-release` 只生成并验证本地安装包和发布说明，不需要 GitHub 登录。脚本不自动暂存、提交或推送代码；项目不再使用 GitHub workflows，普通构建、测试和打包命令也不会发布 Release。
 
 ## Illustrator 回归检查
 

@@ -5,9 +5,10 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 usage() {
   cat <<'EOF'
-用法：bash release.sh [--no-release]
+用法：bash gh_release.sh [--no-release]
 
 默认：检查、测试、打包、验证后，通过 gh 发布版本说明及百度、夸克网盘地址。
+工作区没有改动也会发布；同版本 Release 已存在时更新发布说明。
 ZIP/ZXP 安装包仅保存在本地，不上传到 GitHub Release。
 --no-release  只验证并生成本地安装包和发布说明，不访问 GitHub。
 
@@ -62,6 +63,7 @@ if ! "$publish"; then
   exit 0
 fi
 
+# Always publish after verification, even when the working tree is unchanged.
 # Listing must succeed: authentication/network errors must not mean "not found".
 release_tags=$(gh api --paginate "repos/$repo/releases?per_page=100" --jq '.[].tag_name')
 if [[ $'\n'"$release_tags"$'\n' == *$'\n'"$tag"$'\n'* ]]; then
