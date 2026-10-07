@@ -168,6 +168,7 @@
 
     readHash();
     let syncTimer: number | undefined;
+    let disposed = false;
     const onSettingsUpdate = () => {
       const freshSettings = readSettings(localStorage);
       settings.set(freshSettings);
@@ -182,6 +183,7 @@
       void bridge
         .initialize()
         .then(() => {
+          if (disposed) return;
           syncTimer = window.setInterval(() => {
             void actions.syncZoom();
           }, 400);
@@ -189,6 +191,7 @@
         .catch((error) => console.error('Host initialization failed', error));
     }
     return () => {
+      disposed = true;
       if (syncTimer) clearInterval(syncTimer);
       if (window.__adobe_cep__?.removeEventListener) {
         window.__adobe_cep__.removeEventListener(

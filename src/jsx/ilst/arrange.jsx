@@ -2235,22 +2235,22 @@ function deleteTag(item, name) {
 
 function findItemByTag(doc, name) {
     try {
-        for (var i = 0; i < doc.pageItems.length; i++) {
-            var it = doc.pageItems[i];
-            try {
-                var tag = it.tags.getByName(name);
-                if (tag) return it;
-            } catch (e) {}
+        var tags = doc.tags;
+        for (var i = 0, count = tags.length; i < count; i++) {
+            var tag = tags[i];
+            if (tag.name === name) return tag.parent;
         }
     } catch (docErr) {}
     return null;
 }
 
 function clearZoomSessionTags(doc) {
-    for (var i = 0; i < doc.pageItems.length; i++) {
-        deleteTag(doc.pageItems[i], "ILST_ZOOM_ACTIVE_TARGET");
-        deleteTag(doc.pageItems[i], "ILST_ZOOM_ACTIVE_MANUAL");
+    var tags = doc.tags, sessionTags = [];
+    for (var i = 0, count = tags.length; i < count; i++) {
+        var tag = tags[i];
+        if (tag.name === "ILST_ZOOM_ACTIVE_TARGET" || tag.name === "ILST_ZOOM_ACTIVE_MANUAL") sessionTags.push(tag);
     }
+    for (var j = sessionTags.length - 1; j >= 0; j--) sessionTags[j].remove();
 }
 
 function getZoomSelection(selection) {
@@ -2274,10 +2274,10 @@ function getZoomSelection(selection) {
 
 function getActiveZoomTargets(doc) {
     var targets = [];
-    for (var i = 0; i < doc.pageItems.length; i++) {
-        var item = doc.pageItems[i];
-        var order = getTag(item, "ILST_ZOOM_ACTIVE_TARGET");
-        if (order !== null) targets.push({ item: item, order: Number(order) });
+    var tags = doc.tags;
+    for (var i = 0, count = tags.length; i < count; i++) {
+        var tag = tags[i];
+        if (tag.name === "ILST_ZOOM_ACTIVE_TARGET") targets.push({ item: tag.parent, order: Number(tag.value) });
     }
     targets.sort(function (a, b) { return a.order - b.order; });
     var result = [];
@@ -2443,7 +2443,7 @@ function tryClipLine(start, end, bounds) {
 
 // Always derive guide endpoints from the live clipping bounds, including when
 // an editor/tracker reload has lost the previous position of a moved zoom.
-function refreshZoomGuideLines(doc, key, source, marker, zoom, options, createMissing) {
+function refreshZoomGuideLines(doc, key, source, marker, zoom, options, createMissing, index) {
     if (!options.addGuideLines) return;
     var s = getVisibleBounds(source) || source.geometricBounds;
     var m = getVisibleBounds(marker) || marker.geometricBounds;
@@ -2460,7 +2460,7 @@ function refreshZoomGuideLines(doc, key, source, marker, zoom, options, createMi
             if (clipped) points = [clipped.start, clipped.end];
         }
         var tagName = "ILST_ZOOM_GUIDE" + (g + 1) + "_" + key;
-        var line = findItemByTag(doc, tagName);
+        var line = index ? (g === 0 ? index.guides1[key] : index.guides2[key]) : findItemByTag(doc, tagName);
         if (!line) {
             if (!createMissing) continue;
             var layer = source.layer || doc.activeLayer;
@@ -2945,9 +2945,22 @@ function resetZoomTrackingHistory() {
     _zoomHistoryPictures = {};
 }
 
-function zoomItemInIndex(index, item) {
+function zoomItemInIndex(index, item, allowUntagged) {
+    if (!item) return false;
     for (var i = 0; item && i < index.items.length; i++) {
         if (index.items[i] === item) return true;
+    }
+    if (!allowUntagged) return false;
+    // Cleanup can remove a source's last tag before the undo transaction has
+    // its own anchor tag. Only this exceptional membership check needs the
+    // artwork collection; ordinary polls use tag parents exclusively.
+    if (!index.untaggedItems) {
+        index.untaggedItems = [];
+        var items = index.document.pageItems;
+        for (var j = 0, count = items.length; j < count; j++) index.untaggedItems.push(items[j]);
+    }
+    for (var j = 0; j < index.untaggedItems.length; j++) {
+        if (index.untaggedItems[j] === item) return true;
     }
     return false;
 }
@@ -3104,13 +3117,16 @@ function recordZoomTrackingHistory(doc, beforeAuto, beforeUser, index) {
     if (!sameZoomTrackingState(beforeAuto, afterAuto)) {
         var anchor = null;
         for (var key in _zoomHistoryPictures) {
-            if (zoomItemInIndex(index, _zoomHistoryPictures[key])) {
+            if (zoomItemInIndex(index, _zoomHistoryPictures[key], true)) {
                 anchor = _zoomHistoryPictures[key];
                 break;
             }
         }
         if (anchor) {
-            var token = createZoomRecordKey(doc), oldToken = getTag(anchor, _zoomHistoryTag);
+            // History tokens are tag values, so they do not need a document-wide
+            // search for an unused artwork tag name like zoom record keys do.
+            var token = new Date().getTime().toString(36) + "_" + Math.floor(Math.random() * 1679616).toString(36);
+            var oldToken = getTag(anchor, _zoomHistoryTag);
             // This tag is written in the same host transaction as the derived
             // artwork. Its rollback proves that the user undid our update.
             addTag(anchor, _zoomHistoryTag, token);
@@ -3209,40 +3225,45 @@ function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
 }
 
 function readCurrentZoomRecords(doc) {
-    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [] };
-    // Build one index per poll instead of looking up each cached zoom through
-    // its old native reference. Some host references remain readable after a
-    // replacement even though they no longer belong to the document.
-    for (var i = 0; i < doc.pageItems.length; i++) {
-        var item = doc.pageItems[i];
+    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [], document: doc, editing: false };
+    // Document.tags includes nested artwork. Scanning its live parents avoids
+    // visiting thousands of unrelated paths on every 400 ms background poll,
+    // while still detecting replacements and objects restored by native undo.
+    var tags = doc.tags;
+    for (var t = 0, count = tags.length; t < count; t++) {
+        var tag = tags[t];
+        var name = tag.name;
+        if (name.indexOf("ILST_ZOOM_") !== 0) continue;
+        var item = tag.parent;
         index.items.push(item);
-        for (var t = 0; t < item.tags.length; t++) {
-            var tag = item.tags[t];
-            if (tag.name.indexOf("ILST_ZOOM_ITEM_") === 0) {
-                index.records[tag.name.substring(15)] = { zoom: item, value: tag.value };
-            } else if (tag.name.indexOf("ILST_ZOOM_SRC_") === 0) {
-                index.pictures[tag.name.substring(14)] = item;
-                index.keys[tag.name.substring(14)] = true;
-            } else if (tag.name.indexOf("ILST_ZOOM_MARKER_") === 0) {
-                index.markers[tag.name.substring(17)] = item;
-                index.keys[tag.name.substring(17)] = true;
-            } else if (tag.name.indexOf("ILST_ZOOM_GUIDE1_") === 0) {
-                index.guides1[tag.name.substring(17)] = item;
-                index.keys[tag.name.substring(17)] = true;
-            } else if (tag.name.indexOf("ILST_ZOOM_GUIDE2_") === 0) {
-                index.guides2[tag.name.substring(17)] = item;
-                index.keys[tag.name.substring(17)] = true;
-            }
+        if (name === "ILST_ZOOM_ACTIVE_TARGET") {
+            index.editing = true;
+        } else if (name.indexOf("ILST_ZOOM_ITEM_") === 0) {
+            index.records[name.substring(15)] = { zoom: item, value: tag.value };
+        } else if (name.indexOf("ILST_ZOOM_SRC_") === 0) {
+            index.pictures[name.substring(14)] = item;
+            index.keys[name.substring(14)] = true;
+        } else if (name.indexOf("ILST_ZOOM_MARKER_") === 0) {
+            index.markers[name.substring(17)] = item;
+            index.keys[name.substring(17)] = true;
+        } else if (name.indexOf("ILST_ZOOM_GUIDE1_") === 0) {
+            index.guides1[name.substring(17)] = item;
+            index.keys[name.substring(17)] = true;
+        } else if (name.indexOf("ILST_ZOOM_GUIDE2_") === 0) {
+            index.guides2[name.substring(17)] = item;
+            index.keys[name.substring(17)] = true;
         }
     }
     return index;
 }
 
 function removeDeletedZoomAssociations(index) {
+    var changed = false;
     // Document tags also allow cleanup after a panel/script restart, when no
     // cached native reference to the deleted zoom remains.
     for (var key in index.keys) {
         if (index.records[key]) continue;
+        changed = true;
         try { if (index.guides1[key]) index.guides1[key].remove(); } catch (e) {}
         try { if (index.guides2[key]) index.guides2[key].remove(); } catch (e) {}
         var marker = index.markers[key];
@@ -3262,6 +3283,7 @@ function removeDeletedZoomAssociations(index) {
         }
         try { if (index.pictures[key]) deleteTag(index.pictures[key], "ILST_ZOOM_SRC_" + key); } catch (e) {}
     }
+    return changed;
 }
 
 function syncZoomTracker() {
@@ -3269,10 +3291,10 @@ function syncZoomTracker() {
     var doc = app.activeDocument;
     // The modeless editor owns updates until confirm/cancel clears its tags.
     // Background polling must not rewrite the artwork behind its preview.
-    if (findItemByTag(doc, "ILST_ZOOM_ACTIVE_TARGET")) return "OK";
     var docName = "";
     try { docName = doc.name; } catch (e) { return "OK"; }
     var index = readCurrentZoomRecords(doc);
+    if (index.editing) return "OK";
     if (_zoomTrackedDocument !== doc || _zoomTrackedDocName !== docName) {
         _zoomTrackedDocument = doc;
         _zoomTrackedDocName = docName;
@@ -3289,8 +3311,9 @@ function syncZoomTracker() {
         }
     }
     var beforeAuto = captureZoomTrackingState(index);
+    if (sameZoomTrackingState(beforeAuto, _zoomLastTrackingState)) return "OK";
     var beforeUser = _zoomLastTrackingState;
-    removeDeletedZoomAssociations(index);
+    var removedAssociations = removeDeletedZoomAssociations(index);
     var remaining = [];
     for (var key in index.records) {
         var currentRecord = index.records[key];
@@ -3303,7 +3326,7 @@ function syncZoomTracker() {
             // Check the document before treating an old reference as deletion.
             group = readZoomTrackingRecord(key, picture, marker, currentRecord.zoom, currentRecord.value);
             remaining.push(group);
-            try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false); } catch (e) {}
+            try { refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false, index); } catch (e) {}
             continue;
         }
         // Keep cached positions for movement detection, but use the live object.
@@ -3360,9 +3383,11 @@ function syncZoomTracker() {
         group.lastPBounds = [pBounds[0], pBounds[1], pBounds[2], pBounds[3]];
         group.lastMBounds = [mBounds[0], mBounds[1], mBounds[2], mBounds[3]];
         group.lastZBounds = [zBounds[0], zBounds[1], zBounds[2], zBounds[3]];
-        refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false);
+        refreshZoomGuideLines(doc, group.key, group.picture, group.marker, group.zoom, group, false, index);
     }
     _zoomTrackedGroups = remaining;
-    recordZoomTrackingHistory(doc, beforeAuto, beforeUser, readCurrentZoomRecords(doc));
+    // Geometry changes keep these live references valid. Only deletion cleanup
+    // invalidates membership and requires another native tag index.
+    recordZoomTrackingHistory(doc, beforeAuto, beforeUser, removedAssociations ? readCurrentZoomRecords(doc) : index);
     return "OK";
 }

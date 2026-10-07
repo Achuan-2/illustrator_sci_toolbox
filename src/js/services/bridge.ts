@@ -8,6 +8,7 @@ import {
 export interface CepAdapter {
   evalScript(script: string, callback: (result: string) => void): void;
   getSystemPath(name: string): string;
+  invokeSync?(name: string, payload: string): unknown;
   getExtensionId?(): string;
   getExtensions?(): string;
   requestOpenExtension?(extensionId: string, params?: string): void;

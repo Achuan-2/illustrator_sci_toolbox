@@ -3,6 +3,7 @@ import { settings } from '../stores/settings';
 import { workspace } from '../stores/workspace';
 import { t } from '../i18n';
 import { bridge, HostError } from './bridge';
+import { isPanelVisible } from './cep';
 import type {
   AlignmentMode,
   Direction,
@@ -415,7 +416,7 @@ export const actions = {
     });
   },
   syncZoom: () => {
-    if (!get(settings).zoomAutoUpdate) return Promise.resolve();
+    if (!get(settings).zoomAutoUpdate || !isPanelVisible()) return Promise.resolve();
     if (!zoomSyncPending) {
       zoomSyncPending = bridge
         .call('syncZoomTracker')

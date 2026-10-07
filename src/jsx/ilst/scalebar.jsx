@@ -222,9 +222,12 @@ function scaleResolveSelectionItem(doc, item) {
         if (key) {
             if (getTag(current.parent, "SCI_SCALE_WRAPPER")) return scaleWrapperPicture(current.parent);
             if (scaleReadOptions(current.parent)) return current.parent;
-            for (var i = 0; i < doc.pageItems.length; i++) {
-                var candidate = doc.pageItems[i];
-                if (getTag(candidate, "SCI_SCALE_ID") === key && (!candidate.uuid || candidate.uuid === key)) return scaleWrapperPicture(candidate);
+            var tags = doc.tags;
+            for (var i = 0, count = tags.length; i < count; i++) {
+                var tag = tags[i];
+                if (tag.name !== "SCI_SCALE_ID" || tag.value !== key) continue;
+                var candidate = tag.parent;
+                if (!candidate.uuid || candidate.uuid === key) return scaleWrapperPicture(candidate);
             }
         }
         if (getTag(current, "SCI_SCALE_WRAPPER")) return scaleWrapperPicture(current);
@@ -259,13 +262,21 @@ function scaleSelectionTarget(doc) {
 }
 
 function scaleTargetToken(doc, target) {
-    if (target.uuid) return target.uuid;
+    if (target.uuid) {
+        var uuid = target.uuid;
+        // UUID lookup can return an incorrectly typed PageItem wrapper. Its
+        // tag parent gives autosave the original typed native object instead.
+        if (getTag(target, "SCI_SCALE_TARGET") !== uuid) addTag(target, "SCI_SCALE_TARGET", uuid);
+        return uuid;
+    }
     var token = getTag(target, "SCI_SCALE_TARGET");
     // Older hosts have no UUID; copied tags must not pin two pictures to one ID.
     if (token) {
         var copies = [];
-        for (var i = 0; i < doc.pageItems.length; i++) {
-            if (doc.pageItems[i] !== target && getTag(doc.pageItems[i], "SCI_SCALE_TARGET") === token) copies.push(doc.pageItems[i]);
+        var tags = doc.tags;
+        for (var i = 0, count = tags.length; i < count; i++) {
+            var tag = tags[i];
+            if (tag.name === "SCI_SCALE_TARGET" && tag.value === token && tag.parent !== target) copies.push(tag.parent);
         }
         if (copies.length) {
             // Retire the ambiguous ID everywhere. A pending save using it must
@@ -332,15 +343,42 @@ function scaleRemoveBars(doc, target) {
     var owner = null;
     if (target.typename === "GroupItem") owner = target;
     else if (getTag(target.parent, "SCI_SCALE_WRAPPER")) owner = target.parent;
-    var items = doc.pageItems;
-    for (var i = items.length - 1; i >= 0; i--) {
-        var bar = items[i];
-        if (getTag(bar, "SCI_SCALE_BAR") !== key) continue;
+    // Capture matching tag parents before removal changes the live collection.
+    var tags = doc.tags, bars = [];
+    for (var i = 0, count = tags.length; i < count; i++) {
+        var tag = tags[i];
+        if (tag.name === "SCI_SCALE_BAR" && tag.value === key) bars.push(tag.parent);
+    }
+    for (var i = bars.length - 1; i >= 0; i--) {
+        var bar = bars[i];
         var insideOwner = owner && bar.parent === owner;
         var nativeOwner = target.uuid && getTag(bar, "SCI_SCALE_OWNER") === target.uuid;
         if (!insideOwner && !nativeOwner && (owner || target.uuid)) continue;
         bar.remove();
     }
+}
+
+function scaleFindTargetByToken(doc, token) {
+    // Illustrator 24+ exposes UUID lookup. CEP 8 hosts use persistent tags.
+    try {
+        if (doc.getPageItemFromUuid) {
+            var item = doc.getPageItemFromUuid(token);
+            if (item && item.uuid === token) {
+                var identity = item.tags.getByName("SCI_SCALE_TARGET");
+                var target = identity.parent;
+                if (identity.value === token && target.uuid === token) return target;
+            }
+        }
+    } catch (error) {}
+    var tags = doc.tags;
+    for (var i = 0, count = tags.length; i < count; i++) {
+        var tag = tags[i];
+        if ((tag.name === "SCI_SCALE_TARGET" || tag.name === "SCI_SCALE_ID") && tag.value === token) {
+            var target = tag.parent;
+            if (!target.uuid || target.uuid === token) return target;
+        }
+    }
+    return null;
 }
 
 function scaleDrawBar(doc, target, fov, options) {
@@ -443,9 +481,10 @@ function applyScalebar(payloadJson) {
         var selectionTargets = payload.autoSave ? null : scaleSelectionTargets(doc);
         if (selectionTargets && selectionTargets.length !== requested.length) return sciError("errors.scaleTargetChanged");
         for (var i = 0; i < requested.length; i++) {
-            var target = null, candidates = selectionTargets || doc.pageItems;
-            for (var c = 0; c < candidates.length; c++) {
-                var candidate = candidates[c];
+            var target = null;
+            if (!selectionTargets) target = scaleFindTargetByToken(doc, requested[i].token);
+            else for (var c = 0; c < selectionTargets.length; c++) {
+                var candidate = selectionTargets[c];
                 if ((candidate.uuid || getTag(candidate, "SCI_SCALE_TARGET")) === requested[i].token) { target = candidate; break; }
             }
             if (!target) return sciError("errors.scaleTargetChanged");

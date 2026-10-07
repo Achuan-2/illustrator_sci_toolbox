@@ -15,6 +15,10 @@ import { isHostSource } from '../vite.es.config.ts';
 
 const hostSource = fs.readFileSync('dist/cep/jsx/index.js', 'utf8');
 
+function documentTags(items: any[]) {
+  return items.flatMap((item) => [...(item.tags || [])].map((tag) => ({ ...tag, parent: item })));
+}
+
 test('host file watching accepts Vite paths and Windows drive-letter casing', () => {
   const host = path.resolve('src/jsx/index.ts').replace(/\\/g, '/');
   assert.equal(isHostSource(host), true);
@@ -137,6 +141,7 @@ test('zoom preview bounds raster size for large images and retains detail for sm
     const document = {
       selection: [source],
       pageItems: [source],
+      get tags() { return documentTags(this.pageItems); },
       documentColorSpace: 'RGB',
       imageCapture(_file: unknown, bounds: unknown, options: { resolution: number }) {
         assert.deepEqual(Array.from(bounds as number[]), [0, height, width, 0]);
@@ -228,6 +233,7 @@ test('zoom preview excludes overlapping rectangles without switching documents a
     });
     const document = {
       selection: [source, rectangle], pageItems: [source, rectangle], documentColorSpace: 'RGB',
+      get tags() { return documentTags(this.pageItems); },
       imageCapture() {
         captures++;
         assert.equal(source.hidden, false);
@@ -281,6 +287,7 @@ test('preview isolation follows nested groups and layers and preserves initially
     const otherLayer: any = { typename: 'Layer', visible: true, locked: true };
     const document = {
       selection: [source], pageItems: [source, sibling, preHidden, group, layerSibling],
+      get tags() { return documentTags(this.pageItems); },
       layers: [mainLayer, otherLayer],
       imageCapture() {
         assert.equal(sibling.hidden, true);
@@ -328,6 +335,7 @@ test('plain linked PNG and JPEG images use their source files while embedded and
     };
     const document = {
       selection: [source], pageItems: [source],
+      get tags() { return documentTags(this.pageItems); },
       imageCapture() { captures++; }
     };
     Object.assign(source, { parent: document });

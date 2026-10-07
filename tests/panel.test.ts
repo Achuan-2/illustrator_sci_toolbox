@@ -998,6 +998,51 @@ test('zoom automatic update switch persists and gates background host polling', 
   }
 });
 
+test('hidden panels pause zoom and scalebar polling and resume when visible', async () => {
+  let hidden = true;
+  const panel = await createPanel(undefined, false, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    Object.defineProperty(window.document, 'hidden', { get: () => hidden });
+  });
+  const polls = () => panel.requests.filter((request) =>
+    request.operation === 'syncZoomTracker' || request.operation === 'inspectScalebar');
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
+  try {
+    await pause();
+    assert.equal(polls().length, 0);
+    hidden = false;
+    await pause();
+    assert.ok(polls().some((request) => request.operation === 'syncZoomTracker'));
+    assert.ok(polls().some((request) => request.operation === 'inspectScalebar'));
+    hidden = true;
+    const count = polls().length;
+    await pause();
+    assert.equal(polls().length, count);
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
+test('CEP-collapsed panels pause polling even when the web document stays visible', async () => {
+  let visible: boolean | string = false;
+  const panel = await createPanel(undefined, false, 'http://localhost:3000/main/index.html#scalebar', (window) => {
+    Object.defineProperty(window.document, 'hidden', { get: () => false });
+    (window as any).__adobe_cep__.invokeSync = (name: string, payload: string) => {
+      assert.equal(name, 'isWindowVisible'); assert.equal(payload, ''); return visible;
+    };
+  });
+  const polls = () => panel.requests.filter((request) =>
+    request.operation === 'syncZoomTracker' || request.operation === 'inspectScalebar');
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
+  try {
+    await pause(); assert.equal(polls().length, 0);
+    visible = 'true'; await pause();
+    assert.ok(polls().some((request) => request.operation === 'syncZoomTracker'));
+    assert.ok(polls().some((request) => request.operation === 'inspectScalebar'));
+    visible = 'false'; const count = polls().length;
+    await pause(); assert.equal(polls().length, count);
+  } finally { await panel.window.happyDOM.close(); }
+});
+
 test('checkbox activation survives the browser checkpoint between click and change', async () => {
   const panel = await createPanel();
   try {

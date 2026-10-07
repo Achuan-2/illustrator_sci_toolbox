@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { t } from '../i18n';
   import { bridge, HostError } from '../services/bridge';
+  import { isPanelVisible } from '../services/cep';
   import { settings } from '../stores/settings';
   import {
     defaultScalebar,
@@ -64,7 +65,7 @@
       cause instanceof HostError ? $t(cause.key, cause.args) : String(cause);
   }
   async function inspect(force = false) {
-    if (inspecting) return;
+    if (inspecting || !isPanelVisible()) return;
     inspecting = true;
     try {
       const result: ScalebarInspection | null = JSON.parse(

@@ -18,7 +18,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
     visible: true,
     pageItems: []
   };
-  function tags() {
+  function tags(parent: any) {
     const collection: any = [];
     collection.getByName = (name: string) => {
       const tag = collection.find((entry: any) => entry.name === name);
@@ -28,6 +28,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
     collection.add = () => {
       let name = '';
       const tag = {
+        parent,
         get name() {
           return name;
         },
@@ -91,7 +92,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
       selected: false,
       hidden: false,
       locked: false,
-      tags: tags(),
+      tags: undefined,
       embedded: true,
       opacity: 100,
       get geometricBounds() {
@@ -200,6 +201,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
         removed = true;
       }
     };
+    artwork.tags = tags(artwork);
     if (type === 'GroupItem') {
       artwork.pageItems = [];
       artwork.pathItems = paths(artwork);
@@ -233,6 +235,9 @@ function fixture(strokedPosition = false, undoSupport = false) {
     name: 'test.ai',
     layers: [layer],
     pageItems: items,
+    get tags() {
+      return items.flatMap((artwork) => [...artwork.tags]);
+    },
     activeLayer: layer,
     imageCapture(_file: any, bounds: number[]) {
       captures.push([...bounds]);
@@ -390,6 +395,57 @@ function trackedFixture(count = 1) {
   assert.equal(host.call('syncZoomTracker').data, 'OK');
   return { host, records };
 }
+
+for (const hasZoom of [false, true]) {
+  test(`background tracking avoids unrelated artwork with ${hasZoom ? 'an existing zoom' : 'no zooms'}`, () => {
+    const host = hasZoom ? trackedFixture().host : fixture();
+    // Ordinary paths must not be accessed through the host artwork collection
+    // while idle. Tag parents still expose the live tracked objects.
+    for (let i = 0; i < 5000; i++) host.items.push({ tags: [] });
+    const readTags = Object.getOwnPropertyDescriptor(host.document, 'tags')!.get!;
+    let tagPasses = 0;
+    Object.defineProperty(host.document, 'tags', {
+      get() { tagPasses++; return readTags.call(host.document); }
+    });
+    Object.defineProperty(host.document, 'pageItems', {
+      get() { throw new Error('Idle polling must not enumerate document.pageItems'); }
+    });
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    const previousPasses = tagPasses;
+    const previousTransforms = host.transformCalls;
+    for (let i = 0; i < 5; i++) assert.equal(host.call('syncZoomTracker').data, 'OK');
+    assert.equal(tagPasses - previousPasses, 5, 'Unchanged polls build only one tag index');
+    assert.equal(host.transformCalls, previousTransforms, 'Idle polls do not transform artwork');
+    if (hasZoom) {
+      host.source.translate(10, 0);
+      const movementPasses = tagPasses;
+      assert.equal(host.call('syncZoomTracker').data, 'OK', 'Source movement also uses the tag index');
+      assert.equal(tagPasses - movementPasses, 1, 'Geometry updates reuse the same index for guides and history');
+      const marker = host.items.find((artwork) => artwork.tags.some((tag: any) => tag.name.startsWith('ILST_ZOOM_MARKER_')));
+      assertBounds(marker.geometricBounds, [20, 90, 30, 80]);
+    }
+  });
+}
+
+test('zoom editor session setup and cancellation do not scan unrelated artwork', () => {
+  const host = fixture();
+  const source = host.item('PlacedItem', 0, 100, 100, 100);
+  Object.assign(source, {
+    embedded: false,
+    file: { exists: true, name: 'linked.png', fsName: 'D:/Temp/linked.png' },
+    matrix: { mValueA: 1, mValueB: 0, mValueC: 0, mValueD: 1 }
+  });
+  Object.defineProperty(host.document, 'pageItems', {
+    get() { throw new Error('Editor session tags must not require a full artwork scan'); }
+  });
+  // Linked PNG preview avoids the separate, necessary visibility traversal
+  // used when rasterizing embedded artwork against overlapping siblings.
+  const preview = host.inspect(source);
+  assert.equal(preview.previewPath, 'D:/Temp/linked.png');
+  assert.ok(source.tags.some((tag: any) => tag.name === 'ILST_ZOOM_ACTIVE_TARGET'));
+  assert.equal(host.call('cancelZoomTarget').data, 'OK');
+  assert.equal(source.tags.some((tag: any) => tag.name.startsWith('ILST_ZOOM_ACTIVE_')), false);
+});
 
 function undoFixture() {
   const host = fixture(false, true);

@@ -207,7 +207,12 @@ test('copied target tags on pre-UUID hosts become unique and retire the ambiguou
   const first = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
   const second = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
   const third = { tags: { SCI_SCALE_TARGET: 'copied-token' } };
-  const doc = { pageItems: [first, second, third] };
+  const doc = {
+    pageItems: [first, second, third],
+    get tags() {
+      return this.pageItems.map((item) => ({ name: 'SCI_SCALE_TARGET', value: item.tags.SCI_SCALE_TARGET, parent: item }));
+    }
+  };
   const host = vm.createContext({
     getTag: (item: any, name: string) => item.tags[name] || null,
     addTag: (item: any, name: string, value: string) => { item.tags[name] = value; },
@@ -219,6 +224,61 @@ test('copied target tags on pre-UUID hosts become unique and retire the ambiguou
   assert.equal(tokens.includes('copied-token'), false);
   assert.deepEqual(doc.pageItems.map((item) => host.scaleTargetToken(doc, item)), tokens,
     'Once disambiguated, target tokens remain stable across polling');
+});
+
+test('pre-UUID scalebar identity checks only target tags in a large document', () => {
+  const target = { tags: { SCI_SCALE_TARGET: 'stable-token' } };
+  const doc = {
+    tags: [{ name: 'SCI_SCALE_TARGET', value: 'stable-token', parent: target }],
+    get pageItems() { throw new Error('Identity polling must not enumerate artwork'); }
+  };
+  const host = vm.createContext({ getTag: (item: any, name: string) => item.tags[name] || null });
+  vm.runInContext(source, host);
+  for (let i = 0; i < 10; i++) assert.equal(host.scaleTargetToken(doc, target), 'stable-token');
+});
+
+test('scalebar autosave locates native UUIDs and legacy tokens without scanning artwork', () => {
+  const native = { uuid: 'native-id', typename: 'RasterItem' }, legacy = {};
+  const wrapper = { uuid: native.uuid, typename: 'GroupItem', tags: { getByName: () => ({ value: native.uuid, parent: native }) } };
+  const host = vm.createContext({});
+  vm.runInContext(source, host);
+  const doc = {
+    getPageItemFromUuid(token: string) {
+      if (token === native.uuid) return wrapper;
+      throw new Error('Missing UUID');
+    },
+    tags: [{ name: 'SCI_SCALE_TARGET', value: 'legacy-id', parent: legacy }],
+    get pageItems() { throw new Error('Autosave must not enumerate artwork'); }
+  };
+  assert.equal(host.scaleFindTargetByToken(doc, 'native-id'), native);
+  assert.equal(host.scaleFindTargetByToken(doc, 'legacy-id'), legacy);
+  assert.equal(host.scaleFindTargetByToken(doc, 'deleted-id'), null);
+});
+
+test('scalebar replacement snapshots tag parents before removing matching annotations', () => {
+  const layer = {}, target = { uuid: 'source-id', parent: layer };
+  const tags: any[] = [], removed: string[] = [];
+  function bar(name: string, parent: unknown, owner: string) {
+    const item = { name, parent, owner, remove() {
+      removed.push(name);
+      tags.splice(tags.findIndex((tag) => tag.parent === item), 1);
+    } };
+    tags.push({ name: 'SCI_SCALE_BAR', value: 'source-id', parent: item });
+    return item;
+  }
+  bar('old-bar', layer, 'source-id');
+  bar('old-label', layer, 'source-id');
+  bar('copied-annotation', layer, 'copied-source-id');
+  const host = vm.createContext({ getTag: (item: any, name: string) => {
+    if (name === 'SCI_SCALE_ID' && item === target) return target.uuid;
+    if (name === 'SCI_SCALE_OWNER') return item.owner;
+    return null;
+  } });
+  vm.runInContext(source, host);
+  const doc = { tags, get pageItems() { throw new Error('Bar updates must not enumerate artwork'); } };
+  host.scaleRemoveBars(doc, target);
+  assert.deepEqual(removed.sort(), ['old-bar', 'old-label']);
+  assert.equal(tags.length, 1, 'The copied source keeps its independent annotation');
 });
 
 test('FOV note round-trips while preserving unrelated text and tags', () => {
