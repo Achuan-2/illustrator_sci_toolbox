@@ -168,12 +168,8 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, then `pnpm build` to check and generate a static extension that works without a dev server; the command exits after building. `pnpm dev` starts or reuses the HMR server, prepares the extension on first use and switches the panel to its dynamic entry. After stopping dev, run `pnpm build` and reopen the panel to work offline. `pnpm test` also builds a static entry. Frontend changes use HMR; translation JSON and host script changes reload the panel. `pnpm zxp` produces a static extension and signed ZXP, then automatically copies the ZXP to a byte-identical ZIP; no separate `pnpm zip` command is needed. Run `bash gh_release.sh` to build and verify ZIP/ZXP locally, then publish the matching CHANGELOG entry and Baidu/Quark cloud drive links through GitHub CLI (`gh`), even without working tree changes or new commits. An existing Release for the same version has its notes updated. Packages are not uploaded to GitHub Releases. Use `bash gh_release.sh --no-release` to build locally without publishing. See [Development and release](docs/development.md) for setup and verification boundaries.
 
-## ❤️Powered by Love
+## ❤️ Tips Are Welcome
 
-If you like my work, feel free to buy me a coffee, which will motivate me to continue maintaining the project and creating new ones.
+If you find this plugin useful, you're welcome to leave a tip or give the repository a star on GitHub. Your support helps me maintain and improve this plugin and develop new ones. Thank you for your support!
 
-Limited personal time and energy, priority given to feature suggestions and bug reports from sponsored users.
-
-Friends who have accumulated 50 yuan in sponsorships, if you want to add me on WeChat, you can send an email to achuan-2@outlook.com for friend request (I won't reply to emails or add friends if sponsorship doesn't reach 50 yuan, as I don't want to be a free customer service).
-
-<img alt="" src="https://camo.githubusercontent.com/8cf1ad8251e7cecf3dbd2f818706e8aad08aeab824c8bed49b6826f2df443000/68747470733a2f2f63646e2e6e6c61726b2e636f6d2f79757175652f302f323032342f6a7065672f313430383034362f313731343735343537333339332d39633766373062302d303565632d343839652d623561322d3161333766623638316636662e6a7065673f782d6f73732d70726f636573733d696d616765253246666f726d617425324377656270253246696e7465726c61636525324331" style="width: 450px;" />
+[Leave a tip](https://pancake.waffo.ai/store/achuan-2-fdbho4ye/product/PROD_3F7Aa7c2NQlz9KmxcgxjQ7?type=onetime&currency=USD)
