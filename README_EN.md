@@ -168,8 +168,9 @@ Recently, while writing a paper, arranging images in Adobe Illustrator can be qu
 
 The project uses Bolt CEP, Svelte and TypeScript. Run `pnpm install`, then `pnpm build` to check and generate a static extension that works without a dev server; the command exits after building. `pnpm dev` starts or reuses the HMR server, prepares the extension on first use and switches the panel to its dynamic entry. After stopping dev, run `pnpm build` and reopen the panel to work offline. `pnpm test` also builds a static entry. Frontend changes use HMR; translation JSON and host script changes reload the panel. `pnpm zxp` produces a static extension and signed ZXP, then automatically copies the ZXP to a byte-identical ZIP; no separate `pnpm zip` command is needed. Run `bash gh_release.sh` to build and verify ZIP/ZXP locally, then publish the matching CHANGELOG entry and Baidu/Quark cloud drive links through GitHub CLI (`gh`), even without working tree changes or new commits. An existing Release for the same version has its notes updated. Packages are not uploaded to GitHub Releases. Use `bash gh_release.sh --no-release` to build locally without publishing. See [Development and release](docs/development.md) for setup and verification boundaries.
 
-## ❤️ Tips Are Welcome
+## ❤️ Buy me a coffee
 
-If you find this plugin useful, you're welcome to leave a tip or give the repository a star on GitHub. Your support helps me maintain and improve this plugin and develop new ones. Thank you for your support!
+If you find this plugin useful, you're welcome to buy me a coffee. Your support helps me maintain and improve this plugin and develop new ones.
 
-[Leave a tip](https://pancake.waffo.ai/store/achuan-2-fdbho4ye/product/PROD_3F7Aa7c2NQlz9KmxcgxjQ7?type=onetime&currency=USD)
+[Buy me a coffee](https://pancake.waffo.ai/store/achuan-2-fdbho4ye/product/PROD_3F7Aa7c2NQlz9KmxcgxjQ7?type=onetime&currency=USD)
+
