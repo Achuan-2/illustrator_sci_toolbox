@@ -17,7 +17,11 @@
 </a>
 
 
-## 开发背景
+# illustrator 插件 SCI Toolbox 安装教程
+
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-c719fa09-747f-452f-852e-108c0f80862a-20260114181205-3ucuway.png" style="width: 2406px;" />
+
+## 1 开发背景
 
 之前为了组会做ppt快速排图、导入markdown笔记，写了一个ppt插件，开源在Github：[Achuan-2/SlideSCI](https://github.com/Achuan-2/SlideSCI)，博客：[SlideSCI README](https://mp.weixin.qq.com/s/_NrGwjJnEta0oT5a6EKdiA)
 
@@ -27,22 +31,22 @@
 - 比如我需要图片批量改宽高，全选图片后，输入具体值，但实际改的是整体大小，每个图片的大小并不是我输入的具体值
 - 比如我要给图片添加label，一个个标签添加，要改编号，还要对齐也好累
 
-## 如何安装、使用本插件
+## 2 如何安装、使用本插件
 
-### 下载zip或zxp文件
+### 2.1 下载zip或zxp文件
 
-本插件安装包的兼容目标为 Illustrator 2024及以上。
-
-下载插件 ZXP 安装包或 ZIP 分发包（选一个就好）
+**illustrator版本要求**：本插件安装包的illustrator版本要求2024及以上，尝试兼容了2018-2023的版本，但不一定可以兼容成功。
 
 **下载地址：**
+
+下载插件 ZXP 安装包或 ZIP 分发包（选一个就好）
 
 - 百度网盘地址：[https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit](https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit)
 - 夸克网盘地址：[https://pan.quark.cn/s/12bf0d38de47](https://pan.quark.cn/s/12bf0d38de47)
 
-### 安装方法
+### 2.2 安装方法
 
-#### 【方法一: zxp文件安装】
+#### 2.2.1 【方法一: zxp文件安装】
 
 下载zxp文件后，安装[ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/?srsltid=AfmBOoo-EVsObqPpzaZW0PvdAs_QcLleVQPtl2Yy00HAkA4rzndfdAcI)，打开软件拖进zxp文件进行安装
 
@@ -53,27 +57,27 @@ ZXP/UXP Installer也可从网盘地址下载：
 
 安装ZXP installer程序，只用勾选ZXP/UXP installer和I agree to the license terms and conditions
 
-![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102229-velq1hh.png)
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102229-velq1hh.png" style="width: 359px;" />
 
 然后打开ZXP/UXP installer
 
-![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102245-4mndxv7.png)
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102245-4mndxv7.png" style="width: 350px;" />
 
 点击File选择下载的zxp文件进行安装
 
-![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102308-q3l687w.png)
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102308-q3l687w.png" style="width: 399px;" />
 
-![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102318-9bddu55.png)
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102318-9bddu55.png" style="width: 407px;" />
 
 > 如果软件没有找到illustrator版本，可以不管，点击确定继续安装
 
 安装成功
 
-![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102328-kb9oayh.png)
+<img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20261004102328-kb9oayh.png" style="width: 408px;" />
 
 安装后记得重启illustrator！！！
 
-#### 【方法二：zip文件安装】
+#### 2.2.2 【方法二：zip文件安装】
 
 ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹，将整个文件夹复制到 Adobe 插件目录，安装后重启 Illustrator。
 
@@ -86,9 +90,9 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
   - 目录：​`~/Library/Application Support/Adobe/CEP/extension`
 
-![PixPin_2026-10-04_10-24-56](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-24-56-20261004102458-6tvoae2.png)
+<img alt="PixPin_2026-10-04_10-24-56" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-24-56-20261004102458-6tvoae2.png" />
 
-#### **设置PlayerDebugMode（如果能正常使用可跳过）**
+#### 2.2.3 **设置PlayerDebugMode（如果能正常使用可跳过）**
 
 如果打开插件后若显示页面空白，需要额外设置PlayerDebugMode，才能使用本插件
 
@@ -99,7 +103,7 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
   - `win+r`​输入`regedit`，打开注册表
   - 找到`计算机\HKEY_CURRENT_USER\Software\Adobe\`​（可以直接在地址栏粘贴跳转）下的`CSXS.版本号`文件夹：右键新建【字符串值】，名称为 PlayerDebugMode，然后双击输入值为1。如果CSXS有多个版本，需要每个版本都创建PlayerDebugMode字符串！！！
 
-    ![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-9d2e4b7d-201b-48e6-95ea-4dc02bdf0986-20260114181242-hc1pnup.png)
+    <img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-9d2e4b7d-201b-48e6-95ea-4dc02bdf0986-20260114181242-hc1pnup.png" style="width: 1902px;" />
 - Mac系统解决方法
 
   - 打开终端，输入
@@ -125,22 +129,22 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
     > 如果不知道你的版本号，其实可以把4到12都设置一个遍
     >
 
-### 打开插件
+### 2.3 打开插件
 
 - 点击「窗口-扩展」功能，点击本插件，就可以打开插件
 
-  ![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260114180745-iub6hwf.png)
+  <img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260114180745-iub6hwf.png" style="width: 501px;" />
 - 窗口可以拖拽到侧栏方便使用
 
-  ![PixPin_2026-10-04_10-29-42](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-29-42-20261004102943-qz0zsoj.png)
+  <img alt="PixPin_2026-10-04_10-29-42" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-29-42-20261004102943-qz0zsoj.png" style="width: 454px;" />
 
-## 功能介绍
+## 3 功能介绍
 
-![](https://assets.b3logfile.com/siyuan/1610205759005/assets/mindmap-image-20261004103126-nn6sttf.png)
+<img alt="" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/mindmap-image-20261004103126-nn6sttf.png" />
 
-### 一键添加子图label和更新label
+### 3.1 一键添加子图label和更新label
 
-![PixPin_2026-10-04_12-19-01](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-19-01-20261004121904-tttn1sk.png)
+<img alt="PixPin_2026-10-04_12-19-01" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-19-01-20261004121904-tttn1sk.png" style="width: 391px;" />
 
 【**添加label功能介绍】**
 
@@ -148,7 +152,7 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 注：要退出这个状态只需要随意点击其他按钮、输入框即可
 
-![PixPin_2026-10-04_12-20-58](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-20-58-20261004122113-rr21kmx.gif)
+<img alt="PixPin_2026-10-04_12-20-58" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-20-58-20261004122113-rr21kmx.gif" />
 
  **【更新label介绍】**
 
@@ -156,22 +160,22 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 可以根据设置的label index编号来一个个更新，可以批量选中所有label一键更新
 
-![PixPin_2026-10-04_12-22-50](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-22-50-20261004122256-3eeyvqi.gif)
+<img alt="PixPin_2026-10-04_12-22-50" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-22-50-20261004122256-3eeyvqi.gif" />
 
-### 网格排布：可以批量调整图片宽高、一键排列整齐
+### 3.2 网格排布：可以批量调整图片宽高、一键排列整齐
 
-![PixPin_2026-10-04_12-32-37](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-32-37-20261004123239-yxqmac5.png)
+<img alt="PixPin_2026-10-04_12-32-37" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-32-37-20261004123239-yxqmac5.png" />
 
 设置介绍
 
 - **自动排布**：可以自动检测每行排布几个元素，这样用户初步摆放之后，就可以直接点击进行优化布局，不需要数每列有几个元素了。如果要指定每列摆放几个元素，则取消勾选，设置列数
 - **边缘对齐**：可以让左右边缘对齐，并支持自定义宽度，程序会自动设置每行间距。
 
-  ![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260816091913-18mvx6q.png)
+  <img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260816091913-18mvx6q.png" />
 
   如果每行对象的数目不对齐，也可以对齐。
 
-  ![image](https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260816092400-trbfp66.png)
+  <img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260816092400-trbfp66.png" />
 - **对象尺寸**：支持选择
 
   - 保持原始尺寸
@@ -179,10 +183,10 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
   - 自定义尺寸
 - **排序方式**：判断对象的排布先后顺序，插件支持根据网格顺序、垂直位置、水平位置以及图层顺序来确定对象顺序。默认推荐网格顺序，可以综合考虑对象的垂直和水平位置来智能判断。
 
-![PixPin_2026-10-04_12-47-43](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-47-43-20261004124745-0tc39zs.gif)
+<img alt="PixPin_2026-10-04_12-47-43" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_12-47-43-20261004124745-0tc39zs.gif" />
 
 
-### 复制粘贴相对位置：
+### 3.3 复制粘贴相对位置：
 
 使用说明
 
@@ -198,59 +202,59 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 - 快速统一label位置：一个图加了label，其他图的label位置也需要一样，也可以快速统一
 - 可以基于画布复制多选形状的位置，进行跨画布统一位置
 
-![PixPin_2026-10-04_14-42-39](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_14-42-39-20261004144243-h3oe3ub.gif)
+<img alt="PixPin_2026-10-04_14-42-39" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_14-42-39-20261004144243-h3oe3ub.gif" />
 
-### 尺寸粘贴
+### 3.4 尺寸粘贴
 
 复制一个形状的宽高或者手动输入宽高，点击「粘贴尺寸」即可对选择的形状进行批量粘贴形状。
 
 宽高前有勾选框，默认全部勾选，可以只勾选其中一个，比如只勾选宽度则只粘贴宽度，则粘贴后的对象高度根据原来宽高比自动调整。
 
-![PixPin_2026-10-04_11-04-59](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-04-59-20261004110511-cemx2e7.png)
+<img alt="PixPin_2026-10-04_11-04-59" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-04-59-20261004110511-cemx2e7.png" />
 
-### 交换两个形状的位置
+### 3.5 交换两个形状的位置
 
 用途
 
 - 一组图已经排版好，复制一份，然后用本功能，把新图和原来的图替换
 - 组图后需要修改，交换两个图的位置
 
-![PixPin_2026-10-04_11-00-55](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-00-55-20261004110056-d5yn0k5.png)
+<img alt="PixPin_2026-10-04_11-00-55" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-00-55-20261004110056-d5yn0k5.png" />
 
-### 排列分布
+### 3.6 排列分布
 
-![PixPin_2026-10-04_11-01-44](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-01-44-20261004110146-ythwdfj.png)
+<img alt="PixPin_2026-10-04_11-01-44" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-01-44-20261004110146-ythwdfj.png" />
 
 - **对齐对象**：集成illustrator内置的水平居左、居中、居右，垂直顶对齐、居中、底对齐，以及水平与垂直同时居中。
 - **分布对象**：按水平左边缘、中心、右边缘，或垂直顶边缘、中心、底边缘等距离分布。至少选择三个对象，两端对象保持不动，中间对象只沿对应方向移动
 - **等间距分布功能**：一键统一不同宽高的形状之间的水平/垂直间距
 
-  ![水平间距均匀分布-20251128204458-56dc2da](https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-971991ff-cec1-4488-b862-26534e445522-20260114181252-z98cqc7.gif)
+  <img alt="水平间距均匀分布-20251128204458-56dc2da" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-971991ff-cec1-4488-b862-26534e445522-20260114181252-z98cqc7.gif" />
 - **间距复制粘贴功能**：快速复制粘贴水平/垂直间距
 
   官方的分布间距只能指定值，而不能获取值，如果原先已经排好了两个形状的间距，想批量应用到其他形状，就可以用本功能
 
   下面是一个例子：在画一个流程图，矩形和箭头的间距调整了一个满意的，然后就可以复制这个间距，快速批量应用于其他矩形和箭头，统一这个间距
 
-  ![复制粘贴间距-20251128205250-r9vjwbw](https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-0567f2aa-6a3c-4757-9ffd-f1fc3cf12d58-20260114181253-dzomi3s.gif)
+  <img alt="复制粘贴间距-20251128205250-r9vjwbw" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/network-asset-0567f2aa-6a3c-4757-9ffd-f1fc3cf12d58-20260114181253-dzomi3s.gif" />
 
-### 一键添加图片边框
+### 3.7 一键添加图片边框
 
-![PixPin_2026-10-04_11-03-47](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-03-47-20261004110349-m5b6n5v.png)
+<img alt="PixPin_2026-10-04_11-03-47" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_11-03-47-20261004110349-m5b6n5v.png" style="width: 380px;" />
 
-### 添加伪彩和合并通道
+### 3.8 添加伪彩和合并通道
 
 支持给图片上伪彩以及合并多通道图片。
 
 伪彩：支持红、绿、蓝、青、品红、黄和灰度。
 
-![PixPin_2026-10-04_10-32-21](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-32-21-20261004103223-dm2pkd4.png)
+<img alt="PixPin_2026-10-04_10-32-21" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-32-21-20261004103223-dm2pkd4.png" style="width: 418px;" />
 
 例子：
 
-![PixPin_2026-10-04_10-41-12](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-41-12-20261004104114-7c9h3p9.png)
+<img alt="PixPin_2026-10-04_10-41-12" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-41-12-20261004104114-7c9h3p9.png" />
 
-### 制作比例尺scalebar
+### 3.9 制作比例尺scalebar
 
 设置图片FOV信息后，可以制作比例尺。如果tif本身有FOV信息，插件也会读取。
 
@@ -258,13 +262,13 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 
 比例尺支持设置横向 Width / 纵向 Height、厚度（pt）、比例尺颜色、文字显示、字体颜色、字号、加粗和四角位置，比例尺默认与图片编组。
 
-![PixPin_2026-10-04_10-42-50](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-42-50-20261004104256-b8zpcz3.png)
+<img alt="PixPin_2026-10-04_10-42-50" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-42-50-20261004104256-b8zpcz3.png" style="width: 429px;" />
 
 例子：
 
-![PixPin_2026-10-04_10-49-48](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-49-48-20261004104955-np2yv8z.png)
+<img alt="PixPin_2026-10-04_10-49-48" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-49-48-20261004104955-np2yv8z.png" />
 
-### 制作放大图
+### 3.10 制作放大图
 
 点击制作放大图按钮，会打开弹窗，通过鼠标左键框选放大区域来制作放大图。
 
@@ -277,22 +281,21 @@ ZIP 与 ZXP 内容相同，仅扩展名不同。下载 ZIP 后解压为文件夹
 - 支持批量制作：如果多张图要放大的区域一致，支持同时选择多张图进行批量设置放大图。
 - 支持自动更新：移动原图、放大矩形、放大图，放大图都会重新制作。
 
-![PixPin_2026-10-04_15-49-45](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_15-49-45-20261004154948-8ywookj.png)
+<img alt="PixPin_2026-10-04_15-49-45" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_15-49-45-20261004154948-8ywookj.png" />
 
 例子：
 
-![PixPin_2026-10-04_10-58-22](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-58-22-20261004105826-6hl5cnj.png)
+<img alt="PixPin_2026-10-04_10-58-22" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-58-22-20261004105826-6hl5cnj.png" />
 
-### 色卡功能
+### 3.11 色卡功能
 
 默认提供“期刊配色、分类配色、连续配色、发散配色”四个默认分组，内置 23 套常用科研配色，用户也可以自定义分组和新增色卡。
 
 左键点击某个颜色可以为所选形状直接应用填充色，右键颜色则是复制 HEX 或 RGB 值
 
-![PixPin_2026-10-04_10-45-08](https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-45-08-20261004104510-42jnfuo.png)
+<img alt="PixPin_2026-10-04_10-45-08" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/PixPin_2026-10-04_10-45-08-20261004104510-42jnfuo.png" />
 
-## 博客
-
+## 4 博客
 
 - [论文排图太累，于是我写了一个adobe illustrator插件](https://zhuanlan.zhihu.com/p/1949230421322731895)
 - [科研组图丨我宣布，我实现了illustrator添加子图编号的极致便捷体验](https://www.zhihu.com/zvideo/1951806163646648639)
