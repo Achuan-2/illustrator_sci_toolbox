@@ -37,11 +37,10 @@
 
 **illustrator版本要求**：本插件安装包的illustrator版本要求2024及以上，尝试兼容了2018-2023的版本，但不一定可以兼容成功。
 
-**下载地址：**
+**下载：**
 
 下载插件 ZXP 安装包或 ZIP 分发包（选一个就好）
 
-- 百度网盘地址：[https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit](https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit)
 - 夸克网盘地址：[https://pan.quark.cn/s/12bf0d38de47](https://pan.quark.cn/s/12bf0d38de47)
 
 ### 2.2 安装方法
@@ -52,7 +51,6 @@
 
 ZXP/UXP Installer也可从网盘地址下载：
 
-- 百度网盘地址：[https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit](https://pan.baidu.com/s/1zRVdx0TtWFCZi0rwfZkUBw?pwd=ftit)
 - 夸克网盘地址：[https://pan.quark.cn/s/12bf0d38de47](https://pan.quark.cn/s/12bf0d38de47)
 
 安装ZXP installer程序，只用勾选ZXP/UXP installer和I agree to the license terms and conditions
