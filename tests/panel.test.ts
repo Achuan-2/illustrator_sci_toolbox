@@ -1456,6 +1456,71 @@ test('zoom loads linked files with their MIME type and only deletes generated pr
   }
 });
 
+test('zoom file URL fallback escapes filenames on Windows, macOS and network shares', async () => {
+  for (const [filename, expected] of [
+    ['D:/images/image #1%?.png', 'file:///D:/images/image%20%231%25%3F.png'],
+    ['/Users/user/image #1.png', 'file:///Users/user/image%20%231.png'],
+    ['//server/share/image #1.png', 'file://server/share/image%20%231.png']
+  ]) {
+    let loadedUrl = '';
+    const panel = await createPanel(undefined, false, undefined, (window) => {
+      (window as any).Image = class {
+        set src(value: string) { loadedUrl = value; }
+      };
+      const cep = (window as any).__adobe_cep__;
+      const evaluate = cep.evalScript;
+      cep.evalScript = (script: string, callback: (result: string) => void) => {
+        if (script.includes('"inspectZoomTarget"')) {
+          callback(JSON.stringify({ ok: true, data: JSON.stringify({
+            sourceWidth: 100, sourceHeight: 100, previewPath: filename,
+            existingEntries: [], manualRect: null
+          }) }));
+        } else evaluate(script, callback);
+      };
+    });
+    try {
+      await panel.click('make-zoom-button');
+      assert.equal(loadedUrl, expected);
+    } finally {
+      await panel.window.happyDOM.close();
+    }
+  }
+});
+
+test('standalone zoom recovers a missed session event and ignores stale temporary sessions', async () => {
+  const oldSession = JSON.stringify({ data: null, settings: {}, timestamp: 1 });
+  const panel = await createPanel(undefined, true, 'http://localhost:3000/main/index.html#zoom-window', (window) => {
+    (window as any).require = (name: string) => {
+      if (name === 'os') return { tmpdir: () => 'D:/Temp' };
+      if (name === 'path') return { join: (...parts: string[]) => parts.join('/') };
+      if (name === 'fs') return {
+        existsSync: () => true,
+        readFileSync: () => oldSession
+      };
+      throw new Error(`Unexpected module: ${name}`);
+    };
+  });
+  try {
+    assert.ok(panel.window.document.querySelector('.zoom-loading'));
+    panel.window.localStorage.setItem('sci_zoom_session', JSON.stringify({
+      data: {
+        sourceWidth: 100, sourceHeight: 100, previewDataUrl: 'data:image/png;base64,preview',
+        existingEntries: [], manualRect: null
+      },
+      settings: { language: 'zh_CN' }, timestamp: 2
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    await panel.flush();
+    assert.ok(panel.window.document.querySelector('.zoom-modal-window'));
+    assert.equal(panel.window.document.documentElement.lang, 'zh-CN');
+    await panel.input('zoom-line-width', '4');
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    assert.equal((panel.element('zoom-line-width') as any).value, '4');
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 test('failed preview capture shows a dismissible translated error in the zoom dialog', async () => {
   const panel = await createPanel(JSON.stringify({ language: 'zh_CN' }), false, undefined, (window) => {
     const cep = (window as any).__adobe_cep__;

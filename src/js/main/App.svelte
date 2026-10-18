@@ -146,6 +146,7 @@
         const fresh = loadZoomSession();
         if (fresh) applySession(fresh);
       };
+      const sessionTimer = window.setInterval(onCepUpdate, 500);
       if (window.__adobe_cep__?.addEventListener) {
         window.__adobe_cep__.addEventListener(
           'com.achuan-2.illustrator_sci_toolbox.zoomSessionUpdate',
@@ -154,6 +155,7 @@
       }
 
       return () => {
+        window.clearInterval(sessionTimer);
         window.removeEventListener('storage', onStorage);
         window.removeEventListener('focus', onFocus);
         if (window.__adobe_cep__?.removeEventListener) {

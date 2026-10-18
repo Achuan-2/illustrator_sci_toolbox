@@ -390,7 +390,15 @@ export const actions = {
         }
       } catch {}
       if (!previewDataUrl) {
-        previewDataUrl = `file:///${data.previewPath.replace(/\\/g, '/')}`;
+        const path = data.previewPath.replace(/\\/g, '/');
+        const prefix = path.startsWith('//')
+          ? 'file:'
+          : path.startsWith('/')
+            ? 'file://'
+            : 'file:///';
+        previewDataUrl = encodeURI(prefix + path)
+          .replace(/#/g, '%23')
+          .replace(/\?/g, '%3F');
       }
     }
     if (!previewDataUrl) fail('errors.zoomCaptureFailed');

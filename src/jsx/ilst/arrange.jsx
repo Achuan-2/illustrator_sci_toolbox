@@ -2594,9 +2594,9 @@ function inspectZoomTarget() {
     var tempFile = new File(Folder.temp.fsName + "/sci_zoom_preview_" + (new Date().getTime()) + ".png");
     var capOpts = new ImageCaptureOptions();
     capOpts.antiAliasing = true;
-    // Screen preview only: bound the long edge instead of rasterizing large
-    // scientific images at a fixed DPI. Final zooms still duplicate the source.
-    capOpts.resolution = Math.max(1, Math.min(150, 1600 * 72 / Math.max(sWidth, sHeight)));
+    // Screen preview only: prefer a 1600px long edge within the host's
+    // supported 72-2400 PPI range. Final zooms still duplicate the source.
+    capOpts.resolution = Math.max(72, Math.min(150, 1600 * 72 / Math.max(sWidth, sHeight)));
     capOpts.transparency = true;
     var linkedPreview = getZoomLinkedPreview(sourceItem);
     if (!linkedPreview) {

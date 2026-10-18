@@ -157,6 +157,7 @@ export function saveZoomSession(
 }
 
 export function loadZoomSession(): ZoomSession | null {
+  let session: ZoomSession | null = null;
   try {
     const tmp = getTempFilePath();
     if (
@@ -167,7 +168,8 @@ export function loadZoomSession(): ZoomSession | null {
       const fs = win.require('fs');
       if (fs.existsSync(tmp)) {
         const content = fs.readFileSync(tmp, 'utf8');
-        return JSON.parse(content) as ZoomSession;
+        const stored = JSON.parse(content) as ZoomSession;
+        if (stored && Number.isFinite(stored.timestamp)) session = stored;
       }
     }
   } catch {
@@ -177,13 +179,19 @@ export function loadZoomSession(): ZoomSession | null {
   try {
     const item = localStorage.getItem(SESSION_KEY);
     if (item) {
-      return JSON.parse(item) as ZoomSession;
+      const stored = JSON.parse(item) as ZoomSession;
+      if (
+        stored &&
+        Number.isFinite(stored.timestamp) &&
+        (!session || stored.timestamp > session.timestamp)
+      )
+        session = stored;
     }
   } catch {
     // ignore
   }
 
-  return null;
+  return session;
 }
 
 export function closeZoomWindow(): void {

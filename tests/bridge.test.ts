@@ -132,7 +132,7 @@ test('bridge waits for initialization, serializes requests and continues after a
   assert.ok(calls[0].includes('D:/a b/extension/jsx/index.js'));
 });
 
-test('zoom preview bounds raster size for large images and retains detail for small images', () => {
+test('zoom preview respects the host minimum resolution and retains detail for small images', () => {
   for (const [width, height] of [[5000, 2500], [2500, 5000], [200, 100]]) {
     let captureOptions: { resolution: number } | undefined;
     const source = {
@@ -157,14 +157,23 @@ test('zoom preview bounds raster size for large images and retains detail for sm
       SaveOptions: { DONOTSAVECHANGES: 'no-save' },
       Folder: { temp: { fsName: 'D:/Temp' } },
       File: function (this: { fsName: string }, filename: string) { this.fsName = filename; },
-      ImageCaptureOptions: function () {}
+      ImageCaptureOptions: function (this: { resolution: number }) {
+        let resolution = 150;
+        Object.defineProperty(this, 'resolution', {
+          get: () => resolution,
+          set(value: number) {
+            if (value < 72 || value > 2400) throw new Error('Unsupported capture resolution');
+            resolution = value;
+          }
+        });
+      }
     });
     vm.runInContext(hostSource, context);
     const response = JSON.parse(context.$[hostNamespace].call('inspectZoomTarget', '%5B%5D'));
     assert.equal(response.ok, true);
     assert.ok(JSON.parse(response.data).previewPath.endsWith('.png'));
     assert.ok(captureOptions);
-    assert.ok(Math.max(width, height) * captureOptions.resolution / 72 <= 1600);
+    assert.equal(captureOptions.resolution, Math.max(72, Math.min(150, 1600 * 72 / Math.max(width, height))));
     if (width === 200) assert.equal(captureOptions.resolution, 150);
     assert.deepEqual(source.geometricBounds, [0, height, width, 0]);
     assert.equal(document.selection[0], source);
