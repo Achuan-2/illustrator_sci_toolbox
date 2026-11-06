@@ -998,6 +998,26 @@ test('zoom automatic update switch persists and gates background host polling', 
   }
 });
 
+test('editor notifications force fresh tracking without waiting for the polling timer', async () => {
+  const event = 'com.achuan-2.illustrator_sci_toolbox.zoomTrackingChanged';
+  const listeners = new Map<string, (event: unknown) => void>();
+  const panel = await createPanel(undefined, false, undefined, (window) => {
+    const cep = (window as any).__adobe_cep__;
+    cep.addEventListener = (type: string, listener: (event: unknown) => void) => listeners.set(type, listener);
+    cep.removeEventListener = (type: string) => listeners.delete(type);
+  });
+  try {
+    assert.ok(listeners.has(event));
+    listeners.get(event)!({});
+    await panel.flush();
+    const polls = panel.requests.filter((request) => request.operation === 'syncZoomTracker');
+    assert.ok(polls.length > 0, 'A notification wakes the initial timer immediately');
+    assert.deepEqual(polls.at(-1)!.args, [true], 'An editor confirmation cannot reuse the stale idle index');
+  } finally {
+    await panel.window.happyDOM.close();
+  }
+});
+
 test('hidden panels pause zoom and scalebar polling and resume when visible', async () => {
   let hidden = true;
   const panel = await createPanel(undefined, false, 'http://localhost:3000/main/index.html#scalebar', (window) => {

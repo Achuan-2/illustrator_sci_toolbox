@@ -83,7 +83,7 @@ export interface HostArguments {
   applyScalebar: [string];
   applyZoomImages: [string];
   cancelZoomTarget: [];
-  syncZoomTracker: [];
+  syncZoomTracker: [boolean?];
   inspectPseudocolorLayerTargets: [];
   cancelPseudocolorLayerTargets: [string];
   applyPseudocolorLayers: [string];

@@ -2245,6 +2245,7 @@ function findItemByTag(doc, name) {
 }
 
 function clearZoomSessionTags(doc) {
+    _zoomTrackingIndex = null;
     var tags = doc.tags, sessionTags = [];
     for (var i = 0, count = tags.length; i < count; i++) {
         var tag = tags[i];
@@ -2937,8 +2938,11 @@ var _zoomRedoHistory = [];
 var _zoomLastTrackingState = null;
 var _zoomHistoryPictures = {};
 var _zoomHistoryTag = "ILST_ZOOM_UNDO";
+var _zoomTrackingIndex = null;
+var _zoomNextDiscovery = 0;
 
 function resetZoomTrackingHistory() {
+    _zoomTrackingIndex = null;
     _zoomUndoHistory = [];
     _zoomRedoHistory = [];
     _zoomLastTrackingState = null;
@@ -3039,6 +3043,7 @@ function rebindZoomTrackingHistory(doc, index) {
         _zoomTrackedGroups.push(readZoomTrackingRecord(key, index.pictures[key], index.markers[key], record.zoom, record.value));
     }
     _zoomLastTrackingState = captureZoomTrackingState(index);
+    _zoomTrackingIndex = index;
 }
 
 function restoreZoomTrackingHistory(doc, index) {
@@ -3286,21 +3291,59 @@ function removeDeletedZoomAssociations(index) {
     return changed;
 }
 
-function syncZoomTracker() {
-    if (app.documents.length === 0) return sciError("errors.noDocument");
+function zoomTrackingHistoryChanged() {
+    // Undo can restore deleted associations while the cached index is empty.
+    // Its surviving anchor token must therefore be checked independently of
+    // cached geometry, before deciding that the document is still idle.
+    if (_zoomUndoHistory.length) {
+        var undo = _zoomUndoHistory[_zoomUndoHistory.length - 1];
+        if (getTag(undo.anchor, _zoomHistoryTag) !== undo.afterToken) return true;
+    }
+    if (_zoomRedoHistory.length) {
+        var redo = _zoomRedoHistory[_zoomRedoHistory.length - 1];
+        if (getTag(redo.anchor, _zoomHistoryTag) !== redo.beforeToken) return true;
+    }
+    return false;
+}
+
+function syncZoomTracker(forceRefresh) {
+    if (app.documents.length === 0) {
+        _zoomTrackingIndex = null;
+        return sciError("errors.noDocument");
+    }
     var doc = app.activeDocument;
     // The modeless editor owns updates until confirm/cancel clears its tags.
     // Background polling must not rewrite the artwork behind its preview.
     var docName = "";
     try { docName = doc.name; } catch (e) { return "OK"; }
-    var index = readCurrentZoomRecords(doc);
-    if (index.editing) return "OK";
     if (_zoomTrackedDocument !== doc || _zoomTrackedDocName !== docName) {
         _zoomTrackedDocument = doc;
         _zoomTrackedDocName = docName;
         _zoomTrackedGroups = [];
         resetZoomTrackingHistory();
     }
+    // Native Document.tags indexing grows with the entire artwork collection,
+    // even when very few items have tags. Reuse known references only for a
+    // read-only idle check; never write or restore history from a cached index.
+    // Periodic discovery also catches pasted/restored records and missed CEP
+    // notifications from the independent editor.
+    var now = new Date().getTime();
+    if (!forceRefresh && _zoomTrackingIndex && now < _zoomNextDiscovery) {
+        try {
+            if (_zoomTrackingIndex.editing) return "OK";
+            if (!zoomTrackingHistoryChanged() &&
+                sameZoomTrackingState(captureZoomTrackingState(_zoomTrackingIndex), _zoomLastTrackingState)) return "OK";
+        } catch (staleReference) {
+            // Deleted/replaced native handles require a fresh membership check.
+        }
+    }
+    var scanStart = new Date().getTime();
+    var index = readCurrentZoomRecords(doc);
+    _zoomTrackingIndex = index;
+    // Expensive documents get a longer discovery interval (at most 30 s).
+    var scanEnd = new Date().getTime();
+    _zoomNextDiscovery = scanEnd + Math.max(5000, Math.min(30000, (scanEnd - scanStart) * 19));
+    if (index.editing) return "OK";
     if (restoreZoomTrackingHistory(doc, index)) return "OK";
     var cached = {};
     for (var c = 0; c < _zoomTrackedGroups.length; c++) cached[_zoomTrackedGroups[c].key] = _zoomTrackedGroups[c];
@@ -3388,6 +3431,7 @@ function syncZoomTracker() {
     _zoomTrackedGroups = remaining;
     // Geometry changes keep these live references valid. Only deletion cleanup
     // invalidates membership and requires another native tag index.
-    recordZoomTrackingHistory(doc, beforeAuto, beforeUser, removedAssociations ? readCurrentZoomRecords(doc) : index);
+    _zoomTrackingIndex = removedAssociations ? readCurrentZoomRecords(doc) : index;
+    recordZoomTrackingHistory(doc, beforeAuto, beforeUser, _zoomTrackingIndex);
     return "OK";
 }

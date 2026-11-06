@@ -9,6 +9,7 @@ const hostSource = fs.readFileSync('dist/cep/jsx/index.js', 'utf8');
 // Model Illustrator's tag-name limit, inherited tags, nested clipping and
 // transforms about uncropped bounds. Pixel rendering needs the real host.
 function fixture(strokedPosition = false, undoSupport = false) {
+  let time = Date.now();
   const items: any[] = [];
   let transformCalls = 0;
   let selectionOrder: any[] = [];
@@ -306,6 +307,9 @@ function fixture(strokedPosition = false, undoSupport = false) {
   const forkHost = () => {
     const context = vm.createContext({
       $: {},
+      Date: class extends Date {
+        constructor() { super(time); }
+      },
       app: { documents: [document], activeDocument: document,
         ...(undoSupport ? { undo: nativeUndo, redo: nativeRedo } : {}) },
       RGBColor: function (this: any) {
@@ -335,7 +339,13 @@ function fixture(strokedPosition = false, undoSupport = false) {
       assert.equal(response.ok, true, response.error);
       return JSON.parse(response.data);
     };
-    return { reload, call, apply, inspect };
+    return {
+      reload, call, apply, inspect,
+      activateDocument(document: any) {
+        context.app.documents = document ? [document] : [];
+        context.app.activeDocument = document;
+      }
+    };
   };
   const find = (prefix: string, key: string) =>
     items.find((artwork) =>
@@ -349,6 +359,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
     forkHost,
     item,
     captures,
+    advanceTime(milliseconds: number) { time += milliseconds; },
     find,
     userEdit: commitNative,
     nativeUndo,
@@ -414,7 +425,7 @@ for (const hasZoom of [false, true]) {
     const previousPasses = tagPasses;
     const previousTransforms = host.transformCalls;
     for (let i = 0; i < 5; i++) assert.equal(host.call('syncZoomTracker').data, 'OK');
-    assert.equal(tagPasses - previousPasses, 5, 'Unchanged polls build only one tag index');
+    assert.equal(tagPasses - previousPasses, 0, 'Idle polls reuse known objects without rebuilding native tags');
     assert.equal(host.transformCalls, previousTransforms, 'Idle polls do not transform artwork');
     if (hasZoom) {
       host.source.translate(10, 0);
@@ -424,8 +435,37 @@ for (const hasZoom of [false, true]) {
       const marker = host.items.find((artwork) => artwork.tags.some((tag: any) => tag.name.startsWith('ILST_ZOOM_MARKER_')));
       assertBounds(marker.geometricBounds, [20, 90, 30, 80]);
     }
-  });
+});
 }
+
+test('idle discovery expires, supports explicit editor invalidation and survives closing or switching documents', () => {
+  const host = fixture();
+  const readTags = Object.getOwnPropertyDescriptor(host.document, 'tags')!.get!;
+  let scans = 0;
+  Object.defineProperty(host.document, 'tags', {
+    get() { scans++; return readTags.call(host.document); }
+  });
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assert.equal(scans, 1);
+  host.advanceTime(4999);
+  host.call('syncZoomTracker');
+  assert.equal(scans, 1);
+  host.advanceTime(2);
+  host.call('syncZoomTracker');
+  assert.equal(scans, 2, 'Missed notifications still have a bounded discovery fallback');
+  host.call('syncZoomTracker', [true]);
+  assert.equal(scans, 3, 'Editor notifications bypass the idle cache');
+  host.activateDocument(Object.create(host.document)); // Different native document, same name.
+  host.call('syncZoomTracker');
+  host.activateDocument(host.document);
+  host.call('syncZoomTracker');
+  assert.equal(scans, 5, 'Returning to a same-named document rebuilds membership');
+  host.activateDocument(null);
+  assert.equal(host.call('syncZoomTracker').error, 'errors.noDocument');
+  host.activateDocument(host.document);
+  host.call('syncZoomTracker');
+  assert.equal(scans, 6, 'Closing the last document invalidates the cache');
+});
 
 test('zoom editor session setup and cancellation do not scan unrelated artwork', () => {
   const host = fixture();
@@ -445,6 +485,20 @@ test('zoom editor session setup and cancellation do not scan unrelated artwork',
   assert.ok(source.tags.some((tag: any) => tag.name === 'ILST_ZOOM_ACTIVE_TARGET'));
   assert.equal(host.call('cancelZoomTarget').data, 'OK');
   assert.equal(source.tags.some((tag: any) => tag.name.startsWith('ILST_ZOOM_ACTIVE_')), false);
+});
+
+test('periodic discovery finds the first zoom when an independent editor notification is missed', () => {
+  const host = fixture();
+  host.call('syncZoomTracker'); // Cache an empty document before the editor opens.
+  const editor = host.forkHost();
+  editor.apply([entry(0)]);
+  const zoom = host.document.selection[0];
+  const key = zoom.tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
+  host.advanceTime(5001);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  host.source.translate(20, -10);
+  host.call('syncZoomTracker');
+  assertBounds(host.find('ILST_ZOOM_MARKER_', key).geometricBounds, [30, 80, 40, 70]);
 });
 
 function undoFixture() {
@@ -737,7 +791,7 @@ test('an already-running tracker discovers newly created zooms from another edit
   const zoom = host.document.selection[0];
   const mask = zoom.pageItems[0];
   const before = [...mask.geometricBounds];
-  host.call('syncZoomTracker');
+  host.call('syncZoomTracker', [true]); // Simulate the editor's CEP invalidation.
   otherSource.translate(30, -15);
   host.call('syncZoomTracker');
   assertBounds(mask.geometricBounds, before);

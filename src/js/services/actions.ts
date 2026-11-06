@@ -324,6 +324,17 @@ export function offsetWheel(
 
 // Timer ticks must not build up a host queue while preview capture is running.
 let zoomSyncPending: Promise<string | void> | undefined;
+let zoomRefreshRequested = false;
+
+function notifyZoomTrackingChange() {
+  try {
+    window.__adobe_cep__?.dispatchEvent?.({
+      type: 'com.achuan-2.illustrator_sci_toolbox.zoomTrackingChanged',
+      scope: 'APPLICATION',
+      data: ''
+    });
+  } catch {}
+}
 
 export const actions = {
   copyPosition: () => run(copyPosition),
@@ -361,6 +372,7 @@ export const actions = {
   addBorder: () => run(addBorder),
   inspectZoom: async () => {
     const resultStr = await bridge.call('inspectZoomTarget');
+    notifyZoomTrackingChange();
     let data: any;
     try {
       data = JSON.parse(resultStr);
@@ -417,18 +429,29 @@ export const actions = {
     deletedKeys: string[];
   }): Promise<void> => {
     await bridge.call('applyZoomImages', JSON.stringify(payload));
+    notifyZoomTrackingChange();
   },
   cancelZoomTarget: async (): Promise<void> => {
     await bridge.call('cancelZoomTarget').catch(() => {
       // Quiet background cleanup
     });
+    notifyZoomTrackingChange();
   },
-  syncZoom: () => {
+  syncZoom: (forceRefresh = false) => {
+    zoomRefreshRequested ||= forceRefresh;
     if (!get(settings).zoomAutoUpdate || !isPanelVisible()) return Promise.resolve();
     if (!zoomSyncPending) {
+      const refresh = zoomRefreshRequested;
+      zoomRefreshRequested = false;
       zoomSyncPending = bridge
-        .call('syncZoomTracker')
+        .callBackground('syncZoomTracker', refresh)
+        .then((result) => {
+          // A foreground command took priority; retry invalidation next time.
+          if (result === undefined) zoomRefreshRequested ||= refresh;
+          return result;
+        })
         .catch(() => {
+          zoomRefreshRequested ||= refresh;
           // Quiet background sync
         })
         .finally(() => {

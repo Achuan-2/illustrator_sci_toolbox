@@ -117,6 +117,7 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
                 path.filled=false;path.stroked=false;created++;
             }
             measure("emptyZoom/current",function(){sync(current);},20);
+            measure("emptyZoomDiscovery/current",function(){assert(current.sync(true)==="OK","Forced discovery failed");},5);
             if(!config.skipLegacy) measure("emptyZoom/beforeOptimization",function(){sync(legacy);},5);
         }
         // The fixture remains in this disposable document throughout the test.
@@ -145,6 +146,8 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
         measure("oneZoomMove/current",function(){source.translate(1,0);sync(current);},10);
         createZooms(20);
         measure("manyZoomsIdle/current",function(){sync(current);},20);
+        if(!config.skipLegacy) measure("manyZoomsIdle/beforeOptimization",function(){sync(legacy);},20);
+        measure("manyZoomsDiscovery/current",function(){assert(current.sync(true)==="OK","Forced discovery failed");},5);
         measure("manyZoomsIndex/current",function(){current.index(doc);},20);
         var profilingIndex=current.index(doc);
         measure("manyZoomsSnapshot/current",function(){current.state(profilingIndex);},20);

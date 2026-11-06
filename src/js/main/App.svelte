@@ -32,6 +32,7 @@
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import AboutPanel from '../components/AboutPanel.svelte';
   import { actions } from '../services/actions';
+  import { startBackgroundPolling } from '../services/backgroundPolling';
 
   const standaloneZoom = isZoomWindow();
 
@@ -169,16 +170,25 @@
     }
 
     readHash();
-    let syncTimer: number | undefined;
+    let syncPoller: ReturnType<typeof startBackgroundPolling> | undefined;
+    let refreshZoom = false;
     let disposed = false;
     const onSettingsUpdate = () => {
       const freshSettings = readSettings(localStorage);
       settings.set(freshSettings);
     };
+    const onZoomTrackingChange = () => {
+      refreshZoom = true;
+      syncPoller?.refresh();
+    };
     if (window.__adobe_cep__?.addEventListener) {
       window.__adobe_cep__.addEventListener(
         'com.achuan-2.illustrator_sci_toolbox.settingsUpdate',
         onSettingsUpdate
+      );
+      window.__adobe_cep__.addEventListener(
+        'com.achuan-2.illustrator_sci_toolbox.zoomTrackingChanged',
+        onZoomTrackingChange
       );
     }
     if (window.__adobe_cep__) {
@@ -186,19 +196,25 @@
         .initialize()
         .then(() => {
           if (disposed) return;
-          syncTimer = window.setInterval(() => {
-            void actions.syncZoom();
-          }, 400);
+          syncPoller = startBackgroundPolling(() => {
+            const force = refreshZoom;
+            refreshZoom = false;
+            return actions.syncZoom(force);
+          });
         })
         .catch((error) => console.error('Host initialization failed', error));
     }
     return () => {
       disposed = true;
-      if (syncTimer) clearInterval(syncTimer);
+      syncPoller?.dispose();
       if (window.__adobe_cep__?.removeEventListener) {
         window.__adobe_cep__.removeEventListener(
           'com.achuan-2.illustrator_sci_toolbox.settingsUpdate',
           onSettingsUpdate
+        );
+        window.__adobe_cep__.removeEventListener(
+          'com.achuan-2.illustrator_sci_toolbox.zoomTrackingChanged',
+          onZoomTrackingChange
         );
       }
       dispose();

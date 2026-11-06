@@ -132,6 +132,35 @@ test('bridge waits for initialization, serializes requests and continues after a
   assert.ok(calls[0].includes('D:/a b/extension/jsx/index.js'));
 });
 
+test('background polling yields to queued user operations and releases its slot after errors', async () => {
+  const operations: string[] = [];
+  let complete: (result: string) => void = () => assert.fail('No active request');
+  const bridge = createBridge({
+    getSystemPath: () => 'D:/plugin',
+    evalScript(script, callback) {
+      if (script.includes('$.evalFile')) return callback('SCI_READY');
+      operations.push(script);
+      complete = callback;
+    }
+  });
+  await bridge.initialize();
+  const first = bridge.call('copySize');
+  const second = bridge.call('copySize');
+  assert.equal(await bridge.callBackground('syncZoomTracker'), undefined);
+  await new Promise((resolve) => setImmediate(resolve));
+  complete(JSON.stringify({ ok: true, data: 'size' }));
+  await first;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(await bridge.callBackground('inspectScalebar', ''), undefined);
+  complete(JSON.stringify({ ok: false, error: 'errors.noDocument', args: [] }));
+  await assert.rejects(second);
+  const background = bridge.callBackground('syncZoomTracker');
+  await new Promise((resolve) => setImmediate(resolve));
+  complete(JSON.stringify({ ok: true, data: 'OK' }));
+  assert.equal(await background, 'OK');
+  assert.equal(operations.length, 3, 'Skipped background reads never enter the native queue');
+});
+
 test('zoom preview respects the host minimum resolution and retains detail for small images', () => {
   for (const [width, height] of [[5000, 2500], [2500, 5000], [200, 100]]) {
     let captureOptions: { resolution: number } | undefined;

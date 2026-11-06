@@ -3,6 +3,7 @@
   import { t } from '../i18n';
   import { bridge, HostError } from '../services/bridge';
   import { isPanelVisible } from '../services/cep';
+  import { startBackgroundPolling } from '../services/backgroundPolling';
   import { settings } from '../stores/settings';
   import {
     defaultScalebar,
@@ -68,9 +69,11 @@
     if (inspecting || !isPanelVisible()) return;
     inspecting = true;
     try {
-      const result: ScalebarInspection | null = JSON.parse(
-        await bridge.call('inspectScalebar', force ? '' : signature)
-      );
+      const response = force
+        ? await bridge.call('inspectScalebar', '')
+        : await bridge.callBackground('inspectScalebar', signature);
+      if (response === undefined) return;
+      const result: ScalebarInspection | null = JSON.parse(response);
       if (!result) return;
       // The pending snapshot belongs to the previous image, not the new form.
       void flushSave();
@@ -214,11 +217,9 @@
       untrack(() => {
         void inspect(true);
       });
-      const timer = setInterval(() => {
-        void inspect();
-      }, 350);
+      const poller = startBackgroundPolling(() => inspect(), 350);
       return () => {
-        clearInterval(timer);
+        poller.dispose();
         void flushSave();
       };
     }

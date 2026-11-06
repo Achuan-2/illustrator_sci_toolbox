@@ -13,7 +13,12 @@ export interface CepAdapter {
   getExtensions?(): string;
   requestOpenExtension?(extensionId: string, params?: string): void;
   closeExtension?(): void;
-  dispatchEvent?(event: { type: string; scope: string; data: string; [key: string]: unknown }): void;
+  dispatchEvent?(event: {
+    type: string;
+    scope: string;
+    data: string;
+    [key: string]: unknown;
+  }): void;
   addEventListener?(type: string, listener: (event: unknown) => void): void;
   removeEventListener?(type: string, listener: (event: unknown) => void): void;
 }
@@ -38,6 +43,7 @@ export function extensionPath(cep: CepAdapter): string {
 export function createBridge(cep: CepAdapter | undefined) {
   let initialization: Promise<void> | undefined;
   let queue: Promise<unknown> = Promise.resolve();
+  let pending = 0;
 
   const evaluate = (script: string) =>
     new Promise<string>((resolve, reject) => {
@@ -73,26 +79,39 @@ export function createBridge(cep: CepAdapter | undefined) {
 
   return {
     initialize,
+    /** Background reads must not wait behind user commands in the host queue. */
+    callBackground<K extends HostOperation>(
+      operation: K,
+      ...args: HostArguments[K]
+    ): Promise<string | undefined> {
+      if (pending) return Promise.resolve(undefined);
+      return this.call(operation, ...args);
+    },
     call<K extends HostOperation>(
       operation: K,
       ...args: HostArguments[K]
     ): Promise<string> {
-      const request = queue.then(async () => {
-        await initialize();
-        // Payload cannot introduce executable code, even with quotes or backslashes.
-        const payload = encodeURIComponent(JSON.stringify(args));
-        const result = await evaluate(
-          `$[${JSON.stringify(hostNamespace)}].call(${JSON.stringify(operation)}, ${JSON.stringify(payload)})`
-        );
-        let response: HostResponse;
-        try {
-          response = JSON.parse(result);
-        } catch {
-          throw new HostError('errors.script');
-        }
-        if (!response.ok) throw new HostError(response.error, response.args);
-        return response.data;
-      });
+      pending++;
+      const request = queue
+        .then(async () => {
+          await initialize();
+          // Payload cannot introduce executable code, even with quotes or backslashes.
+          const payload = encodeURIComponent(JSON.stringify(args));
+          const result = await evaluate(
+            `$[${JSON.stringify(hostNamespace)}].call(${JSON.stringify(operation)}, ${JSON.stringify(payload)})`
+          );
+          let response: HostResponse;
+          try {
+            response = JSON.parse(result);
+          } catch {
+            throw new HostError('errors.script');
+          }
+          if (!response.ok) throw new HostError(response.error, response.args);
+          return response.data;
+        })
+        .finally(() => {
+          pending--;
+        });
       queue = request.catch(() => undefined);
       return request;
     }
