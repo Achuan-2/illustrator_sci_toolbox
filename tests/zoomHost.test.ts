@@ -438,14 +438,14 @@ for (const hasZoom of [false, true]) {
 });
 }
 
-test('idle discovery expires, supports explicit editor invalidation and survives closing or switching documents', () => {
-  const host = fixture();
+test('documents with zooms retain periodic discovery, explicit invalidation and document lifecycle checks', () => {
+  const { host } = trackedFixture();
   const readTags = Object.getOwnPropertyDescriptor(host.document, 'tags')!.get!;
   let scans = 0;
   Object.defineProperty(host.document, 'tags', {
     get() { scans++; return readTags.call(host.document); }
   });
-  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assert.equal(host.call('syncZoomTracker', [true]).data, 'OK');
   assert.equal(scans, 1);
   host.advanceTime(4999);
   host.call('syncZoomTracker');
@@ -465,6 +465,22 @@ test('idle discovery expires, supports explicit editor invalidation and survives
   host.activateDocument(host.document);
   host.call('syncZoomTracker');
   assert.equal(scans, 6, 'Closing the last document invalidates the cache');
+});
+
+test('documents without zooms never rescan tags or artwork after initial detection', () => {
+  const host = fixture();
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  const transforms = host.transformCalls;
+  for (const name of ['tags', 'pageItems']) {
+    Object.defineProperty(host.document, name, {
+      get() { throw new Error(`An unused zoom feature must not access document.${name}`); }
+    });
+  }
+  for (const elapsed of [5001, 30001, 3600000, 86400000]) {
+    host.advanceTime(elapsed);
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+  }
+  assert.equal(host.transformCalls, transforms);
 });
 
 test('zoom editor session setup and cancellation do not scan unrelated artwork', () => {
@@ -487,15 +503,15 @@ test('zoom editor session setup and cancellation do not scan unrelated artwork',
   assert.equal(source.tags.some((tag: any) => tag.name.startsWith('ILST_ZOOM_ACTIVE_')), false);
 });
 
-test('periodic discovery finds the first zoom when an independent editor notification is missed', () => {
+test('an editor notification wakes an empty document after the first zoom is created', () => {
   const host = fixture();
   host.call('syncZoomTracker'); // Cache an empty document before the editor opens.
   const editor = host.forkHost();
   editor.apply([entry(0)]);
   const zoom = host.document.selection[0];
   const key = zoom.tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
-  host.advanceTime(5001);
-  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  host.advanceTime(86400000);
+  assert.equal(host.call('syncZoomTracker', [true]).data, 'OK');
   host.source.translate(20, -10);
   host.call('syncZoomTracker');
   assertBounds(host.find('ILST_ZOOM_MARKER_', key).geometricBounds, [30, 80, 40, 70]);
@@ -562,8 +578,17 @@ test('undoing zoom deletion revives document associations instead of deleting th
   host.userEdit(() => host.find('ILST_ZOOM_ITEM_', key).remove());
   host.call('syncZoomTracker');
   const deleted = snapshot();
+  const readTags = Object.getOwnPropertyDescriptor(host.document, 'tags')!.get!;
+  let scans = 0;
+  Object.defineProperty(host.document, 'tags', {
+    get() { scans++; return readTags.call(host.document); }
+  });
+  host.advanceTime(86400000);
+  host.call('syncZoomTracker');
+  assert.equal(scans, 0, 'Deleting the last zoom parks document scanning indefinitely');
   host.nativeUndo();
   host.call('syncZoomTracker');
+  assert.ok(scans > 0, 'A restored history anchor wakes discovery without periodic scans');
   assert.deepEqual(snapshot(), before);
   for (let i = 0; i < 3; i++) host.call('syncZoomTracker');
   host.nativeRedo();

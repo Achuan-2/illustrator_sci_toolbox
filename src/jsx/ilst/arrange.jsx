@@ -3230,7 +3230,7 @@ function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
 }
 
 function readCurrentZoomRecords(doc) {
-    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [], document: doc, editing: false };
+    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [], document: doc, editing: false, hasRecords: false };
     // Document.tags includes nested artwork. Scanning its live parents avoids
     // visiting thousands of unrelated paths on every 400 ms background poll,
     // while still detecting replacements and objects restored by native undo.
@@ -3245,6 +3245,7 @@ function readCurrentZoomRecords(doc) {
             index.editing = true;
         } else if (name.indexOf("ILST_ZOOM_ITEM_") === 0) {
             index.records[name.substring(15)] = { zoom: item, value: tag.value };
+            index.hasRecords = true;
         } else if (name.indexOf("ILST_ZOOM_SRC_") === 0) {
             index.pictures[name.substring(14)] = item;
             index.keys[name.substring(14)] = true;
@@ -3325,14 +3326,19 @@ function syncZoomTracker(forceRefresh) {
     // Native Document.tags indexing grows with the entire artwork collection,
     // even when very few items have tags. Reuse known references only for a
     // read-only idle check; never write or restore history from a cached index.
-    // Periodic discovery also catches pasted/restored records and missed CEP
-    // notifications from the independent editor.
+    // Documents with zooms keep periodic discovery for pasted/restored records.
+    // An empty document stays parked until an editor notification, document
+    // switch or script reload. Its surviving undo anchor can still wake it.
     var now = new Date().getTime();
-    if (!forceRefresh && _zoomTrackingIndex && now < _zoomNextDiscovery) {
+    if (!forceRefresh && _zoomTrackingIndex) {
         try {
-            if (_zoomTrackingIndex.editing) return "OK";
-            if (!zoomTrackingHistoryChanged() &&
-                sameZoomTrackingState(captureZoomTrackingState(_zoomTrackingIndex), _zoomLastTrackingState)) return "OK";
+            var historyChanged = zoomTrackingHistoryChanged();
+            if (!_zoomTrackingIndex.editing && !_zoomTrackingIndex.hasRecords && !historyChanged) return "OK";
+            if (now < _zoomNextDiscovery) {
+                if (_zoomTrackingIndex.editing) return "OK";
+                if (!historyChanged &&
+                    sameZoomTrackingState(captureZoomTrackingState(_zoomTrackingIndex), _zoomLastTrackingState)) return "OK";
+            }
         } catch (staleReference) {
             // Deleted/replaced native handles require a fresh membership check.
         }
