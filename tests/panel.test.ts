@@ -117,7 +117,7 @@ test('hover explanations wait, dismiss, update translations and add no buttons',
     assert.equal(panel.window.document.querySelector('.help-action'), null);
     const control = panel.element('reverse-move-checkbox') as unknown as HTMLInputElement;
     const checked = control.checked;
-    const hostCalls = () => panel.requests.filter((request) => request.operation !== 'syncZoomTracker');
+    const hostCalls = () => panel.requests.filter((request) => request.operation !== 'syncSelectedZoomTracker');
     const requests = hostCalls().length;
     const pause = (ms = 220) => new Promise((resolve) => setTimeout(resolve, ms));
     const popup = () => panel.window.document.querySelector('.sci-tooltip');
@@ -680,7 +680,7 @@ async function createPanel(
                     showText: true, fontColor: '#ff0000', fontSize: 12, bold: true, position: 'BL', autoGroup: true }
                 }),
                 applyScalebar: 'OK',
-                syncZoomTracker: 'OK'
+                syncSelectedZoomTracker: 'OK'
               };
               if (operation === 'inspectScalebar') {
                 const selection = (window as any).__scaleSelection;
@@ -983,10 +983,10 @@ test('zoom automatic update switch persists and gates background host polling', 
     assert.equal(JSON.parse(panel.window.localStorage.getItem(storageKey)!).zoomAutoUpdate, false);
     const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
     await pause();
-    assert.equal(panel.requests.filter((request) => request.operation === 'syncZoomTracker').length, 0);
+    assert.equal(panel.requests.filter((request) => request.operation === 'syncSelectedZoomTracker').length, 0);
     await panel.click(control.id);
     await pause();
-    assert.ok(panel.requests.some((request) => request.operation === 'syncZoomTracker'));
+    assert.ok(panel.requests.some((request) => request.operation === 'syncSelectedZoomTracker'));
     await panel.click(control.id);
     const count = panel.requests.length;
     await pause();
@@ -998,7 +998,7 @@ test('zoom automatic update switch persists and gates background host polling', 
   }
 });
 
-test('editor notifications force fresh tracking without waiting for the polling timer', async () => {
+test('editor notifications invalidate selection tracking without waiting for the polling timer', async () => {
   const event = 'com.achuan-2.illustrator_sci_toolbox.zoomTrackingChanged';
   const listeners = new Map<string, (event: unknown) => void>();
   const panel = await createPanel(undefined, false, undefined, (window) => {
@@ -1010,9 +1010,9 @@ test('editor notifications force fresh tracking without waiting for the polling 
     assert.ok(listeners.has(event));
     listeners.get(event)!({});
     await panel.flush();
-    const polls = panel.requests.filter((request) => request.operation === 'syncZoomTracker');
+    const polls = panel.requests.filter((request) => request.operation === 'syncSelectedZoomTracker');
     assert.ok(polls.length > 0, 'A notification wakes the initial timer immediately');
-    assert.deepEqual(polls.at(-1)!.args, [true], 'An editor confirmation cannot reuse the stale idle index');
+    assert.deepEqual(polls.at(-1)!.args, [true], 'An editor confirmation invalidates the old selection baseline');
   } finally {
     await panel.window.happyDOM.close();
   }
@@ -1024,14 +1024,14 @@ test('hidden panels pause zoom and scalebar polling and resume when visible', as
     Object.defineProperty(window.document, 'hidden', { get: () => hidden });
   });
   const polls = () => panel.requests.filter((request) =>
-    request.operation === 'syncZoomTracker' || request.operation === 'inspectScalebar');
+    request.operation === 'syncSelectedZoomTracker' || request.operation === 'inspectScalebar');
   const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
   try {
     await pause();
     assert.equal(polls().length, 0);
     hidden = false;
     await pause();
-    assert.ok(polls().some((request) => request.operation === 'syncZoomTracker'));
+    assert.ok(polls().some((request) => request.operation === 'syncSelectedZoomTracker'));
     assert.ok(polls().some((request) => request.operation === 'inspectScalebar'));
     hidden = true;
     const count = polls().length;
@@ -1051,12 +1051,12 @@ test('CEP-collapsed panels pause polling even when the web document stays visibl
     };
   });
   const polls = () => panel.requests.filter((request) =>
-    request.operation === 'syncZoomTracker' || request.operation === 'inspectScalebar');
+    request.operation === 'syncSelectedZoomTracker' || request.operation === 'inspectScalebar');
   const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
   try {
     await pause(); assert.equal(polls().length, 0);
     visible = 'true'; await pause();
-    assert.ok(polls().some((request) => request.operation === 'syncZoomTracker'));
+    assert.ok(polls().some((request) => request.operation === 'syncSelectedZoomTracker'));
     assert.ok(polls().some((request) => request.operation === 'inspectScalebar'));
     visible = 'false'; const count = polls().length;
     await pause(); assert.equal(polls().length, count);

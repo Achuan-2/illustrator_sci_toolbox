@@ -32,7 +32,7 @@
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import AboutPanel from '../components/AboutPanel.svelte';
   import { actions } from '../services/actions';
-  import { startBackgroundPolling } from '../services/backgroundPolling';
+  import { startZoomTracking } from '../services/zoomTracking';
 
   const standaloneZoom = isZoomWindow();
 
@@ -170,7 +170,7 @@
     }
 
     readHash();
-    let syncPoller: ReturnType<typeof startBackgroundPolling> | undefined;
+    let syncPoller: ReturnType<typeof startZoomTracking> | undefined;
     let refreshZoom = false;
     let disposed = false;
     const onSettingsUpdate = () => {
@@ -196,8 +196,8 @@
         .initialize()
         .then(() => {
           if (disposed) return;
-          syncPoller = startBackgroundPolling(() => {
-            const force = refreshZoom;
+          syncPoller = startZoomTracking(window.__adobe_cep__!, (invalidate) => {
+            const force = refreshZoom || invalidate;
             refreshZoom = false;
             return actions.syncZoom(force);
           });

@@ -3399,6 +3399,130 @@ function zoomTrackingHistoryChanged() {
     return false;
 }
 
+// Selection checks never discover a document. Remember only tagged selection
+// owners (including the owner of a directly selected clipping child). Discovery
+// is deferred until one of those objects actually changes.
+var _zoomSelectionDocument = null;
+var _zoomSelectionRows = [];
+var _zoomSelectionNeedsBaseline = true;
+
+function selectedZoomRows(doc) {
+    var rows = [], selection = doc.selection;
+    if (!selection || typeof selection.length !== "number") return rows;
+    for (var s = 0; s < selection.length; s++) {
+        var item = selection[s];
+        // The scalebar tool selects its wrapper; the source keeps the zoom tags.
+        try { item = scaleWrapperPicture(item); } catch (invalidWrapper) { continue; }
+        for (var depth = 0; item && depth < 100; depth++) {
+            try {
+                if (item.typename === "Layer" || item.typename === "Document") break;
+                var names = [], values = {}, tags = item.tags;
+                for (var t = 0; tags && t < tags.length; t++) {
+                    var name = tags[t].name;
+                    if (/^ILST_ZOOM_(SRC_|MARKER_|ITEM_)/.test(name)) {
+                        names.push(name);
+                        values[name] = tags[t].value;
+                    }
+                }
+                if (names.length) {
+                    var found = false;
+                    for (var r = 0; r < rows.length; r++) if (sameZoomNativeObject(rows[r].item, item)) found = true;
+                    if (!found) {
+                        var bounds = getVisibleBounds(item) || item.geometricBounds;
+                        var duplicate = null;
+                        for (var n = 0; n < names.length; n++) {
+                            if (names[n].indexOf("ILST_ZOOM_ITEM_") !== 0) continue;
+                            for (var c = 0; c < item.pageItems.length; c++) {
+                                if (item.pageItems[c].typename !== "PathItem") duplicate = zoomHistoryBounds(item.pageItems[c]);
+                            }
+                        }
+                        rows.push({ item: item, names: names, values: values, duplicate: duplicate,
+                            bounds: [bounds[0], bounds[1], bounds[2], bounds[3]] });
+                    }
+                }
+                item = item.parent;
+            } catch (invalidSelection) { break; }
+        }
+    }
+    return rows;
+}
+
+function syncSelectedZoomTracker(invalidate) {
+    if (!app.documents.length) {
+        _zoomSelectionDocument = null;
+        _zoomSelectionRows = [];
+        _zoomSelectionNeedsBaseline = true;
+        _zoomDocumentRegistries = [];
+        return "OK";
+    }
+    var doc = app.activeDocument;
+    if (!sameZoomNativeObject(doc, _zoomSelectionDocument) || invalidate) {
+        _zoomSelectionDocument = doc;
+        _zoomSelectionRows = [];
+        _zoomSelectionNeedsBaseline = true;
+        if (invalidate) invalidateZoomDocumentRegistry(doc);
+    }
+    var changed = false;
+    for (var r = 0; r < _zoomSelectionRows.length; r++) {
+        try {
+            var row = _zoomSelectionRows[r];
+            if (!row.item.typename || zoomBoundsChanged(getVisibleBounds(row.item) || row.item.geometricBounds, row.bounds)) changed = true;
+        } catch (deletedSelection) { changed = true; }
+    }
+    if (!_zoomSelectionNeedsBaseline && zoomTrackingHistoryChanged()) changed = true;
+    if (changed) {
+        if (_zoomSelectionNeedsBaseline) {
+            _zoomTrackedDocument = doc;
+            _zoomTrackedDocName = doc.name;
+            resetZoomTrackingHistory();
+            var index = readCurrentZoomRecords(doc, false);
+            if (index.editing) {
+                _zoomSelectionRows = selectedZoomRows(doc);
+                return "OK";
+            }
+            rebindZoomTrackingHistory(doc, index);
+            // Bind without rewriting guides on selection/open. Restore the
+            // selected object's pre-gesture bounds for the first real edit.
+            for (var g = 0; g < _zoomTrackedGroups.length; g++) {
+                var group = _zoomTrackedGroups[g];
+                for (var r = 0; r < _zoomSelectionRows.length; r++) {
+                    var row = _zoomSelectionRows[r];
+                    if (sameZoomNativeObject(row.item, group.picture)) group.lastPBounds = row.bounds;
+                    if (sameZoomNativeObject(row.item, group.marker)) group.lastMBounds = row.bounds;
+                    if (sameZoomNativeObject(row.item, group.zoom)) group.lastZBounds = row.bounds;
+                }
+                group.relRegion = relativeZoomBounds(group.lastMBounds, group.lastPBounds);
+            }
+            var beforeUser = captureZoomTrackingState(index);
+            for (var r = 0; r < _zoomSelectionRows.length; r++) {
+                var row = _zoomSelectionRows[r];
+                for (var n = 0; n < row.names.length; n++) {
+                    var name = row.names[n], field, key;
+                    if (name.indexOf("ILST_ZOOM_SRC_") === 0) { field = "picture"; key = name.substring(14); }
+                    else if (name.indexOf("ILST_ZOOM_MARKER_") === 0) { field = "marker"; key = name.substring(17); }
+                    else { field = "zoom"; key = name.substring(15); }
+                    if (!beforeUser[key]) continue;
+                    beforeUser[key][field] = row.bounds;
+                    if (field === "picture") beforeUser[key].sourceTag = row.values[name];
+                    if (field === "zoom") {
+                        beforeUser[key].duplicate = row.duplicate;
+                        beforeUser[key].recordValue = row.values[name];
+                    }
+                }
+            }
+            _zoomLastTrackingState = beforeUser;
+            // Bypass the parked-empty shortcut when the first edit deleted the
+            // only zoom. Membership is still validated before any writes.
+            _zoomTrackingIndex = null;
+            _zoomSelectionNeedsBaseline = false;
+        }
+        syncZoomTracker(false);
+    }
+    // Also flush an edit whose selection disappeared (delete/deselect).
+    _zoomSelectionRows = selectedZoomRows(doc);
+    return "OK";
+}
+
 function syncZoomTracker(forceRefresh) {
     if (app.documents.length === 0) {
         _zoomTrackingIndex = null;

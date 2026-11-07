@@ -24,6 +24,7 @@ declare function inspectZoomTarget(...args: unknown[]): string;
 declare function applyZoomImages(...args: unknown[]): string;
 declare function cancelZoomTarget(...args: unknown[]): string;
 declare function syncZoomTracker(...args: unknown[]): string;
+declare function syncSelectedZoomTracker(...args: unknown[]): string;
 declare function applyPaletteFill(...args: unknown[]): string;
 declare function inspectPseudocolorLayerTargets(...args: unknown[]): string;
 declare function cancelPseudocolorLayerTargets(...args: unknown[]): string;
@@ -54,6 +55,7 @@ var methods: Record<string, (...args: unknown[]) => string> = {
   applyZoomImages: applyZoomImages,
   cancelZoomTarget: cancelZoomTarget,
   syncZoomTracker: syncZoomTracker,
+  syncSelectedZoomTracker: syncSelectedZoomTracker,
   applyPaletteFill: applyPaletteFill,
   inspectPseudocolorLayerTargets: inspectPseudocolorLayerTargets,
   cancelPseudocolorLayerTargets: cancelPseudocolorLayerTargets,

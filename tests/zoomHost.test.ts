@@ -420,6 +420,132 @@ function trackedFixture(count = 1, uuidSupport = false) {
   return { host, records };
 }
 
+test('opening, selecting and idling never discover zooms or rewrite artwork', () => {
+  const { host, records: [{ zoom }] } = trackedFixture(1, true);
+  const reader = host.forkHost();
+  for (const name of ['tags', 'pageItems']) {
+    Object.defineProperty(host.document, name, {
+      get() { throw new Error(`Selection checks must not enumerate document.${name}`); }
+    });
+  }
+  const transforms = host.transformCalls;
+  for (const selection of [[], [host.source], [zoom], [host.item('PathItem', 0, 0, 10, 10)]]) {
+    host.document.selection = selection;
+    for (let i = 0; i < 3; i++) {
+      host.advanceTime(60000);
+      assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    }
+  }
+  assert.equal(host.transformCalls, transforms);
+  assert.equal(host.uuidLookups, 0);
+});
+
+for (const target of ['source', 'marker', 'zoom child'] as const) {
+  test(`first actual ${target} edit discovers and updates the relation`, () => {
+    const { host, records: [{ zoom, marker, mask }] } = trackedFixture(1, true);
+    const reader = host.forkHost();
+    const selected = target === 'source' ? host.source : target === 'marker' ? marker : mask;
+    host.document.selection = [selected];
+    const beforeMarker = [...marker.geometricBounds];
+    const beforeOutput = [...mask.geometricBounds];
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    (target === 'zoom child' ? zoom : selected).translate(10, 0);
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    if (target === 'source') {
+      assertBounds(marker.geometricBounds, beforeMarker.map((v, i) => i % 2 === 0 ? v + 10 : v));
+      assertBounds(mask.geometricBounds, beforeOutput);
+    } else if (target === 'marker') {
+      assertBounds(mask.geometricBounds, beforeOutput);
+      assert.ok(host.transformCalls > 0);
+    } else {
+      assertBounds(mask.geometricBounds, beforeOutput.map((v, i) => i % 2 === 0 ? v + 10 : v));
+    }
+    const calls = host.transformCalls;
+    for (let i = 0; i < 3; i++) assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    assert.equal(host.transformCalls, calls, 'An update event cannot trigger a geometry feedback loop');
+  });
+}
+
+test('deselecting after a source edit flushes it, then ordinary edits never scan known zooms', () => {
+  const { host, records: [{ marker }] } = trackedFixture(1, true);
+  const reader = host.forkHost();
+  host.document.selection = [host.source];
+  reader.call('syncSelectedZoomTracker');
+  const before = marker.geometricBounds[0];
+  host.source.translate(15, 0);
+  host.document.selection = [];
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  assert.equal(marker.geometricBounds[0], before + 15);
+  const lookups = host.uuidLookups;
+  Object.defineProperty(host.document, 'tags', { get() { throw new Error('No document discovery'); } });
+  const ordinary = host.item('PathItem', 0, 0, 10, 10);
+  host.document.selection = [ordinary];
+  for (let i = 0; i < 3; i++) {
+    ordinary.translate(1, 0);
+    host.advanceTime(60000);
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  }
+  assert.equal(host.uuidLookups, lookups);
+});
+
+test('deleting a selected zoom cleans its association on the final selection event', () => {
+  const { host, records: [{ zoom, key }] } = trackedFixture();
+  const reader = host.forkHost();
+  host.document.selection = [zoom];
+  reader.call('syncSelectedZoomTracker');
+  zoom.remove();
+  host.document.selection = [];
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  assert.equal(host.find('ILST_ZOOM_MARKER_', key), undefined);
+  assert.equal(host.source.tags.some((tag: any) => tag.name === 'ILST_ZOOM_SRC_' + key), false);
+});
+
+test('editor invalidation records a new baseline without refreshing the document', () => {
+  const { host } = trackedFixture(1, true);
+  const reader = host.forkHost();
+  host.document.selection = [host.source];
+  reader.call('syncSelectedZoomTracker');
+  host.source.translate(8, 0);
+  Object.defineProperty(host.document, 'tags', { get() { throw new Error('Invalidation is not discovery'); } });
+  assert.equal(reader.call('syncSelectedZoomTracker', [true]).data, 'OK');
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+});
+
+test('selecting the scalebar wrapper observes its tagged source without document discovery', () => {
+  const { host, records: [{ marker }] } = trackedFixture(1, true);
+  const reader = host.forkHost();
+  const wrapper = host.item('GroupItem', 0, 0, 0, 0);
+  Object.assign(wrapper.tags.add(), { name: 'SCI_SCALE_WRAPPER', value: '1' });
+  host.source.moveToBeginning(wrapper);
+  host.document.selection = [wrapper];
+  const before = [...marker.geometricBounds];
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  wrapper.translate(12, 0);
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  assertBounds(marker.geometricBounds, before.map((v, i) => i % 2 === 0 ? v + 12 : v));
+});
+
+test('switching documents only records a selection baseline and reuses registered UUIDs on return', () => {
+  const first = trackedFixture(1, true);
+  const second = trackedFixture(1, true);
+  const reader = first.host.forkHost();
+  first.host.document.selection = [first.host.source];
+  reader.call('syncSelectedZoomTracker');
+  first.host.source.translate(2, 0);
+  reader.call('syncSelectedZoomTracker');
+  const markerBefore = [...first.records[0].marker.geometricBounds];
+  for (const host of [first.host, second.host]) {
+    Object.defineProperty(host.document, 'tags', { get() { throw new Error('Document switch must not scan'); } });
+  }
+  reader.activateDocument(second.host.document, [first.host.document, second.host.document]);
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  reader.activateDocument(first.host.document, [first.host.document, second.host.document]);
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  first.host.source.translate(7, 0);
+  assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+  assertBounds(first.records[0].marker.geometricBounds, markerBefore.map((v, i) => i % 2 === 0 ? v + 7 : v));
+});
+
 test('UUID tracking resolves only registered artwork during idle validation and geometry changes', () => {
   const { host, records: [{ marker, mask }] } = trackedFixture(2, true);
   const output = [...mask.geometricBounds];
@@ -643,6 +769,28 @@ function undoFixture(uuidSupport = false) {
     };
   };
   return { host, key, snapshot };
+}
+
+for (const target of ['source', 'marker', 'zoom', 'delete'] as const) {
+  test(`selection-triggered first ${target} edit keeps paired undo and redo`, () => {
+    const { host, key, snapshot } = undoFixture(true);
+    const reader = host.forkHost();
+    const item = target === 'source' ? host.source
+      : target === 'marker' ? host.find('ILST_ZOOM_MARKER_', key)
+      : host.find('ILST_ZOOM_ITEM_', key);
+    host.document.selection = [item];
+    reader.call('syncSelectedZoomTracker');
+    const before = snapshot();
+    host.userEdit(() => target === 'delete' ? item.remove() : item.translate(20, -10));
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    const after = snapshot();
+    host.nativeUndo();
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    assert.deepEqual(snapshot(), before);
+    host.nativeRedo();
+    assert.equal(reader.call('syncSelectedZoomTracker').data, 'OK');
+    assert.deepEqual(snapshot(), after);
+  });
 }
 
 for (const change of ['move', 'delete']) {

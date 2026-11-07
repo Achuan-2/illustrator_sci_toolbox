@@ -444,11 +444,11 @@ export const actions = {
       const refresh = zoomRefreshRequested;
       zoomRefreshRequested = false;
       zoomSyncPending = bridge
-        .callBackground('syncZoomTracker', refresh)
+        .callBackground('syncSelectedZoomTracker', refresh)
         .then((result) => {
           // A foreground command took priority; retry invalidation next time.
           if (result === undefined) zoomRefreshRequested ||= refresh;
-          return result;
+          return result === undefined ? 'RETRY' : result;
         })
         .catch(() => {
           zoomRefreshRequested ||= refresh;
