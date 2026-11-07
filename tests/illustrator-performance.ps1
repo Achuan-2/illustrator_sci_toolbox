@@ -28,6 +28,7 @@ $taskTemp = Join-Path ([IO.Path]::GetTempPath()) ('sci-performance-' + [guid]::N
 $taskLegacyPath = Join-Path $taskTemp 'legacy.jsx'
 $taskLegacyScalePath = Join-Path $taskTemp 'legacy-scalebar.jsx'
 $taskImagePath = Join-Path $taskTemp 'imagej.tif'
+$taskAiPath = Join-Path $taskTemp 'uuid-roundtrip.ai'
 Push-Location -LiteralPath $taskRoot
 try {
     $taskLegacy = & git show "${LegacyRevision}:src/jsx/ilst/arrange.jsx"
@@ -45,6 +46,7 @@ $taskConfig = @{
     legacyPath = $taskLegacyPath.Replace('\', '/')
     legacyScalePath = $taskLegacyScalePath.Replace('\', '/')
     imagePath = $taskImagePath.Replace('\', '/')
+    aiPath = $taskAiPath.Replace('\', '/')
     legacyRevision = $LegacyRevision
     sizes = $ArtworkCounts
     skipLegacy = [bool]$SkipLegacy
@@ -63,8 +65,14 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
     scaleCode = scaleCode.replace('} catch (error) { return sciError(String(error.message)); }',
         '} catch (error) { return sciError(String(error.message) + " at host line " + error.line + " target " + (targets[0] ? targets[0].typename : "none")); }');
     function makeApi(code, scale) {
+        // Count whole-document discovery in a test-only source copy so the
+        // native UUID path is verified independently of elapsed-time noise.
+        code="var sciPerformanceScans=0;\n"+code.replace(
+            "var index = createZoomTrackingIndex(doc), tags = doc.tags;",
+            "sciPerformanceScans++;var index = createZoomTrackingIndex(doc), tags = doc.tags;");
         return new Function("JSON", code + scale +
             ";return {sync:syncZoomTracker,index:readCurrentZoomRecords,tag:addTag," +
+            "scanCount:function(){return sciPerformanceScans;}," +
             "apply:applyZoomImages,inspectScale:inspectScalebar,applyScale:applyScalebar,token:typeof scaleTargetToken==='function'?scaleTargetToken:null," +
             "find:findItemByTag,bounds:getVisibleBounds,state:captureZoomTrackingState,history:restoreZoomTrackingHistory,writeFov:scaleWriteFov};")(JSON);
     }
@@ -132,6 +140,7 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
             return current.index(doc);
         }
         createZooms(1);
+        if(!config.skipLegacy) assert(legacy.sync(true)==="OK","Baseline editor notification");
         measure("oneZoomIdle/current",function(){sync(current);},20);
         if(!config.skipLegacy) measure("oneZoomIdle/beforeOptimization",function(){sync(legacy);},5);
         // Moving the source must keep its zoom output fixed while the marker follows.
@@ -145,10 +154,17 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
         checks.push("native source movement preserves zoom output");
         measure("oneZoomMove/current",function(){source.translate(1,0);sync(current);},10);
         createZooms(20);
+        if(!config.skipLegacy) assert(legacy.sync(true)==="OK","Baseline editor notification");
         measure("manyZoomsIdle/current",function(){sync(current);},20);
         if(!config.skipLegacy) measure("manyZoomsIdle/beforeOptimization",function(){sync(legacy);},20);
         measure("manyZoomsDiscovery/current",function(){assert(current.sync(true)==="OK","Forced discovery failed");},5);
-        measure("manyZoomsIndex/current",function(){current.index(doc);},20);
+        var scansBefore=current.scanCount();
+        measure("manyZoomsUuidIndex/current",function(){current.index(doc);},20);
+        if(doc.getPageItemFromUuid) {
+            assert(current.scanCount()===scansBefore,"UUID validation unexpectedly scanned the document");
+            checks.push("native UUID validation performs zero full scans");
+        }
+        measure("manyZoomsFullScan/current",function(){current.index(doc,true);},5);
         var profilingIndex=current.index(doc);
         measure("manyZoomsSnapshot/current",function(){current.state(profilingIndex);},20);
         measure("manyZoomsHistory/current",function(){current.history(doc,profilingIndex);},20);
@@ -167,6 +183,30 @@ $taskScript = '(function(){var config=' + $taskConfig + ';' + @'
         var payload=JSON.stringify({token:info.token,fov:info.fov,options:scaleOptions,autoSave:true});
         measure("scaleAutosave/current",function(){var output=current.applyScale(payload);assert(output==="OK","Scalebar autosave failed: " + output);},5);
         checks.push("native scalebar autosave by UUID");
+        if(doc.getPageItemFromUuid) {
+            var sourceUuid=source.uuid, copy=source.duplicate();
+            assert(copy.uuid!==sourceUuid,"A duplicate must receive its own native UUID");
+            copy.remove();
+            checks.push("native duplicates have distinct UUIDs");
+            var options=new IllustratorSaveOptions();options.pdfCompatible=false;
+            doc.saveAs(new File(config.aiPath),options);
+            doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;
+            doc=app.open(new File(config.aiPath));
+            var stableUuid=false;
+            try {
+                var restored=doc.getPageItemFromUuid(sourceUuid);
+                stableUuid=restored.uuid===sourceUuid;
+            } catch(uuidRemapped) {}
+            sync(current);
+            var reopened=current.index(doc), recordCount=0;
+            for(var reopenedKey in reopened.records) recordCount++;
+            assert(recordCount===21,"Saved zoom associations must survive file reopening");
+            scansBefore=current.scanCount();
+            current.index(doc);
+            assert(current.scanCount()===scansBefore,"Reopened UUID registry unexpectedly scanned the document");
+            checks.push(stableUuid?"native UUID persists through AI save/reopen":"native UUID remapped; cold discovery recovered saved associations");
+            checks.push("native document registry rebuilt after AI save/reopen");
+        }
         result={ok:true,illustratorVersion:app.version,legacyRevision:config.legacyRevision,rows:rows,checks:checks};
     } catch(error) {result={ok:false,error:String(error),line:error.line,rows:rows,checks:checks};}
     finally {
@@ -187,8 +227,18 @@ try {
     $taskParsed = ConvertFrom-Json -InputObject $taskResult
     if (!$taskParsed.ok) { throw "Illustrator performance test failed: $($taskParsed.error)" }
 } finally {
-    foreach ($taskFile in @($taskLegacyPath, $taskLegacyScalePath, $taskImagePath)) {
+    foreach ($taskFile in @($taskLegacyPath, $taskLegacyScalePath, $taskImagePath, $taskAiPath)) {
         if (Test-Path -LiteralPath $taskFile) { Remove-Item -LiteralPath $taskFile }
     }
-    if (Test-Path -LiteralPath $taskTemp) { Remove-Item -LiteralPath $taskTemp }
+    if (Test-Path -LiteralPath $taskTemp) {
+        # Illustrator can leave ~ai-*.tmp beside the disposable AI fixture.
+        # Validate the exact generated directory before recursive cleanup.
+        $taskCleanup = [IO.Path]::GetFullPath($taskTemp)
+        $taskTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+        if ([IO.Path]::GetDirectoryName($taskCleanup) -ne $taskTempRoot -or
+            [IO.Path]::GetFileName($taskCleanup) -notmatch '^sci-performance-[a-f0-9]{32}$') {
+            throw "Unexpected performance fixture path: $taskCleanup"
+        }
+        Remove-Item -LiteralPath $taskCleanup -Recurse -Force -ErrorAction Stop
+    }
 }

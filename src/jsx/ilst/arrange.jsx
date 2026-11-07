@@ -2246,6 +2246,7 @@ function findItemByTag(doc, name) {
 
 function clearZoomSessionTags(doc) {
     _zoomTrackingIndex = null;
+    invalidateZoomDocumentRegistry(doc);
     var tags = doc.tags, sessionTags = [];
     for (var i = 0, count = tags.length; i < count; i++) {
         var tag = tags[i];
@@ -2698,6 +2699,7 @@ function applyZoomImages(payloadJson) {
         _zoomTrackedGroups = [];
         _zoomTrackedDocName = null;
         _zoomTrackedDocument = null;
+        invalidateZoomDocumentRegistry(doc);
         resetZoomTrackingHistory();
     }
     return "Success";
@@ -2940,6 +2942,9 @@ var _zoomHistoryPictures = {};
 var _zoomHistoryTag = "ILST_ZOOM_UNDO";
 var _zoomTrackingIndex = null;
 var _zoomNextDiscovery = 0;
+// UUIDs are native artwork identities; record keys in tags identify relations.
+// Keep a separate registry per open native document, including same-named files.
+var _zoomDocumentRegistries = [];
 
 function resetZoomTrackingHistory() {
     _zoomTrackingIndex = null;
@@ -2952,7 +2957,7 @@ function resetZoomTrackingHistory() {
 function zoomItemInIndex(index, item, allowUntagged) {
     if (!item) return false;
     for (var i = 0; item && i < index.items.length; i++) {
-        if (index.items[i] === item) return true;
+        if (sameZoomNativeObject(index.items[i], item)) return true;
     }
     if (!allowUntagged) return false;
     // Cleanup can remove a source's last tag before the undo transaction has
@@ -2964,7 +2969,7 @@ function zoomItemInIndex(index, item, allowUntagged) {
         for (var j = 0, count = items.length; j < count; j++) index.untaggedItems.push(items[j]);
     }
     for (var j = 0; j < index.untaggedItems.length; j++) {
-        if (index.untaggedItems[j] === item) return true;
+        if (sameZoomNativeObject(index.untaggedItems[j], item)) return true;
     }
     return false;
 }
@@ -3073,7 +3078,7 @@ function restoreZoomTrackingHistory(doc, index) {
         if (sameZoomTrackingState(state, undo.beforeAuto)) {
             if (!undo.blocked && undo.beforeUser && typeof app.undo === "function") {
                 app.undo();
-                var restored = readCurrentZoomRecords(doc);
+                var restored = readCurrentZoomRecords(doc, true);
                 if (sameZoomTrackingState(captureZoomTrackingState(restored), undo.beforeUser)) {
                     _zoomRedoHistory.push(_zoomUndoHistory.pop());
                     rebindZoomTrackingHistory(doc, restored);
@@ -3101,7 +3106,7 @@ function restoreZoomTrackingHistory(doc, index) {
             if (token === redo.beforeToken && sameZoomTrackingState(state, redo.beforeAuto)) {
                 if (!redo.redoBlocked && typeof app.redo === "function") {
                     app.redo();
-                    var restored = readCurrentZoomRecords(doc);
+                    var restored = readCurrentZoomRecords(doc, true);
                     if (sameZoomTrackingState(captureZoomTrackingState(restored), redo.afterAuto)) {
                         _zoomUndoHistory.push(_zoomRedoHistory.pop());
                         rebindZoomTrackingHistory(doc, restored);
@@ -3229,37 +3234,124 @@ function readZoomTrackingRecord(key, picture, marker, zoom, recordValue) {
     };
 }
 
-function readCurrentZoomRecords(doc) {
-    var index = { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [], document: doc, editing: false, hasRecords: false };
-    // Document.tags includes nested artwork. Scanning its live parents avoids
-    // visiting thousands of unrelated paths on every 400 ms background poll,
-    // while still detecting replacements and objects restored by native undo.
-    var tags = doc.tags;
-    for (var t = 0, count = tags.length; t < count; t++) {
-        var tag = tags[t];
-        var name = tag.name;
-        if (name.indexOf("ILST_ZOOM_") !== 0) continue;
-        var item = tag.parent;
-        index.items.push(item);
-        if (name === "ILST_ZOOM_ACTIVE_TARGET") {
-            index.editing = true;
-        } else if (name.indexOf("ILST_ZOOM_ITEM_") === 0) {
-            index.records[name.substring(15)] = { zoom: item, value: tag.value };
-            index.hasRecords = true;
-        } else if (name.indexOf("ILST_ZOOM_SRC_") === 0) {
-            index.pictures[name.substring(14)] = item;
-            index.keys[name.substring(14)] = true;
-        } else if (name.indexOf("ILST_ZOOM_MARKER_") === 0) {
-            index.markers[name.substring(17)] = item;
-            index.keys[name.substring(17)] = true;
-        } else if (name.indexOf("ILST_ZOOM_GUIDE1_") === 0) {
-            index.guides1[name.substring(17)] = item;
-            index.keys[name.substring(17)] = true;
-        } else if (name.indexOf("ILST_ZOOM_GUIDE2_") === 0) {
-            index.guides2[name.substring(17)] = item;
-            index.keys[name.substring(17)] = true;
-        }
+function createZoomTrackingIndex(doc) {
+    return { records: {}, pictures: {}, markers: {}, guides1: {}, guides2: {}, keys: {}, items: [], document: doc, editing: false, hasRecords: false };
+}
+
+function indexZoomTag(index, tag) {
+    var name = tag.name;
+    if (name.indexOf("ILST_ZOOM_") !== 0) return;
+    var item = tag.parent;
+    index.items.push(item);
+    if (name === "ILST_ZOOM_ACTIVE_TARGET") {
+        index.editing = true;
+    } else if (name.indexOf("ILST_ZOOM_ITEM_") === 0) {
+        index.records[name.substring(15)] = { zoom: item, value: tag.value };
+        index.hasRecords = true;
+    } else if (name.indexOf("ILST_ZOOM_SRC_") === 0) {
+        index.pictures[name.substring(14)] = item;
+        index.keys[name.substring(14)] = true;
+    } else if (name.indexOf("ILST_ZOOM_MARKER_") === 0) {
+        index.markers[name.substring(17)] = item;
+        index.keys[name.substring(17)] = true;
+    } else if (name.indexOf("ILST_ZOOM_GUIDE1_") === 0) {
+        index.guides1[name.substring(17)] = item;
+        index.keys[name.substring(17)] = true;
+    } else if (name.indexOf("ILST_ZOOM_GUIDE2_") === 0) {
+        index.guides2[name.substring(17)] = item;
+        index.keys[name.substring(17)] = true;
     }
+}
+
+function sameZoomNativeObject(first, second) {
+    // Illustrator can throw even on identity comparison with a native handle
+    // whose document was closed or whose artwork was deleted.
+    try { return first === second; } catch (invalidReference) { return false; }
+}
+
+function invalidateZoomDocumentRegistry(doc) {
+    for (var i = _zoomDocumentRegistries.length - 1; i >= 0; i--) {
+        if (sameZoomNativeObject(_zoomDocumentRegistries[i].document, doc)) _zoomDocumentRegistries.splice(i, 1);
+    }
+}
+
+function findZoomDocumentRegistry(doc) {
+    var found = null;
+    // Release closed documents without ever enumerating their artwork.
+    for (var i = _zoomDocumentRegistries.length - 1; i >= 0; i--) {
+        var registry = _zoomDocumentRegistries[i], open = false;
+        for (var d = 0; d < app.documents.length; d++) {
+            if (sameZoomNativeObject(app.documents[d], registry.document)) { open = true; break; }
+        }
+        if (!open) _zoomDocumentRegistries.splice(i, 1);
+        else if (sameZoomNativeObject(registry.document, doc)) found = registry;
+    }
+    return found;
+}
+
+function rememberZoomDocumentIndex(doc, index) {
+    invalidateZoomDocumentRegistry(doc);
+    try {
+        if (!doc.getPageItemFromUuid) return;
+        var nodes = [], seen = {};
+        for (var i = 0; i < index.items.length; i++) {
+            var item = index.items[i], uuid = item.uuid;
+            if (!uuid) return; // Older hosts retain the tag-based fallback.
+            if (seen[uuid]) continue;
+            seen[uuid] = true;
+            var names = {}, hint = null, tags = item.tags;
+            for (var t = 0, count = tags.length; t < count; t++) {
+                var name = tags[t].name;
+                if (name.indexOf("ILST_ZOOM_") !== 0) continue;
+                names[name] = true;
+                if (!hint) hint = name;
+            }
+            if (hint) nodes.push({ uuid: uuid, hint: hint, names: names, typename: item.typename });
+        }
+        _zoomDocumentRegistries.push({ document: doc, nodes: nodes });
+    } catch (unsupportedUuid) {} // Optional optimization, not a host requirement.
+}
+
+function readZoomUuidIndex(doc, registry) {
+    var index = createZoomTrackingIndex(doc);
+    try {
+        for (var i = 0; i < registry.nodes.length; i++) {
+            var node = registry.nodes[i];
+            var nativeItem = doc.getPageItemFromUuid(node.uuid);
+            if (!nativeItem || nativeItem.uuid !== node.uuid) return null;
+            // UUID lookup can return a wrongly typed PageItem wrapper. As in
+            // the scalebar code, its tag parent restores the typed native item.
+            var item = nativeItem.tags.getByName(node.hint).parent;
+            if (item.uuid !== node.uuid || item.typename !== node.typename) return null;
+            var tags = item.tags;
+            for (var t = 0, count = tags.length; t < count; t++) {
+                var tag = tags[t], name = tag.name;
+                if (name.indexOf("ILST_ZOOM_") !== 0) continue;
+                // New relations can add other, as-yet unregistered objects.
+                // Session and history tags are local to known objects.
+                if (!node.names[name] && name !== "ILST_ZOOM_UNDO" &&
+                    name !== "ILST_ZOOM_ACTIVE_TARGET" && name !== "ILST_ZOOM_ACTIVE_MANUAL") return null;
+                indexZoomTag(index, tag);
+            }
+        }
+    } catch (invalidUuid) {
+        // Deletion, replacement and undo can invalidate UUIDs or tag hints.
+        return null;
+    }
+    return index;
+}
+
+function readCurrentZoomRecords(doc, forceScan) {
+    var registry = findZoomDocumentRegistry(doc);
+    if (!forceScan && registry) {
+        var registered = readZoomUuidIndex(doc, registry);
+        if (registered) return registered;
+    }
+    // Initial discovery, explicit edits and invalid registries rebuild once.
+    // Normal geometry updates and periodic validation use registered UUIDs.
+    var index = createZoomTrackingIndex(doc), tags = doc.tags;
+    for (var t = 0, count = tags.length; t < count; t++) indexZoomTag(index, tags[t]);
+    rememberZoomDocumentIndex(doc, index);
     return index;
 }
 
@@ -3310,6 +3402,7 @@ function zoomTrackingHistoryChanged() {
 function syncZoomTracker(forceRefresh) {
     if (app.documents.length === 0) {
         _zoomTrackingIndex = null;
+        _zoomDocumentRegistries = [];
         return sciError("errors.noDocument");
     }
     var doc = app.activeDocument;
@@ -3317,7 +3410,7 @@ function syncZoomTracker(forceRefresh) {
     // Background polling must not rewrite the artwork behind its preview.
     var docName = "";
     try { docName = doc.name; } catch (e) { return "OK"; }
-    if (_zoomTrackedDocument !== doc || _zoomTrackedDocName !== docName) {
+    if (!sameZoomNativeObject(_zoomTrackedDocument, doc) || _zoomTrackedDocName !== docName) {
         _zoomTrackedDocument = doc;
         _zoomTrackedDocName = docName;
         _zoomTrackedGroups = [];
@@ -3344,7 +3437,7 @@ function syncZoomTracker(forceRefresh) {
         }
     }
     var scanStart = new Date().getTime();
-    var index = readCurrentZoomRecords(doc);
+    var index = readCurrentZoomRecords(doc, forceRefresh || historyChanged);
     _zoomTrackingIndex = index;
     // Expensive documents get a longer discovery interval (at most 30 s).
     var scanEnd = new Date().getTime();

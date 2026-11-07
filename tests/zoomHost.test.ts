@@ -8,8 +8,9 @@ const hostSource = fs.readFileSync('dist/cep/jsx/index.js', 'utf8');
 
 // Model Illustrator's tag-name limit, inherited tags, nested clipping and
 // transforms about uncropped bounds. Pixel rendering needs the real host.
-function fixture(strokedPosition = false, undoSupport = false) {
+function fixture(strokedPosition = false, undoSupport = false, uuidSupport = false) {
   let time = Date.now();
+  let nextUuid = 0, uuidLookups = 0;
   const items: any[] = [];
   let transformCalls = 0;
   let selectionOrder: any[] = [];
@@ -203,6 +204,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
       }
     };
     artwork.tags = tags(artwork);
+    if (uuidSupport) Object.defineProperty(artwork, 'uuid', { value: `native-${++nextUuid}` });
     if (type === 'GroupItem') {
       artwork.pageItems = [];
       artwork.pathItems = paths(artwork);
@@ -259,6 +261,16 @@ function fixture(strokedPosition = false, undoSupport = false) {
       for (const artwork of selectionOrder) artwork.selected = true;
     }
   };
+  if (uuidSupport) Object.assign(document, {
+    getPageItemFromUuid(uuid: string) {
+      uuidLookups++;
+      const artwork = items.find((candidate) => candidate.uuid === uuid);
+      if (!artwork) throw new Error('UUID is not in this document');
+      // Reproduce the host bug: the generic wrapper lies about its subtype.
+      // Reading a tag's parent must recover the original typed artwork.
+      return { uuid, typename: 'GroupItem', tags: artwork.tags };
+    }
+  });
   layer.parent = document;
   document.selection = [source];
   const undoStack: any[] = [], redoStack: any[] = [];
@@ -341,8 +353,8 @@ function fixture(strokedPosition = false, undoSupport = false) {
     };
     return {
       reload, call, apply, inspect,
-      activateDocument(document: any) {
-        context.app.documents = document ? [document] : [];
+      activateDocument(document: any, openDocuments = document ? [document] : []) {
+        context.app.documents = openDocuments;
         context.app.activeDocument = document;
       }
     };
@@ -366,6 +378,7 @@ function fixture(strokedPosition = false, undoSupport = false) {
     nativeRedo,
     get undoCalls() { return undoCalls; },
     get redoCalls() { return redoCalls; },
+    get uuidLookups() { return uuidLookups; },
     get transformCalls() { return transformCalls; }
   };
 }
@@ -392,8 +405,8 @@ function assertBounds(actual: number[], expected: number[]) {
   }
 }
 
-function trackedFixture(count = 1) {
-  const host = fixture();
+function trackedFixture(count = 1, uuidSupport = false) {
+  const host = fixture(false, false, uuidSupport);
   host.apply(Array.from({ length: count }, (_, i) => ({
     ...entry(i), addGuideLines: true, guideLineExtent: 'acrossImages'
   })));
@@ -406,6 +419,101 @@ function trackedFixture(count = 1) {
   assert.equal(host.call('syncZoomTracker').data, 'OK');
   return { host, records };
 }
+
+test('UUID tracking resolves only registered artwork during idle validation and geometry changes', () => {
+  const { host, records: [{ marker, mask }] } = trackedFixture(2, true);
+  const output = [...mask.geometricBounds];
+  for (const name of ['tags', 'pageItems']) {
+    Object.defineProperty(host.document, name, {
+      get() { throw new Error(`UUID tracking must not enumerate document.${name}`); }
+    });
+  }
+  host.advanceTime(5001);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  host.source.translate(10, 0);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(marker.geometricBounds, [20, 90, 30, 80]);
+  marker.translate(5, -5);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  host.source.resize(120, 140);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(mask.geometricBounds, output);
+  assert.ok(host.uuidLookups > 0, 'Native lookups also handle wrongly typed UUID wrappers');
+});
+
+test('same-named open documents keep independent UUID registries without scanning on return', () => {
+  const { host: first, records: [{ marker }] } = trackedFixture(1, true);
+  const { host: second } = trackedFixture(1, true);
+  const documents = [first.document, second.document];
+  first.activateDocument(second.document, documents);
+  assert.equal(first.call('syncZoomTracker').data, 'OK');
+  for (const host of [first, second]) {
+    Object.defineProperty(host.document, 'tags', {
+      get() { throw new Error('Returning to an indexed document must not rebuild document.tags'); }
+    });
+  }
+  first.activateDocument(first.document, documents);
+  assert.equal(first.call('syncZoomTracker').data, 'OK');
+  first.source.translate(10, 0);
+  assert.equal(first.call('syncZoomTracker').data, 'OK');
+  assertBounds(marker.geometricBounds, [20, 90, 30, 80]);
+  first.activateDocument(second.document, documents);
+  assert.equal(first.call('syncZoomTracker').data, 'OK');
+  assertBounds(second.source.geometricBounds, [0, 100, 100, 0]);
+});
+
+test('a missing UUID rebuilds membership once before cleaning a deleted zoom', () => {
+  const { host, records: [{ key, zoom }] } = trackedFixture(1, true);
+  const readTags = Object.getOwnPropertyDescriptor(host.document, 'tags')!.get!;
+  let scans = 0;
+  Object.defineProperty(host.document, 'tags', {
+    get() { scans++; return readTags.call(host.document); }
+  });
+  zoom.remove();
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assert.ok(scans > 0, 'Deletion is validated against the live document before cleanup');
+  assert.equal(host.find('ILST_ZOOM_MARKER_', key), undefined);
+  const previous = scans;
+  host.advanceTime(86400000);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assert.equal(scans, previous, 'An empty document remains parked after registry recovery');
+});
+
+test('a new relation on a registered source triggers recovery before orphan cleanup', () => {
+  const { host, records: [{ key: originalKey }] } = trackedFixture(1, true);
+  const editor = host.forkHost();
+  editor.inspect(host.source);
+  editor.apply([entry(1)]);
+  const created = host.document.selection[0];
+  const key = created.tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
+  host.advanceTime(5001); // The editor notification was missed.
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  host.source.translate(10, 0);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assert.ok(host.find('ILST_ZOOM_MARKER_', originalKey));
+  assertBounds(host.find('ILST_ZOOM_MARKER_', key).geometricBounds, [40, 90, 50, 80]);
+});
+
+test('UUID lookup sees editor session tags added to a registered source and leaves its artwork alone', () => {
+  const { host, records: [{ marker }] } = trackedFixture(1, true);
+  const before = [...marker.geometricBounds];
+  const editor = host.forkHost();
+  editor.inspect(host.source);
+  host.source.translate(10, 0);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(marker.geometricBounds, before);
+});
+
+test('a host that throws on unsupported UUID properties retains tag-based tracking', () => {
+  const { host, records: [{ marker }] } = trackedFixture();
+  Object.defineProperty(host.document, 'getPageItemFromUuid', {
+    get() { throw new Error('Unsupported host property'); }
+  });
+  host.call('syncZoomTracker', [true]);
+  host.source.translate(10, 0);
+  assert.equal(host.call('syncZoomTracker').data, 'OK');
+  assertBounds(marker.geometricBounds, [20, 90, 30, 80]);
+});
 
 for (const hasZoom of [false, true]) {
   test(`background tracking avoids unrelated artwork with ${hasZoom ? 'an existing zoom' : 'no zooms'}`, () => {
@@ -517,8 +625,8 @@ test('an editor notification wakes an empty document after the first zoom is cre
   assertBounds(host.find('ILST_ZOOM_MARKER_', key).geometricBounds, [30, 80, 40, 70]);
 });
 
-function undoFixture() {
-  const host = fixture(false, true);
+function undoFixture(uuidSupport = false) {
+  const host = fixture(false, true, uuidSupport);
   host.apply([{ ...entry(0), addGuideLines: true, guideLineExtent: 'acrossImages' }]);
   const key = host.document.selection[0].tags[0].name.substring('ILST_ZOOM_ITEM_'.length);
   host.call('syncZoomTracker');
@@ -535,6 +643,25 @@ function undoFixture() {
     };
   };
   return { host, key, snapshot };
+}
+
+for (const change of ['move', 'delete']) {
+  test(`UUID tracking preserves undo and redo after a source ${change}`, () => {
+    const { host, key, snapshot } = undoFixture(true);
+    const before = snapshot();
+    host.userEdit(() => {
+      if (change === 'move') host.source.translate(20, -10);
+      else host.find('ILST_ZOOM_ITEM_', key).remove();
+    });
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    const after = snapshot();
+    host.nativeUndo();
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    assert.deepEqual(snapshot(), before);
+    host.nativeRedo();
+    assert.equal(host.call('syncZoomTracker').data, 'OK');
+    assert.deepEqual(snapshot(), after);
+  });
 }
 
 test('one undo and redo restore the user source move together with its automatic marker and guide update', () => {
@@ -1127,8 +1254,9 @@ test('background tracking does not rewrite source rectangles while their editor 
   editor.call('cancelZoomTarget');
 });
 
-test('a readable stale native object cannot restore old guide positions after another panel confirms', () => {
-  const host = fixture();
+for (const uuidSupport of [false, true]) {
+test(`a readable stale native object cannot overwrite confirmed guides with ${uuidSupport ? 'UUID' : 'legacy'} tracking`, () => {
+  const host = fixture(false, false, uuidSupport);
   host.apply([
     { ...entry(0), addGuideLines: true, guideLineExtent: 'acrossImages' }
   ]);
@@ -1151,6 +1279,7 @@ test('a readable stale native object cannot restore old guide positions after an
   for (let i = 0; i < 4; i++) host.call('syncZoomTracker');
   assert.deepEqual(host.find('ILST_ZOOM_GUIDE1_', key).points, confirmed);
 });
+}
 
 test('refreshing guides to a moved zoom still clips the inside-source mode to the original image', () => {
   const host = fixture();
