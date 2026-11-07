@@ -134,7 +134,9 @@
         style="flex: 0 0 auto; padding: 6px 10px;"
         onclick={actions.undoLabelIndex}>↶</button
       >
-
+    </div>
+    <div class="input-group">
+      <label for="auto-update-index">{$t('labels.autoIndex')}</label>
       <input
         type="checkbox"
         id="auto-update-index"

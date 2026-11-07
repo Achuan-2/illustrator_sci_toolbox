@@ -188,6 +188,7 @@
   "labels.template": "Label Template:",
   "labels.index": "Label Index",
   "labels.undoIndexHint": "Undo to previous label index",
+  "labels.autoIndex": "Auto-update label index",
   "labels.autoIndexHint": "Update automatically",
   "labels.preview": "Preview:",
   "labels.selectText": "Select Only Text",

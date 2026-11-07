@@ -188,6 +188,7 @@
   "labels.template": "标签模板：",
   "labels.index": "标签编号",
   "labels.undoIndexHint": "撤销至上一个标签编号",
+  "labels.autoIndex": "自动更新编号",
   "labels.autoIndexHint": "自动更新编号",
   "labels.preview": "预览：",
   "labels.selectText": "仅选择文本",
