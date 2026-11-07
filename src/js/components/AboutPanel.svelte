@@ -2,10 +2,12 @@
   import { t } from '../i18n';
   import { openExternal } from '../services/cep';
   import donationImage from '../../icons/donate.webp';
+  import { version } from '../../../package.json';
 </script>
 
 <div class="panel active" id="panel-about">
   <h3>{$t('about.title')}</h3>
+  <p>{$t('about.version', { version })}</p>
   <p>{$t('about.author')}</p>
   <p>
     <span>{$t('about.github')}</span>

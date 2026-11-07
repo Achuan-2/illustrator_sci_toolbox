@@ -221,6 +221,7 @@
   "about.github": "GitHub:",
   "about.donation": "Like this plugin? Feel free to support my work with a donation.",
   "about.donationAlt": "Donation QR code",
+  "about.version": "Version: v{version}",
   "errors.prefix": "Error: ",
   "errors.script": "Error executing the script.",
   "errors.scriptNamed": "Error executing the {script} script.",

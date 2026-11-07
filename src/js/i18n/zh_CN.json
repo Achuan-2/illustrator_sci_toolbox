@@ -221,6 +221,7 @@
   "about.github": "GitHub：",
   "about.donation": "喜欢这个插件？欢迎打赏支持我的开发。",
   "about.donationAlt": "打赏二维码",
+  "about.version": "当前版本：v{version}",
   "errors.prefix": "错误：",
   "errors.script": "执行脚本时出错。",
   "errors.scriptNamed": "执行 {script} 脚本时出错。",
