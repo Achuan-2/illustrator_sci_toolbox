@@ -137,7 +137,7 @@
   "arrange.update": "Update Layout",
   "spacing.even": "Even Spacing",
   "alignment.title": "Align Objects",
-  "alignment.hint": "Align to the overall bounds of the selection. Select at least two objects.",
+  "alignment.hint": "Use Illustrator's native alignment and its current key object, selection or artboard reference. Select multiple objects, then click one again without Shift to make it the key object.",
   "alignment.left": "Horizontal Align Left",
   "alignment.horizontalCenter": "Horizontal Align Center",
   "alignment.right": "Horizontal Align Right",

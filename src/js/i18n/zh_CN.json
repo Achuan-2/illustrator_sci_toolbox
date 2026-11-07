@@ -137,7 +137,7 @@
   "arrange.update": "更新排布",
   "spacing.even": "等间距分布",
   "alignment.title": "对齐对象",
-  "alignment.hint": "以选中对象的整体边界为基准对齐，至少选择两个对象。",
+  "alignment.hint": "使用 Illustrator 原生对齐，遵循当前关键对象、选区或画板设置。多选后不按 Shift 再单击一个对象，可将其设为关键对象。",
   "alignment.left": "水平居左对齐",
   "alignment.horizontalCenter": "水平居中对齐",
   "alignment.right": "水平居右对齐",

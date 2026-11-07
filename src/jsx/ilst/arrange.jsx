@@ -1591,7 +1591,7 @@ function swapSelectedPositions(corner) {
     return "Success";
 }
 
-// A shared anchor definition keeps alignment and distribution consistent.
+// Edge and center coordinates for the custom distribution controls.
 function getArrangementAnchor(info, mode) {
     if (mode === "horizontalCenter") return (info.left + info.right) / 2;
     if (mode === "verticalCenter") return (info.top + info.bottom) / 2;
@@ -1603,7 +1603,7 @@ function isArrangementMode(mode) {
         mode === "top" || mode === "verticalCenter" || mode === "bottom";
 }
 
-/** Align against a snapshot of the selection bounds, without resizing items. */
+/** Preserve Illustrator's active reference, including its native key object. */
 function alignObjects(mode) {
     if (app.documents.length === 0) return sciError("errors.noDocument");
     var selection = app.activeDocument.selection;
@@ -1612,30 +1612,21 @@ function alignObjects(mode) {
         return sciError("errors.invalidArrangementMode");
     }
 
-    var entries = [];
-    var bounds = { left: Infinity, top: -Infinity, right: -Infinity, bottom: Infinity };
-    for (var i = 0; i < selection.length; i++) {
-        var info = getVisibleInfo(selection[i]);
-        entries.push({ item: selection[i], info: info });
-        bounds.left = Math.min(bounds.left, info.left);
-        bounds.top = Math.max(bounds.top, info.top);
-        bounds.right = Math.max(bounds.right, info.right);
-        bounds.bottom = Math.min(bounds.bottom, info.bottom);
-    }
-
-    var horizontal = mode === "left" || mode === "horizontalCenter" || mode === "right";
-    for (var j = 0; j < entries.length; j++) {
-        var entry = entries[j];
-        var dx = 0, dy = 0;
-        if (mode === "center") {
-            dx = getArrangementAnchor(bounds, "horizontalCenter") - getArrangementAnchor(entry.info, "horizontalCenter");
-            dy = getArrangementAnchor(bounds, "verticalCenter") - getArrangementAnchor(entry.info, "verticalCenter");
-        } else {
-            var delta = getArrangementAnchor(bounds, mode) - getArrangementAnchor(entry.info, mode);
-            if (horizontal) dx = delta;
-            else dy = delta;
-        }
-        entry.item.translate(dx, dy);
+    var commands = {
+        left: "Horizontal Align Left",
+        horizontalCenter: "Horizontal Align Center",
+        right: "Horizontal Align Right",
+        top: "Vertical Align Top",
+        verticalCenter: "Vertical Align Center",
+        bottom: "Vertical Align Bottom"
+    };
+    // Reassigning selection, even to the same objects, clears the native key.
+    // Let Illustrator apply its own alignment reference and preview bounds.
+    if (mode === "center") {
+        app.executeMenuCommand(commands.horizontalCenter);
+        app.executeMenuCommand(commands.verticalCenter);
+    } else {
+        app.executeMenuCommand(commands[mode]);
     }
     return "Success";
 }

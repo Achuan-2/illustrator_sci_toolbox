@@ -33,7 +33,11 @@ function fixture(
   ]
 ) {
   const items = bounds.map(item);
-  const app = { documents: [{}], activeDocument: { selection: items } };
+  const nativeCommands: string[] = [];
+  const app = {
+    documents: [{}], activeDocument: { selection: items },
+    executeMenuCommand(command: string) { nativeCommands.push(command); }
+  };
   const context = vm.createContext({ $: {}, app });
   vm.runInContext(source, context);
   const call = (operation: string, mode: string) =>
@@ -43,7 +47,7 @@ function fixture(
         encodeURIComponent(JSON.stringify([mode]))
       )
     );
-  return { items, app, call };
+  return { items, app, call, nativeCommands };
 }
 
 function anchor(bounds: Bounds, mode: DistributionMode): number {
@@ -72,29 +76,43 @@ const targets: Record<DistributionMode, number> = {
   bottom: -90
 };
 
-for (const mode of [...Object.keys(targets), 'center'] as AlignmentMode[]) {
-  test(`alignment ${mode} uses selection bounds and preserves dimensions`, () => {
-    const { items, call } = fixture();
+const alignmentCommands: Record<AlignmentMode, string[]> = {
+  left: ['Horizontal Align Left'],
+  horizontalCenter: ['Horizontal Align Center'],
+  right: ['Horizontal Align Right'],
+  top: ['Vertical Align Top'],
+  verticalCenter: ['Vertical Align Center'],
+  bottom: ['Vertical Align Bottom'],
+  center: ['Horizontal Align Center', 'Vertical Align Center']
+};
+
+for (const mode of Object.keys(alignmentCommands) as AlignmentMode[]) {
+  test(`alignment ${mode} delegates to Illustrator without clearing its key object`, () => {
+    const { items, app, call, nativeCommands } = fixture();
     const before = items.map((entry) => [...entry.geometricBounds] as Bounds);
-    assert.deepEqual(call('alignObjects', mode), { ok: true, data: 'Success' });
-    items.forEach((entry, index) => {
-      const bounds = entry.geometricBounds;
-      assert.equal(bounds[2] - bounds[0], before[index][2] - before[index][0]);
-      assert.equal(bounds[1] - bounds[3], before[index][1] - before[index][3]);
-      if (mode === 'center') {
-        assert.equal(anchor(bounds, 'horizontalCenter'), 45);
-        assert.equal(anchor(bounds, 'verticalCenter'), 15);
-      } else {
-        assert.equal(anchor(bounds, mode), targets[mode]);
-        const horizontal = ['left', 'horizontalCenter', 'right'].includes(mode);
-        assert.equal(
-          bounds[horizontal ? 1 : 0],
-          before[index][horizontal ? 1 : 0]
-        );
-      }
+    // Illustrator stores the key outside the scripting DOM. Assigning the
+    // selection would discard it, even if the replacement contains the same items.
+    Object.defineProperty(app.activeDocument, 'selection', {
+      get: () => items,
+      set() { assert.fail('Native key object would be cleared'); }
     });
+    for (const entry of items) entry.translate = () => assert.fail('Alignment must use the native reference');
+    assert.deepEqual(call('alignObjects', mode), { ok: true, data: 'Success' });
+    assert.deepEqual(nativeCommands, alignmentCommands[mode]);
+    assert.equal(app.activeDocument.selection, items);
+    assert.deepEqual(items.map((entry) => entry.geometricBounds), before);
   });
 }
+
+test('failed native alignment returns an error without falling back to a different reference', () => {
+  const { items, app, call } = fixture();
+  const before = items.map((entry) => [...entry.geometricBounds]);
+  app.executeMenuCommand = () => { throw new Error('Native alignment unavailable'); };
+  const response = call('alignObjects', 'left');
+  assert.equal(response.ok, false);
+  assert.equal(response.error, 'errors.details');
+  assert.deepEqual(items.map((entry) => entry.geometricBounds), before);
+});
 
 for (const mode of Object.keys(targets) as DistributionMode[]) {
   test(`distribution ${mode} spaces anchors of differently sized objects evenly`, () => {
@@ -133,7 +151,7 @@ test('right-edge distribution sorts by right edges even when left-edge order dif
   assert.deepEqual(items[2].geometricBounds, [115, 80, 125, 60]);
 });
 
-test('equal anchors remain stable and clipping groups align using their clipping paths', () => {
+test('equal anchors remain stable and native alignment receives the original clipping group', () => {
   const equal = fixture([
     [0, 90, 20, 70],
     [0, 60, 10, 50],
@@ -146,7 +164,7 @@ test('equal anchors remain stable and clipping groups align using their clipping
     before
   );
 
-  const { app, items, call } = fixture();
+  const { app, items, call, nativeCommands } = fixture();
   const clip = Object.assign(item([30, 80, 50, 60]), { clipping: true });
   const group = {
     typename: 'GroupItem',
@@ -159,7 +177,8 @@ test('equal anchors remain stable and clipping groups align using their clipping
   // The host receives Illustrator PageItems, including groups.
   app.activeDocument.selection = [items[0], group] as unknown as typeof items;
   assert.equal(call('alignObjects', 'right').ok, true);
-  assert.equal(items[0].geometricBounds[2], 50);
+  assert.equal(app.activeDocument.selection[1], group);
+  assert.deepEqual(nativeCommands, ['Horizontal Align Right']);
   assert.deepEqual(clip.geometricBounds, [30, 80, 50, 60]);
 });
 
